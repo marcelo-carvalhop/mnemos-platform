@@ -1,8 +1,12 @@
 package br.com.flashcards.flashcards
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkRequest
@@ -18,11 +22,14 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val channelName = "br.com.mnemos/device_wifi"
     private val wifiPermissionRequestCode = 4703
+    private val wifiScanPermissionRequestCode = 4704
 
     private var callback: ConnectivityManager.NetworkCallback? = null
     private var boundNetwork: Network? = null
     private var pendingConnect: Pair<String, String>? = null
     private var pendingResult: MethodChannel.Result? = null
+    private var pendingScanResult: MethodChannel.Result? = null
+    private var scanReceiver: BroadcastReceiver? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -37,27 +44,37 @@ class MainActivity : FlutterActivity() {
                     result.success(null)
                 }
                 "currentSsid" -> result.success(currentSsid())
+                "scanNetworks" -> scanNetworks(result)
                 else -> result.notImplemented()
             }
         }
     }
 
-    private fun requiredWifiPermission(): String? = when {
+    private fun requiredConnectPermissions(): Array<String> = when {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
-            Manifest.permission.NEARBY_WIFI_DEVICES
+            arrayOf(Manifest.permission.NEARBY_WIFI_DEVICES)
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
-            Manifest.permission.ACCESS_FINE_LOCATION
-        else -> null
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        else -> emptyArray()
     }
 
-    private fun hasWifiRuntimePermission(): Boolean {
-        val permission = requiredWifiPermission() ?: return true
-        return checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+    private fun requiredScanPermissions(): Array<String> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return emptyArray()
+        val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions += Manifest.permission.NEARBY_WIFI_DEVICES
+        }
+        return permissions.toTypedArray()
     }
+
+    private fun missingPermissions(permissions: Array<String>): Array<String> =
+        permissions.filter { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }.toTypedArray()
+
+    private fun hasConnectPermission(): Boolean = missingPermissions(requiredConnectPermissions()).isEmpty()
 
     @Suppress("DEPRECATION")
     private fun currentSsid(): String? {
-        if (!hasWifiRuntimePermission()) return null
+        if (!hasConnectPermission()) return null
         return try {
             val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             val raw = wifi.connectionInfo?.ssid ?: return null
@@ -76,15 +93,15 @@ class MainActivity : FlutterActivity() {
             return
         }
 
-        val permission = requiredWifiPermission()
-        if (permission != null && !hasWifiRuntimePermission()) {
-            if (pendingResult != null) {
+        val missing = missingPermissions(requiredConnectPermissions())
+        if (missing.isNotEmpty()) {
+            if (pendingResult != null || pendingScanResult != null) {
                 result.error("WIFI_BUSY", "Já existe uma solicitação Wi-Fi em andamento", null)
                 return
             }
             pendingConnect = ssid to password
             pendingResult = result
-            requestPermissions(arrayOf(permission), wifiPermissionRequestCode)
+            requestPermissions(missing, wifiPermissionRequestCode)
             return
         }
 
@@ -104,30 +121,152 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun scanNetworks(result: MethodChannel.Result) {
+        if (pendingScanResult != null || pendingResult != null) {
+            result.error("WIFI_BUSY", "Já existe uma solicitação Wi-Fi em andamento", null)
+            return
+        }
+        val missing = missingPermissions(requiredScanPermissions())
+        if (missing.isNotEmpty()) {
+            pendingScanResult = result
+            requestPermissions(missing, wifiScanPermissionRequestCode)
+            return
+        }
+        scanNetworksWithPermission(result)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun scanNetworksWithPermission(result: MethodChannel.Result) {
+        val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+        if (!wifi.isWifiEnabled) {
+            result.error("WIFI_DISABLED", "Ative o Wi-Fi para listar redes disponíveis", null)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val location = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+            if (!location.isLocationEnabled) {
+                result.error(
+                    "LOCATION_DISABLED",
+                    "O Android exige que os Serviços de localização estejam ativos para listar redes Wi-Fi próximas",
+                    null,
+                )
+                return
+            }
+        }
+
+        fun deliver() {
+            val rows = try {
+                wifi.scanResults
+            } catch (e: SecurityException) {
+                unregisterScanReceiver()
+                result.error("WIFI_SCAN_PERMISSION", e.message ?: "Permissão insuficiente para listar redes Wi-Fi", null)
+                return
+            }
+
+            val strongest = linkedMapOf<String, Map<String, Any>>()
+            for (scan in rows.sortedByDescending { it.level }) {
+                val ssid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    scan.wifiSsid?.toString()?.removePrefix("\"")?.removeSuffix("\"") ?: scan.SSID
+                } else {
+                    @Suppress("DEPRECATION")
+                    scan.SSID
+                }.trim()
+                if (ssid.isEmpty() || ssid == WifiManager.UNKNOWN_SSID || strongest.containsKey(ssid)) continue
+                val capabilities = scan.capabilities ?: ""
+                strongest[ssid] = mapOf(
+                    "ssid" to ssid,
+                    "level" to scan.level,
+                    "secure" to (
+                                    capabilities.contains("WEP", ignoreCase = true) ||
+                                    capabilities.contains("WPA", ignoreCase = true) ||
+                                    capabilities.contains("SAE", ignoreCase = true) ||
+                                    capabilities.contains("OWE", ignoreCase = true)
+                            ),
+                    "frequency" to scan.frequency,
+                )
+            }
+            unregisterScanReceiver()
+            result.success(strongest.values.toList())
+        }
+
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action == WifiManager.SCAN_RESULTS_AVAILABLE_ACTION) deliver()
+            }
+        }
+        scanReceiver = receiver
+        val filter = IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(receiver, filter)
+        }
+
+        val started = try {
+            wifi.startScan()
+        } catch (e: SecurityException) {
+            unregisterScanReceiver()
+            result.error("WIFI_SCAN_PERMISSION", e.message ?: "Permissão insuficiente para iniciar a varredura Wi-Fi", null)
+            return
+        }
+
+        if (!started) {
+            // Android can throttle active scans. Cached results remain useful
+            // for a provisioning selector, so return them instead of failing.
+            deliver()
+        }
+    }
+
+    private fun unregisterScanReceiver() {
+        scanReceiver?.let {
+            try {
+                unregisterReceiver(it)
+            } catch (_: Exception) {
+            }
+        }
+        scanReceiver = null
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
-        if (requestCode != wifiPermissionRequestCode) {
-            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-            return
-        }
+        when (requestCode) {
+            wifiPermissionRequestCode -> {
+                val pair = pendingConnect
+                val result = pendingResult
+                pendingConnect = null
+                pendingResult = null
+                if (pair == null || result == null) return
+                if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                    connectWithPermission(pair.first, pair.second, result)
+                } else {
+                    result.error(
+                        "WIFI_PERMISSION",
+                        "Permissão de dispositivos Wi-Fi próximos negada",
+                        null,
+                    )
+                }
+            }
 
-        val pair = pendingConnect
-        val result = pendingResult
-        pendingConnect = null
-        pendingResult = null
+            wifiScanPermissionRequestCode -> {
+                val result = pendingScanResult
+                pendingScanResult = null
+                if (result == null) return
+                if (grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                    scanNetworksWithPermission(result)
+                } else {
+                    result.error(
+                        "WIFI_SCAN_PERMISSION",
+                        "Permissão necessária para listar redes Wi-Fi foi negada. O SSID ainda pode ser digitado manualmente.",
+                        null,
+                    )
+                }
+            }
 
-        if (pair == null || result == null) return
-        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            connectWithPermission(pair.first, pair.second, result)
-        } else {
-            result.error(
-                "WIFI_PERMISSION",
-                "Permissão de dispositivos Wi-Fi próximos negada",
-                null,
-            )
+            else -> super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         }
     }
 
@@ -220,6 +359,9 @@ class MainActivity : FlutterActivity() {
         pendingConnect = null
         pendingResult?.error("WIFI_CANCELLED", "Activity encerrada durante a conexão Wi-Fi", null)
         pendingResult = null
+        pendingScanResult?.error("WIFI_SCAN_CANCELLED", "Activity encerrada durante a varredura Wi-Fi", null)
+        pendingScanResult = null
+        unregisterScanReceiver()
         disconnect()
         super.onDestroy()
     }
