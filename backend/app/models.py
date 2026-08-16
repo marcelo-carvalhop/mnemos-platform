@@ -284,7 +284,21 @@ class TerminalCredential(Base):
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     model: Mapped[str] = mapped_column(String(80), nullable=False, default="Mnemos Terminal")
     firmware: Mapped[str] = mapped_column(String(40), nullable=False, default="unknown")
+    # Desired content state chosen in the app. Empty is a valid terminal: pairing
+    # never implicitly installs study content.
     deck_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+
+    # Last state reported by the physical terminal. These fields let the app
+    # display desired versus actual state without treating the backend as the
+    # device itself.
+    reported_deck_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    card_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_cards: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    connectivity: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    wifi_ssid: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    library_revision: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     revoked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

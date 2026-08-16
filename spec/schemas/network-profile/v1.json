@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/network-profile/v1.json",
+  "title": "Mnemos Network Profile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "id", "ssid", "security", "settings"],
+  "properties": {
+    "schema": {"const": "mnemos.network-profile/v1"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "ssid": {"type": "string", "minLength": 1, "maxLength": 32},
+    "security": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {"type": {"const": "open"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "password"],
+          "properties": {
+            "type": {"const": "personal"},
+            "password": {"type": "string", "minLength": 8, "maxLength": 63}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "eap"],
+          "properties": {
+            "type": {"const": "enterprise-password"},
+            "eap": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["method", "username", "password"],
+              "properties": {
+                "method": {"const": "peap"},
+                "identity": {"type": "string", "maxLength": 128},
+                "username": {"type": "string", "minLength": 1, "maxLength": 128},
+                "password": {"type": "string", "minLength": 1, "maxLength": 256}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "autoConnect", "priority"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "autoConnect": {"type": "boolean"},
+        "priority": {"type": "integer", "minimum": 0, "maximum": 100}
+      }
+    }
+  }
+}

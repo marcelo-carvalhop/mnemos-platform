@@ -14,9 +14,19 @@
     <!-- Android 13+: Wi-Fi device/provisioning operations. Mnemos does not derive location. -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
-    <!-- Compatibility for Wi-Fi APIs on Android 12L and earlier. -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
-        android:maxSdkVersion="32" />
+    <!-- Wi-Fi scan results still require fine location permission on current
+         Android releases. Mnemos uses it only to display nearby SSIDs during
+         provisioning; it does not store or derive a physical location. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- On-demand BLE direct sync. Bluetooth is only enabled while explicitly
+         requested; it is not used for background proximity tracking. -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <application
         android:label="Mnemos"

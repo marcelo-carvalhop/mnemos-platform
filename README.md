@@ -20,13 +20,22 @@ A organização é deliberadamente monorepo porque, nesta fase, alterações de 
 
 ## Versões atuais
 
-O produto está na linha `0.3.x`. Os protocolos possuem versionamento independente: `mnemos.card/v1`, `mnemos.deck/v1`, `mnemos.card-state/v1`, `mnemos.review/v1`, `mnemos.sync/v1`, Device Protocol v2 e Backend API v1.
+O produto está na linha `0.4.x`. Os protocolos possuem versionamento independente: `mnemos.card/v1`, `mnemos.deck/v1`, `mnemos.card-state/v1`, `mnemos.review/v1`, `mnemos.sync/v1`, `mnemos.network-profile/v1`, Provisioning v2, BLE Sync Transport v1, Device Protocol v3 e Backend API v1.
 
 O histórico funcional encontra-se em `CHANGELOG.md`. A documentação para implementadores externos começa em `docs/developers/third-party-integration.md`, enquanto os artefatos normativos ficam em `spec/`.
 
+A visão consolidada da v0.4 está em `docs/MNEMOS_V0.4_IMPLEMENTATION_GUIDE.md`; ela registra HMI, conectividade, desired-state sync, BLE, backend, limitações e mapa de código.
+
+
+## Princípio de produto da v0.4
+
+O cliente móvel não é uma superfície de estudo. Ele cria e organiza conteúdo, configura dispositivos, declara o estado desejado da biblioteca, sincroniza e apresenta estatísticas. A leitura/revisão dos cards acontece no terminal Mnemos. A Home do aplicativo é deliberadamente apenas navegação; métricas e lembretes não são misturados às demais tarefas.
+
+A sincronização também não expõe upload/download ao usuário. O aplicativo declara se cada deck deve ficar `No Mnemos` ou `Somente no app`; o Sync Engine reconcilia esse estado com o conteúdo realmente reportado pelo terminal. Reviews sempre retornam do terminal de forma automática e idempotente.
+
 ## Primeira configuração do GitHub
 
-Depois de extrair este pacote, leia `SETUP_GITHUB.md` antes de executar `git add`. O guia cobre identidade Git, autenticação SSH, criação do repositório remoto, verificação de segredos, primeiro commit, primeiro push, tag `v0.3.0` e proteção da branch `main`.
+Depois de extrair este pacote, leia `SETUP_GITHUB.md` antes de executar `git add`. O guia cobre identidade Git, autenticação SSH, criação do repositório remoto, verificação de segredos, primeiro commit, primeiro push, tag `v0.4.0` e proteção da branch `main`.
 
 ## Desenvolvimento rápido
 

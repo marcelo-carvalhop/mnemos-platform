@@ -14,22 +14,52 @@ class RegisterTerminalRequest(BaseModel):
     device_id: str = Field(min_length=1, max_length=64)
     model: str = Field(default="Mnemos Terminal", max_length=80)
     firmware: str = Field(default="unknown", max_length=40)
-    deck_ids: list[str] = Field(min_length=1, max_length=32)
+    # Connection is not content selection. A freshly paired terminal therefore
+    # starts with an empty desired library unless the caller explicitly says
+    # otherwise.
+    deck_ids: list[str] = Field(default_factory=list, max_length=32)
 
 
 class RegisterTerminalResponse(BaseModel):
     device_id: str
     device_token: str
-    protocol: int = 2
+    protocol: int = 3
 
 
 class TerminalSummary(BaseModel):
     device_id: str
     model: str
     firmware: str
-    deck_ids: list[str]
+    desired_deck_ids: list[str]
+    reported_deck_ids: list[str]
+    card_count: int
+    max_cards: int
+    connectivity: str | None = None
+    wifi_ssid: str | None = None
+    library_revision: int = 0
     revoked: bool
     last_seen_at: str | None = None
+    last_sync_at: str | None = None
+
+
+class TerminalDeckIntentRequest(BaseModel):
+    deck_ids: list[str] = Field(default_factory=list, max_length=32)
+
+
+class TerminalObservedRequest(BaseModel):
+    reported_deck_ids: list[str] = Field(default_factory=list, max_length=32)
+    card_count: int = Field(default=0, ge=0, le=100000)
+    max_cards: int = Field(default=0, ge=0, le=100000)
+
+
+class TerminalStatusRequest(BaseModel):
+    reported_deck_ids: list[str] = Field(default_factory=list, max_length=32)
+    card_count: int = Field(default=0, ge=0, le=100000)
+    max_cards: int = Field(default=0, ge=0, le=100000)
+    connectivity: str | None = Field(default=None, max_length=24)
+    wifi_ssid: str | None = Field(default=None, max_length=32)
+    library_revision: int = Field(default=0, ge=0)
+    synced: bool = False
 
 
 class TerminalActionResponse(BaseModel):
@@ -40,6 +70,24 @@ class TerminalActionResponse(BaseModel):
 class ReviewBatchRequest(BaseModel):
     schema: str
     reviews: list[dict] = Field(max_length=500)
+
+
+def _summary(row) -> TerminalSummary:
+    return TerminalSummary(
+        device_id=row.device_id,
+        model=row.model,
+        firmware=row.firmware,
+        desired_deck_ids=list(row.deck_ids or []),
+        reported_deck_ids=list(row.reported_deck_ids or []),
+        card_count=int(row.card_count or 0),
+        max_cards=int(row.max_cards or 0),
+        connectivity=row.connectivity,
+        wifi_ssid=row.wifi_ssid,
+        library_revision=int(row.library_revision or 0),
+        revoked=row.revoked,
+        last_seen_at=row.last_seen_at.isoformat() if row.last_seen_at else None,
+        last_sync_at=row.last_sync_at.isoformat() if row.last_sync_at else None,
+    )
 
 
 def _terminal_credential(session, authorization: str | None):
@@ -88,17 +136,66 @@ def register_terminal(
     summary="Lists dedicated terminals registered to the account",
 )
 def list_terminals(user_id: CurrentUser, session: DbSession) -> list[TerminalSummary]:
-    return [
-        TerminalSummary(
-            device_id=row.device_id,
-            model=row.model,
-            firmware=row.firmware,
-            deck_ids=list(row.deck_ids or []),
-            revoked=row.revoked,
-            last_seen_at=row.last_seen_at.isoformat() if row.last_seen_at else None,
+    return [_summary(row) for row in service.list_terminals(session, user_id)]
+
+
+@router.get(
+    "/v1/terminals/{device_id}/summary",
+    operation_id="getTerminalSummary",
+    response_model=TerminalSummary,
+    summary="Returns desired and last reported terminal state",
+)
+def terminal_summary(device_id: str, user_id: CurrentUser, session: DbSession) -> TerminalSummary:
+    try:
+        return _summary(service.terminal_for_user(session, user_id, device_id))
+    except TerminalScopeError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post(
+    "/v1/terminals/{device_id}/decks",
+    operation_id="setTerminalDeckIntent",
+    response_model=TerminalSummary,
+    summary="Sets the desired deck presence for a terminal",
+)
+def set_terminal_decks(
+    device_id: str,
+    body: TerminalDeckIntentRequest,
+    user_id: CurrentUser,
+    session: DbSession,
+) -> TerminalSummary:
+    try:
+        row = service.update_desired_decks(session, user_id, device_id, body.deck_ids)
+        return _summary(row)
+    except TerminalScopeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post(
+    "/v1/terminals/{device_id}/observed",
+    operation_id="reportDirectTerminalObservation",
+    response_model=TerminalSummary,
+    summary="Records state observed by the authenticated app after direct BLE sync",
+)
+def observe_terminal(
+    device_id: str,
+    body: TerminalObservedRequest,
+    user_id: CurrentUser,
+    session: DbSession,
+) -> TerminalSummary:
+    try:
+        return _summary(
+            service.observe_direct_sync(
+                session,
+                user_id,
+                device_id,
+                reported_deck_ids=body.reported_deck_ids,
+                card_count=body.card_count,
+                max_cards=body.max_cards,
+            )
         )
-        for row in service.list_terminals(session, user_id)
-    ]
+    except TerminalScopeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post(
@@ -157,3 +254,29 @@ def terminal_reviews(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (ValueError, KeyError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post(
+    "/v1/terminal/status",
+    operation_id="reportTerminalStatus",
+    response_model=dict,
+    summary="Stores last physical state reported by a terminal",
+)
+def terminal_status(
+    body: TerminalStatusRequest,
+    session: DbSession,
+    authorization: Annotated[str | None, Header()] = None,
+) -> dict:
+    credential = _terminal_credential(session, authorization)
+    row = service.report_status(
+        session,
+        credential,
+        reported_deck_ids=body.reported_deck_ids,
+        card_count=body.card_count,
+        max_cards=body.max_cards,
+        connectivity=body.connectivity,
+        wifi_ssid=body.wifi_ssid,
+        library_revision=body.library_revision,
+        synced=body.synced,
+    )
+    return {"ok": True, "device_id": row.device_id}

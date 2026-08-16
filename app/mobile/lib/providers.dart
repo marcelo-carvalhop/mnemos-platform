@@ -162,6 +162,23 @@ final decksProvider = FutureProvider<List<Deck>>((ref) async {
       .get();
 });
 
+final deckCardCountsProvider = FutureProvider<Map<String, int>>((ref) async {
+  final db = ref.watch(databaseProvider);
+  final rows = await db.customSelect(
+    '''
+    SELECT deck_id, COUNT(*) AS card_count
+    FROM cards
+    WHERE deleted_at IS NULL
+    GROUP BY deck_id
+    ''',
+    readsFrom: {db.cards},
+  ).get();
+  return {
+    for (final row in rows)
+      row.read<String>('deck_id'): row.read<int>('card_count'),
+  };
+});
+
 final deckMaturityProvider = FutureProvider<Map<String, DeckMaturity>>((ref) async {
   final service = await ref.watch(progressServiceProvider.future);
   return {for (final m in await service.maturityByDeck()) m.deckId: m};

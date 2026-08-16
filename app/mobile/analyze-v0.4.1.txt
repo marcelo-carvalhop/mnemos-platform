@@ -1,0 +1,6 @@
+Analyzing mobile...                                             
+
+warning • Unused import: 'package:drift/drift.dart'. Try removing the import directive • lib/features/device_sync_screen.dart:4:8 • unused_import
+   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement • lib/features/generation/capture_screen.dart:192:17 • deprecated_member_use
+   info • 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement • lib/features/generation/generate_screen.dart:139:17 • deprecated_member_use
+

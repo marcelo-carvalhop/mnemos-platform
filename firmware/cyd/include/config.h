@@ -16,8 +16,8 @@ constexpr uint8_t MAX_DEVICE_CARDS = 48;
 constexpr uint16_t TOUCH_PRESSURE_MIN = 200;
 constexpr uint32_t TOUCH_DEBOUNCE_MS = 180;
 
-constexpr char APP_VERSION[] = "0.3.0";
-constexpr uint8_t DEVICE_PROTOCOL_VERSION = 2;
+constexpr char APP_VERSION[] = "0.4.0";
+constexpr uint8_t DEVICE_PROTOCOL_VERSION = 3;
 constexpr uint16_t PAIRING_TIMEOUT_SECONDS = 300;
 constexpr char DEVICE_MODEL[] = "ESP32-2432S028";
 

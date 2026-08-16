@@ -30,7 +30,7 @@ def _hash(token: str) -> str:
 def _owned_active_decks(session: Session, user_id: str, deck_ids: list[str]) -> list[str]:
     requested = list(dict.fromkeys(deck_ids))
     if not requested:
-        raise TerminalScopeError("at least one deck must be assigned to a terminal")
+        return []
 
     owned = set(
         session.execute(
@@ -45,6 +45,21 @@ def _owned_active_decks(session: Session, user_id: str, deck_ids: list[str]) -> 
     missing = [deck_id for deck_id in requested if deck_id not in owned]
     if missing:
         raise TerminalScopeError(f"decks are not available to this user: {missing}")
+    return requested
+
+
+def _owned_decks_any_state(session: Session, user_id: str, deck_ids: list[str]) -> list[str]:
+    requested = list(dict.fromkeys(deck_ids))
+    if not requested:
+        return []
+    owned = set(
+        session.execute(
+            select(Deck.id).where(Deck.user_id == user_id, Deck.id.in_(requested))
+        ).scalars()
+    )
+    missing = [deck_id for deck_id in requested if deck_id not in owned]
+    if missing:
+        raise TerminalScopeError(f"decks do not belong to this user: {missing}")
     return requested
 
 
@@ -238,7 +253,7 @@ def ingest_reviews(session: Session, credential: TerminalCredential, reviews: li
             session.execute(
                 select(Card.id).where(
                     Card.user_id == credential.user_id,
-                    Card.deck_id.in_(credential.deck_ids or []),
+                    Card.deck_id.in_(set(credential.deck_ids or []) | set(credential.reported_deck_ids or [])),
                     Card.deleted_at.is_(None),
                     Card.id.in_(card_ids),
                 )
@@ -275,6 +290,73 @@ def ingest_reviews(session: Session, credential: TerminalCredential, reviews: li
         "duplicates": result.skipped_stale,
         "highWater": result.high_water,
     }
+
+
+def terminal_for_user(session: Session, user_id: str, device_id: str) -> TerminalCredential:
+    row = session.get(TerminalCredential, device_id)
+    if row is None or row.user_id != user_id:
+        raise TerminalScopeError("terminal is not registered to this user")
+    return row
+
+
+def update_desired_decks(
+    session: Session, user_id: str, device_id: str, deck_ids: list[str]
+) -> TerminalCredential:
+    row = terminal_for_user(session, user_id, device_id)
+    row.deck_ids = _owned_active_decks(session, user_id, deck_ids)
+    session.commit()
+    session.refresh(row)
+    return row
+
+
+def report_status(
+    session: Session,
+    credential: TerminalCredential,
+    *,
+    reported_deck_ids: list[str],
+    card_count: int,
+    max_cards: int,
+    connectivity: str | None,
+    wifi_ssid: str | None,
+    library_revision: int,
+    synced: bool,
+) -> TerminalCredential:
+    # A terminal may only report content that belongs to its desired scope. A
+    # transient old snapshot is allowed during reconciliation, but it cannot
+    # grant itself access to reviews/cards outside that scope.
+    credential.reported_deck_ids = _owned_decks_any_state(
+        session, credential.user_id, reported_deck_ids
+    )
+    credential.card_count = max(0, card_count)
+    credential.max_cards = max(0, max_cards)
+    credential.connectivity = connectivity
+    credential.wifi_ssid = wifi_ssid or None
+    credential.library_revision = max(0, library_revision)
+    if synced:
+        credential.last_sync_at = datetime.now(timezone.utc)
+    session.commit()
+    session.refresh(credential)
+    return credential
+
+
+def observe_direct_sync(
+    session: Session,
+    user_id: str,
+    device_id: str,
+    *,
+    reported_deck_ids: list[str],
+    card_count: int,
+    max_cards: int,
+) -> TerminalCredential:
+    row = terminal_for_user(session, user_id, device_id)
+    row.reported_deck_ids = _owned_decks_any_state(session, user_id, reported_deck_ids)
+    row.card_count = max(0, card_count)
+    row.max_cards = max(0, max_cards)
+    row.connectivity = "ble"
+    row.last_sync_at = datetime.now(timezone.utc)
+    session.commit()
+    session.refresh(row)
+    return row
 
 
 def list_terminals(session: Session, user_id: str) -> list[TerminalCredential]:

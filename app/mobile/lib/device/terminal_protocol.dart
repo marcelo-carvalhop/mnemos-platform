@@ -2,6 +2,31 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+String _requiredString(Map<String, Object?> json, String key, String source) {
+  final value = json[key];
+  if (value is String && value.trim().isNotEmpty) return value;
+  throw FormatException('$source inválido: campo obrigatório "$key" ausente ou inválido.');
+}
+
+int _requiredInt(Map<String, Object?> json, String key, String source) {
+  final value = json[key];
+  if (value is num) return value.toInt();
+  throw FormatException('$source inválido: campo obrigatório "$key" ausente ou inválido.');
+}
+
+Map<String, Object?> _decodeObject(String body, String source) {
+  Object? decoded;
+  try {
+    decoded = jsonDecode(body);
+  } on FormatException catch (e) {
+    throw FormatException('$source retornou JSON inválido: ${e.message}');
+  }
+  if (decoded is! Map) {
+    throw FormatException('$source inválido: era esperado um objeto JSON.');
+  }
+  return Map<String, Object?>.from(decoded);
+}
+
 class TerminalPairing {
   const TerminalPairing({
     required this.protocol,
@@ -41,7 +66,7 @@ class TerminalPairing {
         host == null || token == null) {
       throw const FormatException('QR Code de pareamento incompleto.');
     }
-    if (protocol < 1 || protocol > 2) {
+    if (protocol < 1 || protocol > 3) {
       throw FormatException('Protocolo de terminal incompatível: $protocol.');
     }
     return TerminalPairing(
@@ -69,6 +94,9 @@ class TerminalInfo {
     required this.wifiConnected,
     required this.supportedCardTypes,
     required this.supportedContentFormats,
+    required this.deckIds,
+    required this.bleSync,
+    required this.enterprisePassword,
     this.infrastructureSsid,
   });
 
@@ -82,20 +110,24 @@ class TerminalInfo {
   final bool wifiConnected;
   final List<String> supportedCardTypes;
   final List<String> supportedContentFormats;
+  final List<String> deckIds;
+  final bool bleSync;
+  final bool enterprisePassword;
   final String? infrastructureSsid;
 
   factory TerminalInfo.fromJson(Map<String, Object?> json) {
+    const source = 'Resposta /info do terminal';
     final rawCapabilities = json['capabilities'];
     final capabilities = rawCapabilities is Map ? rawCapabilities : const <Object?, Object?>{};
     final rawCardTypes = capabilities['cardTypes'];
     final rawFormats = capabilities['contentFormats'];
 
     return TerminalInfo(
-      deviceId: json['deviceId']! as String,
-      firmware: json['firmware']! as String,
-      model: json['model']! as String,
-      cardCount: (json['cardCount']! as num).toInt(),
-      maxCards: (json['maxCards']! as num).toInt(),
+      deviceId: _requiredString(json, 'deviceId', source),
+      firmware: _requiredString(json, 'firmware', source),
+      model: _requiredString(json, 'model', source),
+      cardCount: _requiredInt(json, 'cardCount', source),
+      maxCards: _requiredInt(json, 'maxCards', source),
       clockTrusted: json['clockTrusted'] as bool? ?? false,
       wifiEnabled: json['wifiEnabled'] as bool? ?? false,
       wifiConnected: json['wifiConnected'] as bool? ?? false,
@@ -105,10 +137,14 @@ class TerminalInfo {
       supportedContentFormats: rawFormats is List
           ? [for (final value in rawFormats) value.toString()]
           : const [],
+      deckIds: json['deckIds'] is List
+          ? [for (final value in json['deckIds'] as List) value.toString()]
+          : const [],
+      bleSync: (json['features'] is Map ? (json['features'] as Map)['bleSync'] : null) as bool? ?? false,
+      enterprisePassword: (json['features'] is Map ? (json['features'] as Map)['enterprisePassword'] : null) as bool? ?? false,
       infrastructureSsid: json['infrastructureSsid'] as String?,
     );
   }
-
 }
 
 class TerminalNetworkStatus {
@@ -152,14 +188,17 @@ class TerminalReview {
   final int responseTimeMs;
   final int confidence;
 
-  factory TerminalReview.fromJson(Map<String, Object?> json) => TerminalReview(
-        id: json['id']! as String,
-        cardId: json['cardId']! as String,
-        reviewedAt: (json['reviewedAt']! as num).toInt(),
-        rating: (json['rating']! as num).toInt(),
-        responseTimeMs: (json['responseTimeMs'] as num?)?.toInt() ?? 0,
-        confidence: (json['confidence'] as num?)?.toInt() ?? 0,
-      );
+  factory TerminalReview.fromJson(Map<String, Object?> json) {
+    const source = 'Evento de revisão do terminal';
+    return TerminalReview(
+      id: _requiredString(json, 'id', source),
+      cardId: _requiredString(json, 'cardId', source),
+      reviewedAt: _requiredInt(json, 'reviewedAt', source),
+      rating: _requiredInt(json, 'rating', source),
+      responseTimeMs: (json['responseTimeMs'] as num?)?.toInt() ?? 0,
+      confidence: (json['confidence'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 class TerminalClient {
@@ -171,10 +210,13 @@ class TerminalClient {
   Uri _uri(String path) => Uri.parse('http://${pairing.host}$path')
       .replace(queryParameters: {'token': pairing.token});
 
-  Future<Map<String, Object?>> _getJson(String path, {Duration timeout = const Duration(seconds: 10)}) async {
+  Future<Map<String, Object?>> _getJson(
+    String path, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     final response = await _http.get(_uri(path)).timeout(timeout);
     _ensureOk(response);
-    return Map<String, Object?>.from(jsonDecode(response.body) as Map);
+    return _decodeObject(response.body, 'GET $path');
   }
 
   Future<Map<String, Object?>> _postJson(
@@ -191,18 +233,47 @@ class TerminalClient {
         .timeout(timeout);
     _ensureOk(response);
     if (response.body.isEmpty) return const {};
-    return Map<String, Object?>.from(jsonDecode(response.body) as Map);
+    return _decodeObject(response.body, 'POST $path');
   }
 
   Future<TerminalInfo> info() async {
-    final path = pairing.protocol >= 2 ? '/v2/info' : '/v1/info';
+    final path = pairing.protocol >= 3 ? '/v3/info' : pairing.protocol >= 2 ? '/v2/info' : '/v1/info';
     return TerminalInfo.fromJson(await _getJson(path));
   }
 
   Future<void> setClock(DateTime instant) async {
     final epochSeconds = instant.toUtc().millisecondsSinceEpoch ~/ 1000;
-    final path = pairing.protocol >= 2 ? '/v2/time' : '/v1/time';
+    final path = pairing.protocol >= 3 ? '/v3/time' : pairing.protocol >= 2 ? '/v2/time' : '/v1/time';
     await _postJson(path, body: {'epochSeconds': epochSeconds});
+  }
+
+  Future<void> provisionNetworkProfile({
+    required Map<String, Object?> profile,
+    Uri? backendBaseUrl,
+    String? deviceToken,
+    int syncIntervalSeconds = 1800,
+  }) async {
+    if (pairing.protocol < 3) {
+      final security = profile['security'];
+      final securityMap = security is Map ? security : const {};
+      await provision(
+        ssid: profile['ssid']?.toString() ?? '',
+        wifiPassword: securityMap['password']?.toString() ?? '',
+        backendBaseUrl: backendBaseUrl,
+        deviceToken: deviceToken,
+        syncIntervalSeconds: syncIntervalSeconds,
+      );
+      return;
+    }
+    final payload = <String, Object?>{
+      'schema': 'mnemos.provision/v2',
+      'networkProfile': profile,
+      'syncIntervalSeconds': syncIntervalSeconds,
+      'clockEpochSeconds': DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000,
+      if (backendBaseUrl != null && deviceToken != null)
+        'backend': {'baseUrl': backendBaseUrl.toString(), 'deviceToken': deviceToken},
+    };
+    await _postJson('/v3/provision', body: payload);
   }
 
   Future<TerminalNetworkStatus> provision({
@@ -226,11 +297,16 @@ class TerminalClient {
     return TerminalNetworkStatus.fromJson(await _postJson('/v2/provision', body: payload));
   }
 
-  Future<TerminalNetworkStatus> networkStatus() async =>
-      TerminalNetworkStatus.fromJson(await _getJson('/v2/network/status'));
+  Future<TerminalNetworkStatus> networkStatus() async => TerminalNetworkStatus.fromJson(
+        await _getJson(pairing.protocol >= 3 ? '/v3/network/status' : '/v2/network/status'),
+      );
 
   Future<void> completePairing() async {
-    if (pairing.protocol >= 2) await _postJson('/v2/pairing/complete');
+    if (pairing.protocol >= 3) {
+      await _postJson('/v3/pairing/complete');
+    } else if (pairing.protocol >= 2) {
+      await _postJson('/v2/pairing/complete');
+    }
   }
 
   Future<void> acknowledgeReviews() async {
@@ -241,11 +317,20 @@ class TerminalClient {
   Future<List<TerminalReview>> reviews() async {
     if (pairing.protocol >= 2) {
       final payload = await _getJson('/v2/reviews', timeout: const Duration(seconds: 12));
-      final list = payload['reviews'] as List<Object?>? ?? const [];
-      return [
-        for (final value in list)
-          TerminalReview.fromJson(Map<String, Object?>.from(value! as Map)),
-      ];
+      final rawReviews = payload['reviews'];
+      if (rawReviews == null) return const [];
+      if (rawReviews is! List) {
+        throw const FormatException('Resposta /v2/reviews inválida: "reviews" não é uma lista.');
+      }
+      final rows = <TerminalReview>[];
+      for (var i = 0; i < rawReviews.length; i++) {
+        final value = rawReviews[i];
+        if (value is! Map) {
+          throw FormatException('Resposta /v2/reviews inválida: item $i não é um objeto.');
+        }
+        rows.add(TerminalReview.fromJson(Map<String, Object?>.from(value)));
+      }
+      return rows;
     }
 
     final response = await _http.get(_uri('/v1/reviews')).timeout(const Duration(seconds: 12));
@@ -253,7 +338,7 @@ class TerminalClient {
     final rows = <TerminalReview>[];
     for (final line in const LineSplitter().convert(response.body)) {
       if (line.trim().isEmpty) continue;
-      rows.add(TerminalReview.fromJson(Map<String, Object?>.from(jsonDecode(line) as Map)));
+      rows.add(TerminalReview.fromJson(_decodeObject(line, 'Linha /v1/reviews')));
     }
     return rows;
   }
@@ -261,7 +346,7 @@ class TerminalClient {
   Future<int> sendLibrary(Map<String, Object?> bundle) async {
     final path = pairing.protocol >= 2 ? '/v2/library' : '/v1/library';
     final body = await _postJson(path, body: bundle, timeout: const Duration(seconds: 24));
-    return (body['cardCount']! as num).toInt();
+    return _requiredInt(body, 'cardCount', 'Resposta $path');
   }
 
   void _ensureOk(http.Response response) {

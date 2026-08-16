@@ -22,6 +22,11 @@ void StudyEngine::initializeStates() {
         if (states_[i].id.length() == 0) states_[i].id = cards_[i].id;
     }
     storage_.loadStates(states_, count_);
+    resumableSession_ = storage_.loadSession(
+        cards_, count_, queue_, Config::SESSION_MAX_CARDS,
+        sessionCount_, currentPosition_, stats_);
+    confidence_ = Confidence::None;
+    responseTimeMs_ = 0;
 }
 
 uint16_t StudyEngine::dueCount() {
@@ -56,7 +61,24 @@ bool StudyEngine::startSession() {
     }
 
     questionShownAtMs_ = millis();
-    return sessionCount_ > 0;
+    resumableSession_ = sessionCount_ > 0;
+    if (resumableSession_) persistSession();
+    else storage_.clearSession();
+    return resumableSession_;
+}
+
+bool StudyEngine::resumeSession() {
+    if (!resumableSession_ || sessionCount_ == 0 || currentPosition_ >= sessionCount_) return false;
+    confidence_ = Confidence::None;
+    responseTimeMs_ = 0;
+    questionShownAtMs_ = millis();
+    stats_.startedAtMs = millis();
+    return true;
+}
+
+void StudyEngine::persistSession() {
+    if (!resumableSession_) return;
+    storage_.saveSession(cards_, queue_, sessionCount_, currentPosition_, stats_);
 }
 
 const CardDefinition& StudyEngine::currentCard() const {
@@ -148,9 +170,12 @@ bool StudyEngine::rateCurrent(Rating rating) {
     ++currentPosition_;
     if (currentPosition_ >= sessionCount_) {
         stats_.endedAtMs = millis();
+        resumableSession_ = false;
+        storage_.clearSession();
         return true;
     }
 
+    persistSession();
     confidence_ = Confidence::None;
     responseTimeMs_ = 0;
     questionShownAtMs_ = millis();

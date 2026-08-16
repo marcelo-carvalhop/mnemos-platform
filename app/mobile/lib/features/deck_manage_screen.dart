@@ -70,6 +70,7 @@ class _DeckManageScreenState extends ConsumerState<DeckManageScreen> {
     await authoring.archiveDeck(widget.deckId, ref.read(clockProvider)());
     ref
       ..invalidate(decksProvider)
+      ..invalidate(deckCardCountsProvider)
       ..invalidate(queueProvider)
       ..invalidate(deckMaturityProvider);
     if (!mounted) return;
@@ -80,8 +81,9 @@ class _DeckManageScreenState extends ConsumerState<DeckManageScreen> {
   }
 
   Future<void> _delete() async {
-    final stats = ref.read(deckMaturityProvider).valueOrNull?[widget.deckId];
-    final total = stats?.total ?? 0;
+    final counts = await ref.read(deckCardCountsProvider.future);
+    if (!mounted) return;
+    final total = counts[widget.deckId] ?? 0;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -115,6 +117,7 @@ class _DeckManageScreenState extends ConsumerState<DeckManageScreen> {
     final removed = await authoring.deleteDeck(widget.deckId, ref.read(clockProvider)());
     ref
       ..invalidate(decksProvider)
+      ..invalidate(deckCardCountsProvider)
       ..invalidate(queueProvider)
       ..invalidate(hasAnyCardsProvider)
       ..invalidate(deckMaturityProvider);
@@ -128,20 +131,11 @@ class _DeckManageScreenState extends ConsumerState<DeckManageScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stats = ref.watch(deckMaturityProvider).valueOrNull?[widget.deckId];
-
     return Scaffold(
       appBar: AppBar(title: Text(widget.deckName)),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
-          Text(
-            stats == null
-                ? 'Sem cards ainda'
-                : '${stats.mature} de ${stats.total} maduros',
-            style: const TextStyle(fontSize: 13, color: AppColors.faint),
-          ),
-          const SizedBox(height: 24),
           const _Section('Adicionar cards'),
           _Action(
             icon: Icons.edit_outlined,

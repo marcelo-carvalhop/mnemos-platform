@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
+#include <new>
 
 #include "config.h"
 #include "network_service.h"
@@ -152,40 +153,85 @@ bool BackendSyncService::pullSnapshot() {
         if (type != "basic" || promptFormat != "plain" || answerFormat != "plain") return false;
     }
 
-    // Preserve local scheduling by card id while replacing canonical content.
-    CardState oldStates[Config::MAX_DEVICE_CARDS];
+    // Build the replacement in temporary arrays first. The live library is
+    // changed only after the complete snapshot has validated and persisted.
+    CardDefinition* nextCards = new (std::nothrow) CardDefinition[maxCards_];
+    CardState* nextStates = new (std::nothrow) CardState[maxCards_];
+    if (nextCards == nullptr || nextStates == nullptr) {
+        delete[] nextCards;
+        delete[] nextStates;
+        return false;
+    }
     const size_t oldCount = cardCount_;
-    for (size_t i = 0; i < oldCount && i < maxCards_; ++i) oldStates[i] = states_[i];
 
     size_t next = 0;
     for (JsonObjectConst item : items) {
         const String id = item["id"] | "";
-        cards_[next].id = id;
-        cards_[next].deckId = item["deckId"] | "";
-        cards_[next].deck = deckName(cards_[next].deckId);
-        cards_[next].type = "basic";
-        cards_[next].format = "plain";
-        cards_[next].question = item["content"]["prompt"]["text"] | "";
-        cards_[next].answer = item["content"]["answer"]["text"] | "";
-        cards_[next].revision = item["metadata"]["revision"] | 1ULL;
+        nextCards[next].id = id;
+        nextCards[next].deckId = item["deckId"] | "";
+        nextCards[next].deck = deckName(nextCards[next].deckId);
+        nextCards[next].type = "basic";
+        nextCards[next].format = "plain";
+        nextCards[next].question = item["content"]["prompt"]["text"] | "";
+        nextCards[next].answer = item["content"]["answer"]["text"] | "";
+        nextCards[next].revision = item["metadata"]["revision"] | 1ULL;
 
         CardState state{};
         state.id = id;
         for (size_t old = 0; old < oldCount; ++old) {
-            if (oldStates[old].id == id) {
-                state = oldStates[old];
+            if (states_[old].id == id) {
+                state = states_[old];
                 break;
             }
         }
-        states_[next] = state;
+        nextStates[next] = state;
         ++next;
     }
 
+    // State is written first. If library persistence then fails, old library
+    // loading ignores state rows for unknown cards. This avoids exposing a
+    // half-applied snapshot in RAM while keeping crash recovery conservative.
+    if (!storage_.saveStates(nextStates, next) ||
+        !storage_.saveLibrary(nextCards, nextStates, next)) {
+        delete[] nextCards;
+        delete[] nextStates;
+        return false;
+    }
+
+    for (size_t i = 0; i < next; ++i) {
+        cards_[i] = nextCards[i];
+        states_[i] = nextStates[i];
+    }
     cardCount_ = next;
-    if (!storage_.saveLibrary(cards_, states_, cardCount_)) return false;
-    if (!storage_.saveStates(states_, cardCount_)) return false;
+    delete[] nextCards;
+    delete[] nextStates;
     libraryUpdated_ = true;
     return true;
+}
+
+bool BackendSyncService::reportStatus(bool synced) {
+    JsonDocument doc;
+    JsonArray deckIds = doc["reported_deck_ids"].to<JsonArray>();
+    uint64_t revision = 0;
+    for (size_t i = 0; i < cardCount_; ++i) {
+        if (cards_[i].revision > revision) revision = cards_[i].revision;
+        bool exists = false;
+        for (JsonVariantConst value : deckIds) {
+            if (String(value.as<const char*>()) == cards_[i].deckId) { exists = true; break; }
+        }
+        if (!exists && cards_[i].deckId.length() > 0) deckIds.add(cards_[i].deckId);
+    }
+    doc["card_count"] = cardCount_;
+    doc["max_cards"] = maxCards_;
+    doc["connectivity"] = network_.connected() ? "wifi" : "offline";
+    doc["wifi_ssid"] = network_.ssid();
+    doc["library_revision"] = revision;
+    doc["synced"] = synced;
+    String body;
+    serializeJson(doc, body);
+    int status = 0;
+    String response;
+    return request("POST", "/v1/terminal/status", body, status, response) && status >= 200 && status < 300;
 }
 
 bool BackendSyncService::syncNow() {
@@ -195,6 +241,8 @@ bool BackendSyncService::syncNow() {
     lastSyncMs_ = millis();
     const bool reviewsOk = pushReviews();
     const bool snapshotOk = pullSnapshot();
-    Serial.printf("[backend] sync reviews=%d snapshot=%d\n", reviewsOk, snapshotOk);
-    return reviewsOk && snapshotOk;
+    const bool synced = reviewsOk && snapshotOk;
+    const bool statusOk = reportStatus(synced);
+    Serial.printf("[backend] sync reviews=%d snapshot=%d status=%d\n", reviewsOk, snapshotOk, statusOk);
+    return synced;
 }

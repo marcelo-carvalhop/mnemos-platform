@@ -80,11 +80,69 @@ class TerminalSyncService {
     return (imported, skipped);
   }
 
+  Future<(int, int)> importReviewBatchJson(String raw, {required String deviceId}) async {
+    if (raw.trim().isEmpty) return (0, 0);
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map || decoded['schema'] != 'mnemos.review-batch/v1') {
+      throw const FormatException('Lote de revisões Bluetooth incompatível.');
+    }
+    final values = decoded['reviews'];
+    if (values is! List) return (0, 0);
+
+    var imported = 0;
+    var skipped = 0;
+    for (final value in values) {
+      if (value is! Map) {
+        skipped++;
+        continue;
+      }
+      final json = Map<String, Object?>.from(value);
+      final remote = TerminalReview.fromJson(json);
+      final already = await (db.select(db.reviews)..where((t) => t.id.equals(remote.id)))
+          .getSingleOrNull();
+      if (already != null) {
+        skipped++;
+        continue;
+      }
+      final card = await (db.select(db.cards)
+            ..where((t) => t.id.equals(remote.cardId))
+            ..where((t) => t.deletedAt.isNull()))
+          .getSingleOrNull();
+      if (card == null) {
+        skipped++;
+        continue;
+      }
+      try {
+        await study.ingestRemoteReview(
+          id: remote.id,
+          cardId: remote.cardId,
+          reviewedAt: DateTime.fromMillisecondsSinceEpoch(remote.reviewedAt * 1000, isUtc: true),
+          grade: Grade.fromValue(remote.rating),
+          source: ReviewSource.standard,
+          fromDeviceId: deviceId,
+          elapsedMs: remote.responseTimeMs,
+        );
+        imported++;
+      } on ArgumentError {
+        skipped++;
+      }
+    }
+    return (imported, skipped);
+  }
+
   Future<Map<String, Object?>> buildLibraryBundle({
     required Set<String> deckIds,
     required int maxCards,
   }) async {
-    if (deckIds.isEmpty) throw StateError('Selecione ao menos um baralho.');
+    if (deckIds.isEmpty) {
+      return <String, Object?>{
+        'schema': 'mnemos.sync/v1',
+        'exportedAt': DateTime.now().toUtc().toIso8601String(),
+        'decks': const <Object?>[],
+        'cards': const <Object?>[],
+        'states': const <Object?>[],
+      };
+    }
 
     final placeholders = List.filled(deckIds.length, '?').join(',');
     final deckRows = await db.customSelect(

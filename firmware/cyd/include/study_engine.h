@@ -17,6 +17,8 @@ public:
     void initializeStates();
     uint16_t dueCount();
     bool startSession();
+    bool resumeSession();
+    bool hasResumableSession() const { return resumableSession_; }
 
     const CardDefinition& currentCard() const;
     const CardState& currentState() const;
@@ -47,4 +49,7 @@ private:
     uint32_t questionShownAtMs_ = 0;
     uint32_t responseTimeMs_ = 0;
     SessionStats stats_{};
+    bool resumableSession_ = false;
+
+    void persistSession();
 };

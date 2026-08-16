@@ -9,6 +9,8 @@ constexpr char TEMP_LIBRARY_PATH[] = "/library.tmp";
 constexpr char STATE_PATH[] = "/state.json";
 constexpr char TEMP_STATE_PATH[] = "/state.tmp";
 constexpr char REVIEW_LOG_PATH[] = "/reviews.ndjson";
+constexpr char SESSION_PATH[] = "/session.json";
+constexpr char TEMP_SESSION_PATH[] = "/session.tmp";
 }
 
 bool Storage::begin() {
@@ -150,6 +152,99 @@ bool Storage::saveStates(const CardState* states, size_t count) {
     return LittleFS.rename(TEMP_STATE_PATH, STATE_PATH);
 }
 
+bool Storage::saveSession(const CardDefinition* cards,
+                          const uint8_t* queue,
+                          uint8_t sessionCount,
+                          uint8_t currentPosition,
+                          const SessionStats& stats) {
+    if (sessionCount == 0 || currentPosition >= sessionCount) return clearSession();
+
+    JsonDocument doc;
+    doc["schema"] = 1;
+    doc["position"] = currentPosition;
+    JsonArray ids = doc["cardIds"].to<JsonArray>();
+    for (uint8_t i = 0; i < sessionCount; ++i) ids.add(cards[queue[i]].id);
+    doc["stats"]["reviewed"] = stats.reviewed;
+    JsonArray ratings = doc["stats"]["ratings"].to<JsonArray>();
+    for (uint8_t i = 0; i < 4; ++i) ratings.add(stats.ratingCounts[i]);
+
+    File file = LittleFS.open(TEMP_SESSION_PATH, "w");
+    if (!file) return false;
+    const size_t written = serializeJson(doc, file);
+    file.flush();
+    file.close();
+    if (written == 0) {
+        LittleFS.remove(TEMP_SESSION_PATH);
+        return false;
+    }
+    LittleFS.remove(SESSION_PATH);
+    return LittleFS.rename(TEMP_SESSION_PATH, SESSION_PATH);
+}
+
+bool Storage::loadSession(const CardDefinition* cards,
+                          size_t cardCount,
+                          uint8_t* queue,
+                          uint8_t maxQueue,
+                          uint8_t& sessionCount,
+                          uint8_t& currentPosition,
+                          SessionStats& stats) {
+    sessionCount = 0;
+    currentPosition = 0;
+    stats = SessionStats{};
+    if (!LittleFS.exists(SESSION_PATH)) return false;
+
+    File file = LittleFS.open(SESSION_PATH, "r");
+    if (!file) return false;
+    JsonDocument doc;
+    const DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    if (error || (doc["schema"] | 0) != 1) {
+        clearSession();
+        return false;
+    }
+
+    const uint8_t savedPosition = doc["position"] | 0U;
+    JsonArrayConst ids = doc["cardIds"].as<JsonArrayConst>();
+    if (ids.size() == 0 || savedPosition >= ids.size()) {
+        clearSession();
+        return false;
+    }
+
+    // Restore only the unfinished suffix. Mapping by stable card id makes the
+    // session tolerant to library reordering and safely drops removed cards.
+    for (size_t saved = savedPosition; saved < ids.size() && sessionCount < maxQueue; ++saved) {
+        const String id = ids[saved] | "";
+        for (size_t card = 0; card < cardCount; ++card) {
+            if (cards[card].id == id) {
+                queue[sessionCount++] = static_cast<uint8_t>(card);
+                break;
+            }
+        }
+    }
+    if (sessionCount == 0) {
+        clearSession();
+        return false;
+    }
+
+    currentPosition = 0;
+    stats.reviewed = doc["stats"]["reviewed"] | 0U;
+    JsonArrayConst ratings = doc["stats"]["ratings"].as<JsonArrayConst>();
+    for (uint8_t i = 0; i < 4; ++i) {
+        stats.ratingCounts[i] = i < ratings.size()
+            ? ratings[i].as<uint16_t>()
+            : 0U;
+    }
+    stats.startedAtMs = millis();
+    return true;
+}
+
+bool Storage::clearSession() {
+    bool ok = true;
+    if (LittleFS.exists(SESSION_PATH)) ok &= LittleFS.remove(SESSION_PATH);
+    if (LittleFS.exists(TEMP_SESSION_PATH)) ok &= LittleFS.remove(TEMP_SESSION_PATH);
+    return ok;
+}
+
 bool Storage::appendReview(const ReviewEvent& event) {
     File file = LittleFS.open(REVIEW_LOG_PATH, "a");
     if (!file) return false;
@@ -197,5 +292,7 @@ bool Storage::resetAll() {
     if (LittleFS.exists(STATE_PATH)) ok &= LittleFS.remove(STATE_PATH);
     if (LittleFS.exists(TEMP_STATE_PATH)) ok &= LittleFS.remove(TEMP_STATE_PATH);
     if (LittleFS.exists(REVIEW_LOG_PATH)) ok &= LittleFS.remove(REVIEW_LOG_PATH);
+    if (LittleFS.exists(SESSION_PATH)) ok &= LittleFS.remove(SESSION_PATH);
+    if (LittleFS.exists(TEMP_SESSION_PATH)) ok &= LittleFS.remove(TEMP_SESSION_PATH);
     return ok;
 }

@@ -39,12 +39,17 @@ bool PairingService::start() {
     const String suffix = makeHex(static_cast<uint32_t>(mac & 0xFFFFFFU), 6);
     deviceId_ = "CYD-" + suffix;
     ssid_ = "MNEMOS-" + suffix;
-    password_ = "M" + makeHex(esp_random(), 7);
+    password_ = "MN" + makeHex(esp_random(), 10);
     token_ = makeHex(esp_random(), 8) + makeHex(esp_random(), 8);
 
     network_.prepareProvisioning();
-    if (!WiFi.softAP(ssid_.c_str(), password_.c_str())) {
-        Serial.println("[pair] falha ao iniciar SoftAP");
+    const IPAddress localIp(192, 168, 4, 1);
+    const IPAddress gateway(192, 168, 4, 1);
+    const IPAddress subnet(255, 255, 255, 0);
+    if (!WiFi.softAPConfig(localIp, gateway, subnet) ||
+        !WiFi.softAP(ssid_.c_str(), password_.c_str(), 6, 0, 1)) {
+        Serial.println("[pair] falha ao iniciar SoftAP dedicado");
+        network_.finishProvisioning();
         return false;
     }
 
@@ -105,7 +110,15 @@ bool PairingService::authorized() {
 }
 
 void PairingService::configureRoutes() {
-    // v2 — canonical Mnemos interoperability protocol.
+    // v3 — connection-only provisioning. Content synchronization is handled
+    // separately by backend or BLE and never as a side effect of pairing.
+    server_.on("/v3/info", HTTP_GET, [this]() { sendInfo(); });
+    server_.on("/v3/time", HTTP_POST, [this]() { setClock(); });
+    server_.on("/v3/provision", HTTP_POST, [this]() { provisionV3(); });
+    server_.on("/v3/network/status", HTTP_GET, [this]() { networkStatus(); });
+    server_.on("/v3/pairing/complete", HTTP_POST, [this]() { completePairing(); });
+
+    // v2 — canonical Mnemos interoperability protocol kept for migration.
     server_.on("/v2/info", HTTP_GET, [this]() { sendInfo(); });
     server_.on("/v2/library", HTTP_POST, [this]() { importLibraryV2(); });
     server_.on("/v2/reviews", HTTP_GET, [this]() { exportReviewsV2(); });
@@ -147,7 +160,33 @@ void PairingService::sendInfo() {
     doc["features"]["canonicalSchemas"] = true;
     doc["features"]["wifiProvisioning"] = true;
     doc["features"]["backendSync"] = true;
+    doc["features"]["knownNetworks"] = true;
+#ifdef CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT
+    doc["features"]["enterprisePassword"] = true;
+#else
+    doc["features"]["enterprisePassword"] = false;
+#endif
+    doc["features"]["bleSync"] = true;
     doc["features"]["legacyV1"] = true;
+    JsonArray deckIds = doc["deckIds"].to<JsonArray>();
+    for (size_t i = 0; i < cardCount_; ++i) {
+        bool exists = false;
+        for (JsonVariantConst existing : deckIds) {
+            if (String(existing.as<const char*>()) == cards_[i].deckId) { exists = true; break; }
+        }
+        if (!exists && cards_[i].deckId.length() > 0) deckIds.add(cards_[i].deckId);
+    }
+    JsonArray profiles = doc["networkProfiles"].to<JsonArray>();
+    for (size_t i = 0; i < network_.profileCount(); ++i) {
+        const NetworkProfile* profile = network_.profileAt(i);
+        if (profile == nullptr) continue;
+        JsonObject row = profiles.add<JsonObject>();
+        row["id"] = profile->id;
+        row["ssid"] = profile->ssid;
+        row["security"] = profile->security;
+        row["enabled"] = profile->enabled;
+        row["autoConnect"] = profile->autoConnect;
+    }
     JsonArray cardTypes = doc["capabilities"]["cardTypes"].to<JsonArray>();
     cardTypes.add("basic");
     JsonArray contentFormats = doc["capabilities"]["contentFormats"].to<JsonArray>();
@@ -388,6 +427,52 @@ void PairingService::provision() {
         return;
     }
     networkStatus();
+}
+
+void PairingService::provisionV3() {
+    if (!authorized()) {
+        server_.send(401, "application/json", "{\"error\":\"unauthorized\"}");
+        return;
+    }
+    JsonDocument doc;
+    if (deserializeJson(doc, server_.arg("plain")) ||
+        String(doc["schema"] | "") != "mnemos.provision/v2") {
+        server_.send(400, "application/json", "{\"error\":\"invalid_provision_schema\"}");
+        return;
+    }
+
+    JsonObjectConst network = doc["networkProfile"].as<JsonObjectConst>();
+    NetworkProfile profile;
+    profile.id = network["id"] | "";
+    profile.ssid = network["ssid"] | "";
+    profile.enabled = network["settings"]["enabled"] | true;
+    profile.autoConnect = network["settings"]["autoConnect"] | true;
+    profile.priority = network["settings"]["priority"] | 50;
+
+    const String security = network["security"]["type"] | "";
+    profile.security = security;
+    if (security == "personal") {
+        profile.password = network["security"]["password"] | "";
+    } else if (security == "enterprise-password") {
+        profile.identity = network["security"]["eap"]["identity"] | "";
+        profile.username = network["security"]["eap"]["username"] | "";
+        profile.password = network["security"]["eap"]["password"] | "";
+    } else if (security == "open") {
+        profile.password = "";
+    }
+
+    const String backend = doc["backend"]["baseUrl"] | "";
+    const String deviceToken = doc["backend"]["deviceToken"] | "";
+    const uint32_t interval = doc["syncIntervalSeconds"] | 1800U;
+    if (!network_.storeProfile(profile, backend, deviceToken, interval)) {
+        String body = "{\"error\":\"" + network_.lastError() + "\"}";
+        server_.send(422, "application/json", body);
+        return;
+    }
+
+    // Deliberately do not start STA while provisioning. /pairing/complete is
+    // the transaction boundary that tears down AP and moves to infrastructure.
+    server_.send(200, "application/json", "{\"ok\":true,\"stored\":true}");
 }
 
 void PairingService::networkStatus() {

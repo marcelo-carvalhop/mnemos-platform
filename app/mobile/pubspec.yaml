@@ -1,7 +1,7 @@
 name: flashcards
 description: Mnemos — terminal físico-digital para estudo deliberado e revisão adaptativa.
 publish_to: none
-version: 0.3.0
+version: 0.4.0
 
 environment:
   sdk: ^3.8.0
@@ -23,8 +23,6 @@ dependencies:
     path: packages/authoring
   api_client:
     path: packages/api_client
-  modes:
-    path: packages/modes
   progress:
     path: packages/progress
   sync_client:

@@ -30,9 +30,11 @@ class MainActivity : FlutterActivity() {
     private var pendingResult: MethodChannel.Result? = null
     private var pendingScanResult: MethodChannel.Result? = null
     private var scanReceiver: BroadcastReceiver? = null
+    private var bleBridge: MnemosBleBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        bleBridge = MnemosBleBridge(this, flutterEngine.dartExecutor.binaryMessenger)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             channelName,
@@ -163,30 +165,69 @@ class MainActivity : FlutterActivity() {
                 return
             }
 
-            val strongest = linkedMapOf<String, Map<String, Any>>()
-            for (scan in rows.sortedByDescending { it.level }) {
+            data class Aggregate(
+                val ssid: String,
+                var level: Int = -100,
+                var secure: Boolean = false,
+                var enterprise: Boolean = false,
+                var personal: Boolean = false,
+                var has24: Boolean = false,
+                var has5: Boolean = false,
+                var has6: Boolean = false,
+            )
+
+            val grouped = linkedMapOf<String, Aggregate>()
+            for (scan in rows) {
                 val ssid = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     scan.wifiSsid?.toString()?.removePrefix("\"")?.removeSuffix("\"") ?: scan.SSID
                 } else {
                     @Suppress("DEPRECATION")
                     scan.SSID
                 }.trim()
-                if (ssid.isEmpty() || ssid == WifiManager.UNKNOWN_SSID || strongest.containsKey(ssid)) continue
+                if (ssid.isEmpty() || ssid == WifiManager.UNKNOWN_SSID) continue
+
                 val capabilities = scan.capabilities ?: ""
-                strongest[ssid] = mapOf(
-                    "ssid" to ssid,
-                    "level" to scan.level,
-                    "secure" to (
-                                    capabilities.contains("WEP", ignoreCase = true) ||
-                                    capabilities.contains("WPA", ignoreCase = true) ||
-                                    capabilities.contains("SAE", ignoreCase = true) ||
-                                    capabilities.contains("OWE", ignoreCase = true)
-                            ),
-                    "frequency" to scan.frequency,
-                )
+                val aggregate = grouped.getOrPut(ssid) { Aggregate(ssid) }
+                aggregate.level = maxOf(aggregate.level, scan.level)
+                aggregate.has24 = aggregate.has24 || scan.frequency in 2400..2500
+                aggregate.has5 = aggregate.has5 || scan.frequency in 4900..5924
+                aggregate.has6 = aggregate.has6 || scan.frequency >= 5925
+
+                val isEnterprise = capabilities.contains("EAP", ignoreCase = true) ||
+                    capabilities.contains("SUITE_B", ignoreCase = true)
+                // WEP is intentionally not classified as a supported personal
+                // profile. The terminal contract accepts contemporary PSK/SAE
+                // credentials; legacy WEP remains visible as unsupported.
+                val isPersonal = capabilities.contains("PSK", ignoreCase = true) ||
+                    capabilities.contains("SAE", ignoreCase = true)
+                val isLegacyOrEnhancedOpen = capabilities.contains("WEP", ignoreCase = true) ||
+                    capabilities.contains("OWE", ignoreCase = true)
+                val isSecure = isEnterprise || isPersonal || isLegacyOrEnhancedOpen
+                aggregate.enterprise = aggregate.enterprise || isEnterprise
+                aggregate.personal = aggregate.personal || isPersonal
+                aggregate.secure = aggregate.secure || isSecure
             }
+
+            val values = grouped.values
+                .sortedByDescending { it.level }
+                .map { network ->
+                    mapOf(
+                        "ssid" to network.ssid,
+                        "level" to network.level,
+                        "secure" to network.secure,
+                        "securityType" to when {
+                            network.enterprise -> "enterprise"
+                            network.personal -> "personal"
+                            network.secure -> "unknown"
+                            else -> "open"
+                        },
+                        "has24GHz" to network.has24,
+                        "has5GHz" to network.has5,
+                        "has6GHz" to network.has6,
+                    )
+                }
             unregisterScanReceiver()
-            result.success(strongest.values.toList())
+            result.success(values)
         }
 
         val receiver = object : BroadcastReceiver() {
@@ -233,6 +274,7 @@ class MainActivity : FlutterActivity() {
         permissions: Array<out String>,
         grantResults: IntArray,
     ) {
+        if (bleBridge?.onRequestPermissionsResult(requestCode, grantResults) == true) return
         when (requestCode) {
             wifiPermissionRequestCode -> {
                 val pair = pendingConnect

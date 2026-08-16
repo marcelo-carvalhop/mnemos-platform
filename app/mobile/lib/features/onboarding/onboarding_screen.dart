@@ -194,8 +194,8 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         const Text(
-          'Cards curtos, revisados na hora certa. '
-          'O app calcula quando — você só responde.',
+          'O app organiza o conteúdo e o Mnemos cuida da revisão. '
+          'O estudo acontece no terminal, sem distrações.',
           style: TextStyle(fontSize: 14.5, height: 1.55, color: AppColors.muted),
         ),
         const Spacer(),
@@ -440,7 +440,7 @@ class _FreeGeneration extends StatelessWidget {
         const SizedBox(height: 6),
         const Center(
           child: Text(
-            'Escrever cards à mão e estudar são livres, sempre.',
+            'Criar e organizar cards é livre. O estudo acontece no Mnemos.',
             style: TextStyle(fontSize: 11.5, color: AppColors.faint),
           ),
         ),

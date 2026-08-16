@@ -16,6 +16,13 @@ analyzer:
     # "The function 'test' isn't defined". A green analyze that depends on the
     # state of somebody's working tree is not a check.
     - packages/**
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   rules:

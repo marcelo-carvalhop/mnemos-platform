@@ -5,10 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:store/store.dart';
 
 import '../providers.dart';
+import '../providers_sync.dart';
 import 'account_screen.dart';
 import 'subscription_screen.dart';
-import 'terminal_screen.dart';
-import '../providers_sync.dart';
+import 'device_screen.dart';
 import '../theme.dart';
 
 /// Screen `10 Configurações` — §5.12, §5.7, §8.
@@ -23,7 +23,6 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(userSettingsProvider);
-    final sync = ref.watch(syncControllerProvider);
     final quota = ref.watch(quotaProvider);
     final local = ref.watch(localSettingsProvider).valueOrNull ?? const <String, String>{};
 
@@ -125,31 +124,15 @@ class SettingsScreen extends ConsumerWidget {
             const _Section('Conta e dispositivos'),
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.menu_book_outlined, color: AppColors.petrol),
-              title: const Text('Terminal Mnemos', style: TextStyle(fontSize: 15)),
+              leading: const Icon(Icons.devices_other_outlined, color: AppColors.petrol),
+              title: const Text('Dispositivo', style: TextStyle(fontSize: 15)),
               subtitle: const Text(
-                'Parear por QR Code e transferir baralhos.',
+                'Identidade e configuração de conexão.',
                 style: TextStyle(fontSize: 12.5, color: AppColors.faint),
               ),
               trailing: const Icon(Icons.chevron_right, color: AppColors.faint),
               onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const TerminalScreen()),
-              ),
-            ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Sincronização', style: TextStyle(fontSize: 15)),
-              subtitle: Text(
-                switch (sync.phase) {
-                  _ when sync.pending > 0 => '${sync.pending} mudanças esperando envio',
-                  _ when sync.lastSuccess != null => 'Tudo enviado',
-                  _ => 'Ainda não sincronizou',
-                },
-                style: const TextStyle(fontSize: 12.5, color: AppColors.faint),
-              ),
-              trailing: TextButton(
-                onPressed: () => ref.read(syncControllerProvider.notifier).syncNow(),
-                child: const Text('Sincronizar'),
+                MaterialPageRoute(builder: (_) => const DeviceScreen()),
               ),
             ),
             ListTile(

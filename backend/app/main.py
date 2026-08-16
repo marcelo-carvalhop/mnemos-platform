@@ -25,7 +25,7 @@ settings.validate_for_production()
 
 app = FastAPI(
     title="Mnemos API",
-    version="0.3.0",
+    version="0.4.0",
     docs_url="/docs" if settings.docs_enabled else None,
     redoc_url=None,
     # Disabled in production together with the UI. The schema that matters is

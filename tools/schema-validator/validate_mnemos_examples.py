@@ -25,7 +25,10 @@ SCHEMA_FILES = {
     "review": SCHEMA_ROOT / "review" / "v1.json",
     "review-batch": SCHEMA_ROOT / "review-batch" / "v1.json",
     "sync": SCHEMA_ROOT / "sync" / "v1.json",
-    "provision": SCHEMA_ROOT / "provisioning" / "v1.json",
+    "sync-manifest": SCHEMA_ROOT / "sync-manifest" / "v1.json",
+    "network-profile": SCHEMA_ROOT / "network-profile" / "v1.json",
+    "provision-v1": SCHEMA_ROOT / "provisioning" / "v1.json",
+    "provision-v2": SCHEMA_ROOT / "provisioning" / "v2.json",
 }
 
 

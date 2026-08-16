@@ -1,5 +1,7 @@
 # Conectividade
 
-A operação de conexão é um provisionamento temporário. O terminal abre um SoftAP, o aplicativo envia SSID, senha da rede de infraestrutura, relógio, biblioteca inicial e, quando aplicável, credencial restrita do backend. Após conexão bem-sucedida, o SoftAP é encerrado e o terminal permanece em modo estação.
+Na v0.4, Conexão e Sincronização são responsabilidades separadas. O provisionamento temporário identifica o terminal e grava um `mnemos.network-profile/v1` mais uma credencial restrita do backend quando disponível; ele **não transfere decks**.
 
-Desligar o Wi-Fi no terminal desativa o rádio e a sincronização sem apagar credenciais persistidas. Religar o Wi-Fi reutiliza a configuração existente.
+O SoftAP de provisionamento opera em modo AP exclusivo. Somente após `/v3/pairing/complete` o terminal encerra o AP e volta ao modo Station. O terminal persiste múltiplas redes conhecidas, tenta autoconexão apenas quando está desconectado e mantém perfis mesmo com o rádio Wi-Fi desligado.
+
+BLE é um transporte direto de sincronização iniciado pelo usuário e desligado após a sessão. Veja `docs/architecture/connectivity-v0.4.md` para o desenho completo.

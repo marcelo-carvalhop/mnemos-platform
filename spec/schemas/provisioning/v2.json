@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/provision/v2.json",
+  "title": "Mnemos Provision Request v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "networkProfile"],
+  "properties": {
+    "schema": {"const": "mnemos.provision/v2"},
+    "networkProfile": {"$ref": "https://mnemos.dev/schema/network-profile/v1.json"},
+    "backend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseUrl", "deviceToken"],
+      "properties": {
+        "baseUrl": {"type": "string", "format": "uri"},
+        "deviceToken": {"type": "string", "minLength": 20, "maxLength": 512}
+      }
+    },
+    "syncIntervalSeconds": {"type": "integer", "minimum": 300, "maximum": 86400},
+    "clockEpochSeconds": {"type": "integer", "minimum": 1700000000}
+  }
+}

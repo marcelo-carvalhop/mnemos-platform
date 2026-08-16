@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/sync-manifest/v1.json",
+  "title": "Mnemos Sync Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "deviceId", "deckIds", "cardCount", "libraryRevision", "lastReviewSequence"],
+  "properties": {
+    "schema": {"const": "mnemos.sync-manifest/v1"},
+    "deviceId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "deckIds": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "cardCount": {"type": "integer", "minimum": 0},
+    "libraryRevision": {"type": "integer", "minimum": 0},
+    "lastReviewSequence": {"type": "integer", "minimum": 0}
+  }
+}

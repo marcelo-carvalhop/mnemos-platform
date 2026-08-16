@@ -15,9 +15,15 @@ struct TouchPoint {
 enum class UiAction : uint8_t {
     None = 0,
     Start,
-    PairDevice,
+    OpenSync,
+    OpenConnection,
+    SyncBackend,
+    SyncBluetooth,
+    ConfigureNetwork,
     ToggleWifi,
+    Back,
     CancelPairing,
+    CancelBluetooth,
     ConfidenceDontKnow,
     ConfidenceMaybe,
     ConfidenceCertain,
@@ -37,7 +43,10 @@ public:
     UiAction pollAction();
 
     void showBoot(const String& message);
-    void showHome(uint16_t due, size_t total, bool trustedClock, bool wifiEnabled, bool wifiConnected);
+    void showHome(uint16_t due, size_t total, bool trustedClock, bool canResume);
+    void showSyncMenu(size_t total, uint16_t pendingReviews, bool wifiConnected);
+    void showConnectionMenu(bool wifiEnabled, bool wifiConnected, const String& ssid, size_t knownNetworks);
+    void showBluetoothSync(const String& deviceId, bool connected);
     void showPairing(const String& qrPayload, const String& ssid, const String& password);
     void showQuestion(const CardDefinition& card,
                       uint8_t position,

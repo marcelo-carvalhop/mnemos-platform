@@ -159,24 +159,60 @@ void CydDisplay::showBoot(const String& message) {
     drawCentered(String("v") + Config::APP_VERSION, 286, 2, COLOR_MUTED);
 }
 
-void CydDisplay::showHome(uint16_t due, size_t total, bool trustedClock, bool wifiEnabled, bool wifiConnected) {
+void CydDisplay::showHome(uint16_t due, size_t total, bool trustedClock, bool canResume) {
     clear();
-    String status = !wifiEnabled ? "Wi-Fi off" : (wifiConnected ? "Wi-Fi online" : "Wi-Fi offline");
-    drawHeader("MNEMOS", status);
+    drawHeader("MNEMOS");
 
-    drawCentered("Revisoes pendentes", 48, 2, COLOR_MUTED);
-    drawCentered(String(due), 74, 4, COLOR_ACCENT);
-    drawCentered(String(total) + " cartoes neste terminal", 116, 2, COLOR_MUTED);
-    drawCentered(trustedClock ? "Relogio sincronizado" : "Relogio aproximado", 138, 2, COLOR_MUTED);
+    drawCentered(due == 0 ? "Nada pendente" : String(due) + " revisoes", 72, 3,
+                 due == 0 ? COLOR_MUTED : COLOR_ACCENT);
+    drawCentered(String(total) + " cards no dispositivo", 112, 2, COLOR_MUTED);
+    if (!trustedClock) drawCentered("Relogio aproximado", 136, 2, COLOR_MUTED);
 
-    drawButton(24, 166, 192, 38, "INICIAR SESSAO", UiAction::Start);
-    drawButton(24, 212, 192, 38, "CONFIGURAR / SINCRONIZAR", UiAction::PairDevice);
-    drawButton(24, 258, 192, 38, wifiEnabled ? "DESLIGAR WI-FI" : "LIGAR WI-FI", UiAction::ToggleWifi);
-
-    drawCentered(Config::DEMO_INTERVALS ? "Modo demonstracao" : "Intervalos reais",
-                 302, 2, Config::DEMO_INTERVALS ? COLOR_DANGER : COLOR_MUTED);
+    drawButton(24, 174, 192, 38, canResume ? "CONTINUAR SESSAO" : "INICIAR SESSAO",
+               UiAction::Start, false, canResume || due > 0);
+    drawButton(24, 220, 192, 38, "SINCRONIZACAO", UiAction::OpenSync);
+    drawButton(24, 266, 192, 38, "CONEXAO", UiAction::OpenConnection);
 }
 
+void CydDisplay::showSyncMenu(size_t total, uint16_t pendingReviews, bool wifiConnected) {
+    clear();
+    drawHeader("Sincronizacao", wifiConnected ? "Wi-Fi" : "Offline");
+    drawCentered(String(total) + " cards no Mnemos", 62, 2, COLOR_TEXT);
+    drawCentered(String(pendingReviews) + " revisoes aguardando", 88, 2,
+                 pendingReviews > 0 ? COLOR_ACCENT : COLOR_MUTED);
+
+    drawButton(24, 146, 192, 40, "SINCRONIZAR AGORA", UiAction::SyncBackend, false, wifiConnected);
+    drawButton(24, 196, 192, 40, "CELULAR / BLUETOOTH", UiAction::SyncBluetooth);
+    drawButton(40, 270, 160, 34, "VOLTAR", UiAction::Back);
+}
+
+void CydDisplay::showConnectionMenu(bool wifiEnabled,
+                                    bool wifiConnected,
+                                    const String& ssid,
+                                    size_t knownNetworks) {
+    clear();
+    drawHeader("Conexao");
+    const String state = !wifiEnabled ? "Wi-Fi desligado" :
+                         (wifiConnected ? "Conectado" : "Sem conexao");
+    drawCentered(state, 62, 2, wifiConnected ? COLOR_ACCENT : COLOR_MUTED);
+    if (wifiConnected && ssid.length() > 0) drawCentered(ssid, 88, 2, COLOR_TEXT);
+    drawCentered(String(knownNetworks) + " redes conhecidas", 114, 2, COLOR_MUTED);
+
+    drawButton(24, 164, 192, 40, "CONFIGURAR REDE", UiAction::ConfigureNetwork);
+    drawButton(24, 214, 192, 40,
+               wifiEnabled ? "DESLIGAR WI-FI" : "LIGAR WI-FI", UiAction::ToggleWifi);
+    drawButton(40, 270, 160, 34, "VOLTAR", UiAction::Back);
+}
+
+void CydDisplay::showBluetoothSync(const String& deviceId, bool connected) {
+    clear();
+    drawHeader("Bluetooth", connected ? "Conectado" : "Aguardando");
+    drawCentered("Sincronizacao local", 70, 2, COLOR_TEXT);
+    drawCentered(deviceId, 98, 2, COLOR_ACCENT);
+    drawWrappedText("Abra Sincronizacao no app e escolha Bluetooth. O radio sera desligado ao concluir.",
+                    18, 132, 204, 2, COLOR_MUTED, 20, 5);
+    drawButton(40, 270, 160, 34, "CANCELAR", UiAction::CancelBluetooth);
+}
 
 void CydDisplay::showPairing(const String& qrPayload, const String& ssid, const String& password) {
     clear();

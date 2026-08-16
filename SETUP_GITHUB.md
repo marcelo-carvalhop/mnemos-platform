@@ -163,7 +163,7 @@ Corrija `.gitignore` se necessário antes de prosseguir.
 Quando o staging estiver correto:
 
 ```bash
-git commit -m "feat: establish Mnemos v0.3 monorepo architecture"
+git commit -m "feat: establish Mnemos v0.4 platform architecture"
 ```
 
 Confira:
@@ -208,13 +208,13 @@ git push -u origin main
 
 O parâmetro `-u` registra `origin/main` como upstream. A partir daí, em commits normais, `git push` e `git pull` já sabem qual branch remota utilizar.
 
-## 12. Criar a tag inicial v0.3.0
+## 12. Criar a tag inicial v0.4.0
 
 Depois de confirmar que o primeiro commit está corretamente publicado:
 
 ```bash
-git tag -a v0.3.0 -m "Mnemos v0.3.0 - interoperability, Wi-Fi provisioning and backend sync"
-git push origin v0.3.0
+git tag -a v0.4.0 -m "Mnemos v0.4.0 - minimal HMI, desired-state sync and resilient connectivity"
+git push origin v0.4.0
 ```
 
 A tag representa o estado do código-fonte. ZIPs, APKs, `.bin` e outros artefatos compilados não devem ser adicionados ao Git apenas para representar releases; eles podem ser anexados posteriormente a uma GitHub Release associada à tag.

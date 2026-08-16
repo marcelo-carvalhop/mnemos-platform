@@ -63,6 +63,7 @@ private:
     void acknowledgeReviews();
     void setClock();
     void provision();
+    void provisionV3();
     void networkStatus();
     void completePairing();
     String makeHex(uint32_t value, uint8_t digits) const;

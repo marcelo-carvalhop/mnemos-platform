@@ -86,9 +86,9 @@ docker/data/
 # -----------------------------------------------------------------------------
 # Generated/distribution artifacts
 # -----------------------------------------------------------------------------
-dist/
-release/
-releases/
+/dist/
+/release/
+/releases/
 *.zip
 *.tar
 *.tar.gz

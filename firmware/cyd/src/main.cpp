@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
 #include "backend_sync_service.h"
+#include "ble_sync_service.h"
 #include "cards.h"
 #include "config.h"
 #include "cyd_display.h"
@@ -12,7 +13,10 @@
 
 enum class AppScreen : uint8_t {
     Home,
+    Sync,
+    Connection,
     Pairing,
+    BluetoothSync,
     Question,
     Answer,
     Summary,
@@ -30,6 +34,7 @@ PairingService pairing(storage, clockService, networkService,
                        cards, states, Config::MAX_DEVICE_CARDS, cardCount);
 BackendSyncService backendSync(networkService, storage,
                                cards, states, Config::MAX_DEVICE_CARDS, cardCount);
+BleSyncService bleSync(storage, cards, states, Config::MAX_DEVICE_CARDS, cardCount);
 AppScreen screen = AppScreen::Home;
 
 void rebuildEngine() {
@@ -41,13 +46,36 @@ void rebuildEngine() {
     engine->initializeStates();
 }
 
+uint16_t pendingReviewCount() {
+    const String rows = storage.reviewsNdjson();
+    if (rows.length() == 0) return 0;
+    uint16_t count = 0;
+    for (size_t i = 0; i < rows.length(); ++i) {
+        if (rows[i] == '\n') ++count;
+    }
+    if (!rows.endsWith("\n")) ++count;
+    return count;
+}
+
 void renderHome() {
     screen = AppScreen::Home;
     display.showHome(engine == nullptr ? 0 : engine->dueCount(),
                      cardCount,
                      clockService.trusted(),
-                     networkService.enabled(),
-                     networkService.connected());
+                     engine != nullptr && engine->hasResumableSession());
+}
+
+void renderSync() {
+    screen = AppScreen::Sync;
+    display.showSyncMenu(cardCount, pendingReviewCount(), networkService.connected());
+}
+
+void renderConnection() {
+    screen = AppScreen::Connection;
+    display.showConnectionMenu(networkService.enabled(),
+                               networkService.connected(),
+                               networkService.ssid(),
+                               networkService.profileCount());
 }
 
 void renderQuestion() {
@@ -74,6 +102,12 @@ void startPairing() {
     if (!pairing.start()) return;
     screen = AppScreen::Pairing;
     display.showPairing(pairing.qrPayload(), pairing.ssid(), pairing.password());
+}
+
+void startBluetoothSync() {
+    if (!bleSync.start()) return;
+    screen = AppScreen::BluetoothSync;
+    display.showBluetoothSync(bleSync.deviceId(), bleSync.connected());
 }
 
 void handleQuestionAction(UiAction action) {
@@ -104,7 +138,6 @@ void handleQuestionAction(UiAction action) {
 void handleAnswerAction(UiAction action) {
     Rating rating;
     bool hasRating = true;
-
     switch (action) {
         case UiAction::RateAgain: rating = Rating::Again; break;
         case UiAction::RateHard: rating = Rating::Hard; break;
@@ -112,7 +145,6 @@ void handleAnswerAction(UiAction action) {
         case UiAction::RateEasy: rating = Rating::Easy; break;
         default: hasRating = false; break;
     }
-
     if (!hasRating) return;
     const bool finished = engine->rateCurrent(rating);
     if (finished) renderSummary();
@@ -126,7 +158,6 @@ void setup() {
 
     display.begin();
     display.showBoot("Inicializando...");
-
     storage.begin();
     networkService.begin();
     clockService.begin();
@@ -152,19 +183,24 @@ void setup() {
 
 void loop() {
     pairing.loop();
+    bleSync.loop();
     networkService.loop();
 
-    if (pairing.consumeLibraryUpdated()) {
+    if (pairing.consumeLibraryUpdated() || bleSync.consumeLibraryUpdated()) {
         rebuildEngine();
-        Serial.printf("[app] biblioteca atualizada pelo app: %u cartoes\n",
+        Serial.printf("[app] biblioteca local atualizada: %u cartoes\n",
                       static_cast<unsigned>(cardCount));
     }
 
-    if (screen == AppScreen::Home) {
+    const bool nonStudyScreen = screen == AppScreen::Home ||
+                                screen == AppScreen::Sync ||
+                                screen == AppScreen::Connection;
+    if (nonStudyScreen && !pairing.active() && !bleSync.active()) {
         backendSync.loop();
         if (backendSync.consumeLibraryUpdated()) {
             rebuildEngine();
-            renderHome();
+            if (screen == AppScreen::Home) renderHome();
+            else if (screen == AppScreen::Sync) renderSync();
             Serial.printf("[app] biblioteca atualizada pelo backend: %u cartoes\n",
                           static_cast<unsigned>(cardCount));
         }
@@ -172,11 +208,19 @@ void loop() {
 
     if (screen == AppScreen::Pairing && !pairing.active()) {
         rebuildEngine();
-        if (networkService.connected() && networkService.backendUrl().length() > 0) {
-            backendSync.syncNow();
-            if (backendSync.consumeLibraryUpdated()) rebuildEngine();
+        renderConnection();
+    }
+    if (screen == AppScreen::BluetoothSync) {
+        if (!bleSync.active()) {
+            rebuildEngine();
+            renderSync();
+        } else {
+            static bool lastConnected = false;
+            if (lastConnected != bleSync.connected()) {
+                lastConnected = bleSync.connected();
+                display.showBluetoothSync(bleSync.deviceId(), lastConnected);
+            }
         }
-        renderHome();
     }
 
     const UiAction action = display.pollAction();
@@ -187,20 +231,35 @@ void loop() {
 
     switch (screen) {
         case AppScreen::Home:
-            if (action == UiAction::Start && engine != nullptr && engine->startSession()) {
+            if (action == UiAction::Start && engine != nullptr &&
+                (engine->hasResumableSession() ? engine->resumeSession() : engine->startSession())) {
                 renderQuestion();
-            } else if (action == UiAction::PairDevice) {
+            } else if (action == UiAction::OpenSync) {
+                renderSync();
+            } else if (action == UiAction::OpenConnection) {
+                renderConnection();
+            }
+            break;
+
+        case AppScreen::Sync:
+            if (action == UiAction::SyncBackend) {
+                if (backendSync.syncNow() && backendSync.consumeLibraryUpdated()) rebuildEngine();
+                renderSync();
+            } else if (action == UiAction::SyncBluetooth) {
+                startBluetoothSync();
+            } else if (action == UiAction::Back) {
+                renderHome();
+            }
+            break;
+
+        case AppScreen::Connection:
+            if (action == UiAction::ConfigureNetwork) {
                 startPairing();
             } else if (action == UiAction::ToggleWifi) {
-                if (networkService.enabled()) {
-                    networkService.disable();
-                } else {
-                    networkService.enable();
-                    if (networkService.connected() && networkService.backendUrl().length() > 0) {
-                        backendSync.syncNow();
-                        if (backendSync.consumeLibraryUpdated()) rebuildEngine();
-                    }
-                }
+                if (networkService.enabled()) networkService.disable();
+                else networkService.enable();
+                renderConnection();
+            } else if (action == UiAction::Back) {
                 renderHome();
             }
             break;
@@ -208,7 +267,14 @@ void loop() {
         case AppScreen::Pairing:
             if (action == UiAction::CancelPairing) {
                 pairing.stop();
-                renderHome();
+                renderConnection();
+            }
+            break;
+
+        case AppScreen::BluetoothSync:
+            if (action == UiAction::CancelBluetooth) {
+                bleSync.stop();
+                renderSync();
             }
             break;
 

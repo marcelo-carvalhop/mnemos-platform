@@ -1,0 +1,71 @@
+00:00 +0: loading /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/terminal_protocol_test.dart
+00:00 +0: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/terminal_protocol_test.dart: TerminalInfo reports missing required fields instead of null assertion
+00:00 +1: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/terminal_protocol_test.dart: TerminalReview reports missing id instead of null assertion
+00:00 +2: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: (setUpAll)
+00:00 +2: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: a fresh install has a deck and a queue rather than a blank screen
+00:00 +3: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: the headline starts at zero and only moves by remembering
+00:01 +4: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: the grade buttons get four real intervals, ordered
+00:01 +5: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: answering counts against today, bucketed by the stored timezone
+00:01 +6: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: the device id is created once and then reused
+00:01 +7: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: seeding twice does not duplicate the deck
+00:01 +8: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: nothing due and nothing existing are different answers
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:store/src/database.g.dart:5509:36)
+#4      new AppDatabase (package:store/src/database.dart)
+#5      main.<anonymous closure> (file:///mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026%20-2/PISH/mnemos-platform/app/mobile/test/composition_test.dart:98:19)
+<asynchronous suspension>
+#6      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:15)
+<asynchronous suspension>
+#7      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#8      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:01 +9: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/composition_test.dart: (tearDownAll)
+00:01 +9: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: (setUpAll)
+00:01 +9: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: a first launch with no account does not talk to the server
+00:01 +10: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: a successful sync empties the outbox
+00:01 +11: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: offline costs nothing: the outbox is exactly where it was
+00:01 +12: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: offline is not the failure state
+00:01 +13: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: a server error is transient, a rejection is not
+00:01 +14: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: an unexpected failure is shown, not swallowed
+00:01 +15: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: two callers at once produce one sync, not two
+00:01 +16: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: a resync is reported rather than looking like a hang
+00:01 +17: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: a count read while syncing does not overwrite the result
+00:01 +18: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: the pending count refreshes without touching the network
+00:01 +19: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/sync_test.dart: (tearDownAll)
+00:01 +19: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: (setUpAll)
+00:02 +19: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/notifications_test.dart: nothing due means no notification at all
+00:02 +20: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +21: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +22: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +23: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +24: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +25: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +26: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +27: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +28: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +29: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +30: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:02 +31: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/settings_test.dart: changing a limit writes it with a timestamp and a device
+00:03 +32: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: the last step says what the free generation costs
+00:03 +33: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: the last step says what the free generation costs
+00:03 +34: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/editor_screen_test.dart: save stays disabled until both sides have text
+00:04 +35: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/editor_screen_test.dart: save stays disabled until both sides have text
+00:04 +36: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: declining is a real button, not a link in the corner
+00:04 +37: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: declining is a real button, not a link in the corner
+00:04 +38: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/editor_screen_test.dart: over the limit the counter turns and saving is refused
+00:04 +39: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/editor_screen_test.dart: over the limit the counter turns and saving is refused
+00:04 +40: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: skipping still leaves a usable app: a deck and a goal
+00:04 +41: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: skipping still leaves a usable app: a deck and a goal
+00:05 +42: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/editor_screen_test.dart: "salvar e criar outro" clears the fields and keeps the screen
+00:05 +43: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: a chosen goal is the one that is stored
+00:05 +44: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: someone who does not know what to study is not blocked
+00:05 +45: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: it is not shown twice
+00:05 +46: /mnt/8eb95b80-2bdf-4f54-a59d-22a645022f76/PUC/2026 -2/PISH/mnemos-platform/app/mobile/test/onboarding_test.dart: (tearDownAll)
+00:05 +46: All tests passed!

@@ -66,7 +66,7 @@ void main() {
     expect(skip, findsOneWidget);
     expect(tester.widget<OutlinedButton>(skip).onPressed, isNotNull);
     // And the screen says why declining costs nothing.
-    expect(find.textContaining('livres, sempre'), findsOneWidget);
+    expect(find.textContaining('não expira'), findsOneWidget);
   });
 
   testWidgets('skipping still leaves a usable app: a deck and a goal',

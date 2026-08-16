@@ -1,7 +1,7 @@
 # Mnemos Web
 
-Este diretório está reservado para o futuro cliente web oficial do Mnemos. Nenhum framework foi escolhido neste momento; a decisão poderá ser tomada posteriormente sem alterar a organização do monorepositório.
+Reserved official web client.
 
-A aplicação web deverá ser um cliente independente do backend, nunca um consumidor direto do banco interno do aplicativo móvel. As responsabilidades previstas incluem criação e edição em massa de decks e cards, importação e exportação, análise de histórico e retenção, gerenciamento de dispositivos, configurações de conta e administração de sincronização.
+The web interface will follow the same distraction-minimizing HMI rules as the device and mobile application. It is intended for content creation, bulk organization, device/account administration and dedicated statistics. It must not become a second study surface and must not mix dashboards or engagement widgets into unrelated screens.
 
-Qualquer implementação deve consumir a API pública/estável do backend e utilizar os contratos definidos em `../../spec/` quando trocar objetos interoperáveis.
+No web framework is selected yet. The web client will consume the public backend API and Mnemos schemas rather than the mobile application's internal database.

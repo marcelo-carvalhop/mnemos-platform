@@ -1,5 +1,17 @@
 # Registro de versões — Mnemos
 
+## 0.4.1 — correções de análise Flutter e testes locais
+
+Corrige erros introduzidos na consolidação da v0.4.0: resolve a colisão de nome `Column` entre Drift e Flutter na tela de sincronização, remove uma construção `const` inválida, restaura o import do `quotaProvider` em Configurações e protege o uso de `BuildContext` após uma operação assíncrona no gerenciamento de decks. Atualiza também o teste de onboarding para refletir o texto simplificado vigente.
+
+A ausência de `libsqlite3.so` observada em `flutter test` é uma dependência do ambiente Linux e não uma falha do domínio ou do banco Android; a configuração local deve instalar a biblioteca SQLite do sistema antes de executar a suíte VM.
+
+## 0.3.1 — Wi-Fi provisioning diagnostics
+
+Corrige o fluxo de provisionamento do terminal no aplicativo Android. As respostas do terminal e do backend deixam de usar operadores de null assertion nas fronteiras do protocolo e passam a produzir erros estruturados com o campo/endpoint responsável. A tela Terminal Mnemos agora mostra a etapa corrente da configuração, permitindo distinguir conexão temporária, leitura de capacidades, gravação das credenciais, transferência da biblioteca e confirmação da rede.
+
+Adiciona descoberta de redes Wi-Fi próximas durante o provisionamento. O SSID continua editável manualmente, mas o usuário pode solicitar uma varredura e selecionar uma rede detectada, com indicação de intensidade, banda e proteção. A implementação Android solicita as permissões exigidas para scan e preserva o fluxo manual quando a plataforma não disponibiliza resultados.
+
 ## 0.3.0 — 16 de agosto de 2026
 
 A v0.3.0 introduz a primeira especificação pública de interoperabilidade do Mnemos. Cards, decks, estados, reviews, snapshots, lotes de reviews e provisionamento passam a possuir JSON Schemas versionados. O aplicativo converte sua persistência interna para `mnemos.sync/v1`; o firmware CYD implementa o Device Protocol v2 e mantém compatibilidade temporária com rotas v1.

@@ -28,7 +28,7 @@ class ProgressScreen extends ConsumerWidget {
     final graduations = ref.watch(graduationsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Progresso')),
+      appBar: AppBar(title: const Text('Estatísticas')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref

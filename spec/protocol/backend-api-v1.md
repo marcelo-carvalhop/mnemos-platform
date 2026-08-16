@@ -162,3 +162,17 @@ Prefira erros estruturados e estáveis. `401` para autenticação inválida, `40
 ## 18. Evolução
 
 Mantenha parsers antigos durante janela de migração. Nunca reinterprete `mnemos.card/v1` como se fosse v2. Publique schemas antigos permanentemente se já houver dados persistidos que os referenciem. Migrações de banco devem preservar o histórico append-only e permitir rotação/revogação de credenciais sem perda de conteúdo.
+
+## v0.4 terminal desired-state additions
+
+Connection and content assignment are independent. `POST /v1/terminals/register` accepts an empty `deck_ids` list and returns a terminal-scoped credential. A freshly paired terminal therefore has no implicit content assignment.
+
+`GET /v1/terminals/{device_id}/summary` returns both `desired_deck_ids` and `reported_deck_ids`, plus capacity, connectivity and last synchronization metadata.
+
+`POST /v1/terminals/{device_id}/decks` changes only desired deck presence. It does not claim that the physical terminal has already applied the decision.
+
+`POST /v1/terminals/{device_id}/observed` is account-authenticated and records the actual state observed by the official/compatible app immediately after a direct BLE synchronization. It exists so cloud state can converge even when the terminal had no Internet.
+
+`POST /v1/terminal/status` is terminal-token authenticated and reports the terminal's own physical state after infrastructure synchronization.
+
+Review authorization during reconciliation considers the union of desired scope and last validated reported scope. This allows pending reviews to leave a deck safely before that deck is removed from the terminal, while reported deck ids are still validated as belonging to the same account.
