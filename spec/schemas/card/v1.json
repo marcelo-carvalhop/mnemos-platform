@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/card/v1.json",
+  "title": "Mnemos Card v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "deckId",
+    "type",
+    "content",
+    "metadata"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mnemos.card/v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "deckId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "basic",
+        "typed",
+        "multiple_choice",
+        "cloze",
+        "true_false"
+      ]
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prompt",
+        "answer"
+      ],
+      "properties": {
+        "prompt": {
+          "$ref": "#/$defs/contentBlock"
+        },
+        "answer": {
+          "$ref": "#/$defs/contentBlock"
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/contentBlock"
+          }
+        }
+      }
+    },
+    "tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "createdAt",
+        "updatedAt",
+        "revision"
+      ],
+      "properties": {
+        "language": {
+          "type": "string",
+          "pattern": "^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "contentBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "format",
+        "text"
+      ],
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "plain",
+            "markdown"
+          ]
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "multiple_choice"
+          }
+        },
+        "required": [
+          "type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "content": {
+            "required": [
+              "prompt",
+              "answer",
+              "options"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

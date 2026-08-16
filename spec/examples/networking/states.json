@@ -1,0 +1,112 @@
+[
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-01",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-02",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-03",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-04",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-05",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-06",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-07",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-08",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-09",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  },
+  {
+    "schema": "mnemos.card-state/v1",
+    "cardId": "demo-redes-10",
+    "dueAt": 0,
+    "lastReviewedAt": null,
+    "intervalSeconds": 0,
+    "repetitions": 0,
+    "lapses": 0,
+    "lastRating": 0,
+    "revision": 1
+  }
+]

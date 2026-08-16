@@ -1,0 +1,11 @@
+{
+  "schema": "mnemos.deck/v1",
+  "id": "demo-redes",
+  "name": "Redes de Computadores",
+  "description": "Exemplo canônico Mnemos com 10 cards básicos de redes.",
+  "metadata": {
+    "language": "pt-BR",
+    "updatedAt": "2026-08-16T14:00:00Z",
+    "revision": 1
+  }
+}

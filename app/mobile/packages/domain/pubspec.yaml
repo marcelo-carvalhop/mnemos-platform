@@ -1,0 +1,15 @@
+name: domain
+description: Entities, value types and the generated contract. No dependencies on Flutter, storage or IO.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  # Grapheme-cluster segmentation (§7.6). Counting UTF-16 code units would
+  # let the editor accept text the server drops.
+  characters: ^1.4.0
+
+dev_dependencies:
+  test: ^1.25.0

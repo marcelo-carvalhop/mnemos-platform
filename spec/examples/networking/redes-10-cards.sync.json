@@ -1,0 +1,381 @@
+{
+  "schema": "mnemos.sync/v1",
+  "exportedAt": "2026-08-16T14:00:00Z",
+  "decks": [
+    {
+      "schema": "mnemos.deck/v1",
+      "id": "demo-redes",
+      "name": "Redes de Computadores",
+      "description": "Exemplo canônico Mnemos com 10 cards básicos de redes.",
+      "metadata": {
+        "language": "pt-BR",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    }
+  ],
+  "cards": [
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-01",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "Qual é a função principal da camada de enlace?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Entregar quadros entre nós diretamente conectados ao mesmo enlace e coordenar o acesso ao meio físico."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-02",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "Qual é a função principal do protocolo IP?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Endereçar e encaminhar datagramas entre redes, oferecendo entrega por melhor esforço."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-03",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "Qual é a diferença fundamental entre TCP e UDP?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "TCP fornece um fluxo orientado a conexão, confiável e ordenado; UDP fornece datagramas sem conexão e sem garantias de entrega ou ordem."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-04",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "O que ocorre no three-way handshake do TCP?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Cliente e servidor trocam SYN, SYN-ACK e ACK para sincronizar números de sequência e estabelecer a conexão."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-05",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "Para que serve o DNS?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Resolver nomes de domínio em informações como endereços IP por meio de uma hierarquia distribuída de servidores."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-06",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "Qual é a função de uma máscara de sub-rede?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Separar os bits de rede e de host de um endereço IP e permitir determinar quais endereços pertencem à mesma sub-rede."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-07",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "O que faz um roteador?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Encaminha pacotes entre redes distintas com base em sua tabela de roteamento e no endereço IP de destino."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-08",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "O que é ARP em redes IPv4?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "É o protocolo usado em uma rede local para descobrir o endereço MAC associado a um endereço IPv4 conhecido."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-09",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "Qual é a finalidade do DHCP?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Fornecer automaticamente parâmetros de rede como endereço IP, máscara, gateway e servidores DNS."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    },
+    {
+      "schema": "mnemos.card/v1",
+      "id": "demo-redes-10",
+      "deckId": "demo-redes",
+      "type": "basic",
+      "content": {
+        "prompt": {
+          "format": "plain",
+          "text": "O que significa NAT?"
+        },
+        "answer": {
+          "format": "plain",
+          "text": "Network Address Translation é a tradução de endereços entre domínios de rede, frequentemente usada para compartilhar um endereço público entre hosts privados."
+        }
+      },
+      "tags": [
+        "redes-de-computadores"
+      ],
+      "metadata": {
+        "language": "pt-BR",
+        "createdAt": "2026-08-16T14:00:00Z",
+        "updatedAt": "2026-08-16T14:00:00Z",
+        "revision": 1
+      }
+    }
+  ],
+  "states": [
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-01",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-02",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-03",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-04",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-05",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-06",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-07",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-08",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-09",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    },
+    {
+      "schema": "mnemos.card-state/v1",
+      "cardId": "demo-redes-10",
+      "dueAt": 0,
+      "lastReviewedAt": null,
+      "intervalSeconds": 0,
+      "repetitions": 0,
+      "lapses": 0,
+      "lastRating": 0,
+      "revision": 1
+    }
+  ]
+}

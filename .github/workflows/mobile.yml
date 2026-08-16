@@ -1,0 +1,37 @@
+name: Mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/mobile/**'
+      - 'shared/**'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    paths:
+      - 'app/mobile/**'
+      - 'shared/**'
+      - '.github/workflows/mobile.yml'
+
+concurrency:
+  group: mobile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.0'
+          cache: true
+      - name: Resolve dependencies
+        working-directory: app/mobile
+        run: flutter pub get
+      - name: Analyze
+        working-directory: app/mobile
+        run: flutter analyze
+      - name: Test
+        working-directory: app/mobile
+        run: flutter test

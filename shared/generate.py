@@ -1,0 +1,265 @@
+#!/usr/bin/env python3
+"""Generate the shared contract into Dart and Python.
+
+Spec §4: character limits, enums and error codes are declared once in
+contract.yaml and consumed by both sides. The generated files are committed,
+and CI regenerates and diffs them, so a stale generated file fails the build
+rather than silently disagreeing with its source.
+
+    python shared/generate.py           # write the generated files
+    python shared/generate.py --check   # exit 1 if they are out of date
+"""
+
+from __future__ import annotations
+
+import argparse
+import pathlib
+import sys
+
+import yaml
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+CONTRACT = ROOT / "shared" / "contract.yaml"
+DART_OUT = ROOT / "app" / "mobile" / "packages" / "domain" / "lib" / "src" / "contract.g.dart"
+PY_OUT = ROOT / "backend" / "app" / "contract.py"
+
+BANNER_LINES = [
+    "GENERATED FROM shared/contract.yaml — DO NOT EDIT.",
+    "Regenerate with: python shared/generate.py",
+]
+
+
+def _dart(c: dict) -> str:
+    limits = c["card_limits"]
+    sched = c["scheduling"]
+    quota = c["quota"]
+    modes = c["modes"]
+
+    grades ="\n".join(
+        f"  /// {g['label_pt']} (wire value {g['value']})\n"
+        f"  {g['dart']}({g['value']}),"
+        for g in c["grades"]
+    )
+    # The Dart member is camelCase and the wire value is not, so each member
+    # carries its wire value. Without it every client-side mapping hardcodes a
+    # snake_case string — which is the thing §10 exists to stop.
+    sources = "\n".join(f"  {_camel(s)}('{s}')," for s in c["review_sources"])
+    statuses = "\n".join(f"  {_camel(s)}('{s}')," for s in c["card_statuses"])
+    errors = "\n".join(f"  {_camel(e)}('{e}')," for e in c["error_codes"])
+    milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
+
+    banner = "\n".join(f"// {line}" for line in BANNER_LINES)
+    return f"""{banner}
+
+/// Contract version; bumped when this file's shape changes.
+const int kContractVersion = {c['version']};
+
+/// §7.6 — counted in grapheme clusters over NFC-normalised text.
+const int kFrontMaxGraphemes = {limits['front_max_graphemes']};
+const int kBackMaxGraphemes = {limits['back_max_graphemes']};
+
+/// §4 — maturity is a query predicate, never a stored column.
+const int kMatureIntervalDays = {sched['mature_interval_days']};
+const double kDesiredRetention = {sched['desired_retention']};
+const List<int> kGraduationMilestoneDays = [{milestones}];
+
+/// §5.7 — the day rolls over at 04:00 local, not midnight.
+const int kDefaultDayCutoffHour = {sched['default_day_cutoff_hour']};
+
+/// §7.7 — one generation for the lifetime of the account, not per month.
+const int kFreeGenerationsLifetime = {quota['free_generations_lifetime']};
+const int kMaxJobsInFlight = {quota['max_jobs_in_flight']};
+
+/// §5.9 — alternative modes. The grade mapping is a scheduling decision, so
+/// its numbers live in the contract rather than in a widget.
+const int kMultipleChoiceOptions = {modes['multiple_choice_options']};
+const int kMultipleChoiceFastAnswerMs = {modes['multiple_choice_fast_answer_ms']};
+const int kLeechMinLapses = {modes['leech_min_lapses']};
+const int kSimuladoDefaultQuestions = {modes['simulado_default_questions']};
+const int kSimuladoDefaultMinutes = {modes['simulado_default_minutes']};
+const int kTtsAnswerPauseMs = {modes['tts_answer_pause_ms']};
+
+/// §5.2 — the wire value is the contract. Never renumber.
+enum Grade {{
+{grades}
+  ;
+
+  const Grade(this.value);
+
+  /// Persisted and transmitted as this smallint.
+  final int value;
+
+  static Grade fromValue(int value) => Grade.values.firstWhere(
+        (g) => g.value == value,
+        orElse: () => throw ArgumentError('unknown grade value: $value'),
+      );
+}}
+
+/// §5.2 — a review row exists only for modes that feed the scheduler.
+enum ReviewSource {{
+{sources}
+  ;
+
+  const ReviewSource(this.wire);
+
+  /// The string on the wire and in the database.
+  final String wire;
+
+  static ReviewSource fromWire(String wire) => values.firstWhere(
+        (v) => v.wire == wire,
+        orElse: () => throw ArgumentError('unknown review source: $wire'),
+      );
+}}
+
+/// §5.1
+enum CardStatus {{
+{statuses}
+  ;
+
+  const CardStatus(this.wire);
+
+  final String wire;
+
+  static CardStatus fromWire(String wire) => values.firstWhere(
+        (v) => v.wire == wire,
+        orElse: () => throw ArgumentError('unknown card status: $wire'),
+      );
+}}
+
+/// §10 — the client maps codes to copy; it never matches on server prose.
+enum ErrorCode {{
+{errors}
+  ;
+
+  const ErrorCode(this.wire);
+
+  final String wire;
+
+  /// Null for a code this build has never heard of. §5.3 makes that the
+  /// normal case, not a corruption — so it is a lookup that can miss, never
+  /// a throw.
+  static ErrorCode? fromWire(String? wire) {{
+    for (final value in values) {{
+      if (value.wire == wire) return value;
+    }}
+    return null;
+  }}
+}}
+"""
+
+
+def _python(c: dict) -> str:
+    limits = c["card_limits"]
+    sched = c["scheduling"]
+    quota = c["quota"]
+    modes = c["modes"]
+
+    grades ="\n".join(f"    {g['name'].upper()} = {g['value']}" for g in c["grades"])
+    sources = "\n".join(f'    {s.upper()} = "{s}"' for s in c["review_sources"])
+    statuses = "\n".join(f'    {s.upper()} = "{s}"' for s in c["card_statuses"])
+    errors = "\n".join(f'    {e.upper()} = "{e}"' for e in c["error_codes"])
+    milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
+
+    banner = "\n".join(f"# {line}" for line in BANNER_LINES)
+    return f'''{banner}
+
+from __future__ import annotations
+
+from enum import IntEnum, StrEnum
+
+CONTRACT_VERSION = {c['version']}
+
+# §7.6 — counted in grapheme clusters over NFC-normalised text.
+FRONT_MAX_GRAPHEMES = {limits['front_max_graphemes']}
+BACK_MAX_GRAPHEMES = {limits['back_max_graphemes']}
+
+# §4 — maturity is a query predicate, never a stored column.
+MATURE_INTERVAL_DAYS = {sched['mature_interval_days']}
+DESIRED_RETENTION = {sched['desired_retention']}
+GRADUATION_MILESTONE_DAYS = ({milestones},)
+
+# §5.7 — the day rolls over at 04:00 local, not midnight.
+DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']}
+
+# §7.7 — one generation for the lifetime of the account, not per month.
+FREE_GENERATIONS_LIFETIME = {quota['free_generations_lifetime']}
+MAX_JOBS_IN_FLIGHT = {quota['max_jobs_in_flight']}
+
+# §5.9 — alternative modes. Present on the server only so that a future
+# server-side check has the same numbers; the modes themselves are on-device.
+MULTIPLE_CHOICE_OPTIONS = {modes['multiple_choice_options']}
+MULTIPLE_CHOICE_FAST_ANSWER_MS = {modes['multiple_choice_fast_answer_ms']}
+LEECH_MIN_LAPSES = {modes['leech_min_lapses']}
+SIMULADO_DEFAULT_QUESTIONS = {modes['simulado_default_questions']}
+SIMULADO_DEFAULT_MINUTES = {modes['simulado_default_minutes']}
+TTS_ANSWER_PAUSE_MS = {modes['tts_answer_pause_ms']}
+
+
+class Grade(IntEnum):
+    """§5.2 — the wire value is the contract. Never renumber."""
+
+{grades}
+
+
+class ReviewSource(StrEnum):
+    """§5.2 — a review row exists only for modes that feed the scheduler."""
+
+{sources}
+
+
+class CardStatus(StrEnum):
+    """§5.1"""
+
+{statuses}
+
+
+class ErrorCode(StrEnum):
+    """§10 — machine-readable; the client maps these to copy.
+
+    StrEnum, not `(str, Enum)`: the latter stringifies as "ErrorCode.MEMBER" on
+    Python 3.11+, and that string reached the database. A code the client
+    cannot map is the same as no code at all.
+    """
+
+{errors}
+'''
+
+
+def _camel(snake: str) -> str:
+    head, *tail = snake.split("_")
+    return head + "".join(p.capitalize() for p in tail)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--check", action="store_true", help="fail if out of date")
+    args = parser.parse_args()
+
+    contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
+    outputs = {DART_OUT: _dart(contract), PY_OUT: _python(contract)}
+
+    stale = []
+    for path, content in outputs.items():
+        current = path.read_text(encoding="utf-8") if path.exists() else None
+        if current == content:
+            continue
+        if args.check:
+            stale.append(path)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+            print(f"wrote {path.relative_to(ROOT)}")
+
+    if stale:
+        for path in stale:
+            print(f"STALE: {path.relative_to(ROOT)}", file=sys.stderr)
+        print("\nRun: python shared/generate.py", file=sys.stderr)
+        return 1
+
+    if args.check:
+        print("contract: generated files are up to date")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

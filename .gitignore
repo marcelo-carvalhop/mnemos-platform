@@ -1,0 +1,97 @@
+# -----------------------------------------------------------------------------
+# Operating systems and editors
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*~
+*.swp
+
+# -----------------------------------------------------------------------------
+# Secrets and local configuration
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+secrets.json
+credentials.json
+**/google-services.json
+**/GoogleService-Info.plist
+**/key.properties
+
+# Android SDK local path
+**/android/local.properties
+
+# -----------------------------------------------------------------------------
+# Flutter / Dart
+# -----------------------------------------------------------------------------
+**/.dart_tool/
+**/.packages
+**/.pub-cache/
+**/.pub/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/build/
+
+# pubspec.lock is intentionally tracked for applications.
+# Package-level lock files may be omitted by their own package policy.
+
+# -----------------------------------------------------------------------------
+# Android / Gradle
+# -----------------------------------------------------------------------------
+**/.gradle/
+**/captures/
+**/*.apk
+**/*.aab
+
+# -----------------------------------------------------------------------------
+# PlatformIO / embedded build artifacts
+# -----------------------------------------------------------------------------
+**/.pio/
+**/*.elf
+**/*.bin
+**/*.map
+**/*.uf2
+**/*.hex
+
+# -----------------------------------------------------------------------------
+# Python
+# -----------------------------------------------------------------------------
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/*.egg-info/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+**/htmlcov/
+**/.coverage
+
+# -----------------------------------------------------------------------------
+# Docker/local service data
+# -----------------------------------------------------------------------------
+postgres-data/
+minio-data/
+docker/data/
+
+# -----------------------------------------------------------------------------
+# Generated/distribution artifacts
+# -----------------------------------------------------------------------------
+dist/
+release/
+releases/
+*.zip
+*.tar
+*.tar.gz
+
+# Experiment outputs
+**/out/

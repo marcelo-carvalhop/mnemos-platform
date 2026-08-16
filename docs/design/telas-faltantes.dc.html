@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<x-dc>
+<helmet>
+  <meta name="design_doc_mode" content="canvas">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#f0f0ee; font-family:'Outfit', 'Helvetica Neue', Helvetica, sans-serif; -webkit-font-smoothing:antialiased; }
+    * { box-sizing:border-box; }
+    .frame { width:256px; height:600px; background:#fff; border-radius:26px; box-shadow:0 3px 14px rgba(28,53,87,.08); overflow:hidden; display:flex; flex-direction:column; flex:none; }
+    .bar { height:28px; display:flex; align-items:center; justify-content:space-between; padding:0 14px; font-size:8px; color:#7d8fa2; flex:none; }
+    .primary { width:100%; height:35px; border:none; border-radius:11px; background:#204066; color:#fff; font-size:11.5px; font-weight:500; font-family:inherit; letter-spacing:.2px; }
+    .ghost { width:100%; height:35px; border:1px solid #e6eaef; border-radius:11px; background:#fff; color:#4a7ba7; font-size:11.5px; font-weight:500; font-family:inherit; }
+    .tabs { height:50px; border-top:1px solid #f1f4f7; display:flex; align-items:center; justify-content:space-around; font-size:8px; color:#a3b1c0; flex:none; }
+    .tab-on { color:#204066; font-weight:500; }
+    .title { font-size:15px; font-weight:500; color:#1c3557; }
+    .lead { font-size:12.5px; font-weight:500; color:#1c3557; }
+    .body { font-size:10.5px; color:#1c3557; }
+    .label { font-size:8.5px; color:#9aaabb; }
+    .caption { font-size:8px; color:#9aaabb; }
+  </style>
+</helmet>
+
+<div style="width:1920px;background:#f0f0ee;padding:32px;display:flex;flex-direction:column;gap:26px;color:#1c3557">
+
+  <div style="display:flex;gap:20px;align-items:stretch;flex-wrap:wrap">
+
+    <!-- INTRO -->
+    <div style="width:200px;flex:none;display:flex;flex-direction:column">
+      <div style="font-size:23px;font-weight:600;line-height:1.12;letter-spacing:.6px;color:#1c3557">2. O QUE<br>FALTAVA</div>
+      <div style="width:34px;height:2px;background:#c3d2e2;margin:14px 0"></div>
+      <div style="font-size:11px;line-height:1.55;color:#7d8fa2;text-wrap:pretty">
+        As telas que o §13 do spec técnico lista como inexistentes. Mesma linguagem do
+        canvas 1: moldura 256×600, navy #204066, Outfit, metáfora de escalada.
+      </div>
+      <div style="margin-top:16px;font-size:9px;line-height:1.6;color:#9aaabb">
+        StatusBar e NavTabs estão embutidos para o arquivo renderizar sozinho.
+        Ao subir para o projeto, trocar por <code>dc-import</code>.
+      </div>
+      <div style="flex:1;position:relative;margin-top:16px;min-height:220px">
+        <svg viewBox="0 0 200 300" preserveAspectRatio="xMidYMax meet" style="position:absolute;inset:0;width:100%;height:100%">
+          <path d="M-6 300 62 130l40 52 26-34 44 56 34-28v124z" fill="#e3ebf4"></path>
+          <path d="M6 300 96 76l96 224z" fill="#ccdae9"></path>
+          <path d="M96 76l30 78-14 6-10-10-11 8-12-7-11 7z" fill="#fbfdff"></path>
+          <path d="M96 76l96 224h-46z" fill="#bdd0e2"></path>
+          <path d="M28 296c34-14 26-52 54-74s30-58 22-88" stroke="#fff" stroke-width="2.6" stroke-dasharray="5 7" fill="none" stroke-linecap="round"></path>
+          <line x1="96" y1="76" x2="96" y2="46" stroke="#204066" stroke-width="2.2"></line>
+          <path d="M96 46l18 6-18 6z" fill="#204066"></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 13 · ONBOARDING BOAS-VINDAS -->
+    <div class="frame" data-screen-label="13 Onboarding boas-vindas">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="flex:1;position:relative;margin:0;overflow:hidden">
+        <svg viewBox="0 0 256 380" preserveAspectRatio="xMidYMax slice" style="position:absolute;inset:0;width:100%;height:100%">
+          <rect width="256" height="380" fill="#f6fafd"></rect>
+          <path d="M-8 380 54 190l40 50 26-32 46 56 106-52v158z" fill="#e4ecf4"></path>
+          <path d="M14 380 128 130l122 250z" fill="#ccdae9"></path>
+          <path d="M128 130l30 66-14 6-11-10-12 8-11-7z" fill="#fbfdff"></path>
+          <path d="M128 130l122 250h-58z" fill="#bcd0e3"></path>
+          <path d="M44 372c36-16 30-54 60-78s34-56 26-86" stroke="#fff" stroke-width="2.6" stroke-dasharray="5 7" fill="none" stroke-linecap="round"></path>
+          <line x1="128" y1="130" x2="128" y2="98" stroke="#204066" stroke-width="2.2"></line>
+          <path d="M128 98l18 6-18 6z" fill="#204066"></path>
+        </svg>
+      </div>
+      <div style="padding:22px 20px 0">
+        <div style="font-size:19px;font-weight:500;line-height:1.25;letter-spacing:-.2px">Estude menos.<br>Lembre por anos.</div>
+        <div style="font-size:10.5px;color:#7d8fa2;line-height:1.55;margin-top:10px;text-wrap:pretty">
+          Cards curtos, revisados na hora certa. O app calcula quando — você só responde.
+        </div>
+      </div>
+      <div style="padding:18px 15px 20px">
+        <button class="primary">Começar</button>
+      </div>
+    </div>
+
+    <!-- 14 · ONBOARDING O QUE ESTUDAR -->
+    <div class="frame" data-screen-label="14 Onboarding o que estudar">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:14px 15px 0;display:flex;gap:4px">
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#e7ebf0"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#e7ebf0"></div>
+      </div>
+      <div style="padding:20px 15px 0">
+        <div class="title">O que você quer estudar?</div>
+        <div class="caption" style="margin-top:6px;line-height:1.5">Pode ser uma matéria ou um assunto específico que você quer consolidar.</div>
+      </div>
+      <div style="margin:16px 15px 0;border:1px solid #e6eaef;border-radius:12px;padding:11px 12px;min-height:62px">
+        <div style="font-size:11px;color:#c1ccd8">Ex.: Redes de Computadores</div>
+      </div>
+      <div style="padding:16px 15px 0" class="label">Sugestões</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;padding:9px 15px 0">
+        <div style="padding:6px 10px;border-radius:9px;background:#f3f6f9;font-size:9px;color:#4a7ba7">TCP/IP</div>
+        <div style="padding:6px 10px;border-radius:9px;background:#f3f6f9;font-size:9px;color:#4a7ba7">Roteamento</div>
+        <div style="padding:6px 10px;border-radius:9px;background:#f3f6f9;font-size:9px;color:#4a7ba7">DNS</div>
+        <div style="padding:6px 10px;border-radius:9px;background:#f3f6f9;font-size:9px;color:#4a7ba7">Sub-redes</div>
+        <div style="padding:6px 10px;border-radius:9px;background:#f3f6f9;font-size:9px;color:#4a7ba7">Wi-Fi</div>
+        <div style="padding:6px 10px;border-radius:9px;background:#f3f6f9;font-size:9px;color:#4a7ba7">Segurança de Redes</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="padding:0 15px 20px"><button class="primary">Continuar</button></div>
+    </div>
+
+    <!-- 15 · ONBOARDING META -->
+    <div class="frame" data-screen-label="15 Onboarding meta diária">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:14px 15px 0;display:flex;gap:4px">
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#e7ebf0"></div>
+      </div>
+      <div style="padding:20px 15px 0">
+        <div class="title">Quanto por dia?</div>
+        <div class="caption" style="margin-top:6px;line-height:1.5">Dá para mudar depois, a qualquer momento.</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px;padding:16px 15px 0">
+        <div style="border:1px solid #e6eaef;border-radius:13px;padding:12px 13px;display:flex;align-items:center;gap:11px">
+          <div style="flex:1">
+            <div class="body" style="font-weight:500">Leve</div>
+            <div class="caption" style="margin-top:2px">10 cards · cerca de 5 min</div>
+          </div>
+        </div>
+        <div style="border:1.5px solid #204066;border-radius:13px;padding:12px 13px;display:flex;align-items:center;gap:11px;background:#f7fafc">
+          <div style="flex:1">
+            <div class="body" style="font-weight:500">Médio</div>
+            <div class="caption" style="margin-top:2px">25 cards · cerca de 12 min</div>
+          </div>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#204066" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.4 5.7 10 11 4.2"></path></svg>
+        </div>
+        <div style="border:1px solid #e6eaef;border-radius:13px;padding:12px 13px;display:flex;align-items:center;gap:11px">
+          <div style="flex:1">
+            <div class="body" style="font-weight:500">Intenso</div>
+            <div class="caption" style="margin-top:2px">50 cards · cerca de 25 min</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 15px 0"><a href="#" style="font-size:9.5px;color:#4a7ba7;text-decoration:none">Personalizar</a></div>
+      <div style="flex:1"></div>
+      <div style="padding:0 15px 20px"><button class="primary">Continuar</button></div>
+    </div>
+
+    <!-- 16 · GERAÇÃO GRÁTIS (requisito novo do §7.7.1) -->
+    <div class="frame" data-screen-label="16 Onboarding geração grátis">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:14px 15px 0;display:flex;gap:4px">
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+        <div style="flex:1;height:3px;border-radius:2px;background:#204066"></div>
+      </div>
+      <div style="padding:20px 15px 0">
+        <div class="title">Sua geração grátis</div>
+        <div style="font-size:10.5px;color:#7d8fa2;line-height:1.55;margin-top:8px;text-wrap:pretty">
+          Você tem <b style="color:#1c3557">uma geração por IA</b> para usar quando quiser. Ela não expira.
+        </div>
+      </div>
+
+      <div style="margin:16px 12px 0;border:1px solid #e6eaef;border-radius:14px;padding:13px 13px">
+        <div class="label">Usar agora em</div>
+        <div class="body" style="font-weight:500;margin-top:5px">Direito Constitucional</div>
+        <div class="caption" style="margin-top:4px;line-height:1.5">Cria um baralho inicial a partir do que você respondeu.</div>
+      </div>
+
+      <div style="margin:12px 12px 0;border-radius:14px;background:#f7fafc;padding:13px 13px">
+        <div style="display:flex;align-items:flex-start;gap:9px">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#4a7ba7" stroke-width="1.3" style="flex:none;margin-top:1px"><circle cx="8" cy="8" r="6"></circle><line x1="8" y1="7.2" x2="8" y2="11" stroke-linecap="round"></line><circle cx="8" cy="5.1" r=".8" fill="#4a7ba7" stroke="none"></circle></svg>
+          <div style="font-size:9.5px;color:#5c7d9c;line-height:1.55;text-wrap:pretty">
+            Ou guarde para fotografar seu caderno depois — costuma impressionar mais.
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div style="padding:0 15px 10px"><button class="primary">Gerar meu primeiro baralho</button></div>
+      <div style="padding:0 15px 20px"><button class="ghost">Guardar para depois</button></div>
+    </div>
+
+    <!-- 17 · CRIAR CARD -->
+    <div class="frame" data-screen-label="17 Criar card">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 15px 0">
+        <a href="#" style="font-size:10px;color:#4a7ba7;text-decoration:none">Cancelar</a>
+        <div class="lead">Novo card</div>
+        <a href="#" style="font-size:10px;color:#c1ccd8;text-decoration:none">Salvar</a>
+      </div>
+
+      <div style="padding:16px 15px 0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <div class="label">Frente</div>
+          <div style="font-size:8px;color:#9aaabb">57 / 120</div>
+        </div>
+        <div style="border:1px solid #e6eaef;border-radius:11px;padding:10px 11px;margin-top:6px;min-height:52px">
+          <div style="font-size:11px;line-height:1.45">O que foi a Revolução Gloriosa?</div>
+        </div>
+      </div>
+
+      <div style="padding:12px 15px 0">
+        <div style="display:flex;justify-content:space-between;align-items:baseline">
+          <div class="label">Verso</div>
+          <!-- Estado de estouro: contador vermelho e Salvar desabilitado (§5.4) -->
+          <div style="font-size:8px;color:#c25a50;font-weight:500">247 / 240</div>
+        </div>
+        <div style="border:1.5px solid #e8b4ae;border-radius:11px;padding:10px 11px;margin-top:6px;min-height:64px;background:#fefbfb">
+          <div style="font-size:11px;line-height:1.45;color:#1c3557">Revolução inglesa de 1688 que depôs Jaime II e estabeleceu uma monarquia parlamentar, consolidando o poder do Parlamento sobre a Coroa e limitando definitivamente a autoridade real.</div>
+        </div>
+        <div style="font-size:8px;color:#c25a50;margin-top:5px">7 caracteres acima do limite. O card precisa caber na tela do aparelho.</div>
+      </div>
+
+      <!-- Preview no formato do aparelho (§5.4) -->
+      <div style="padding:14px 15px 0">
+        <div class="label">Como fica no aparelho</div>
+        <div style="margin-top:7px;border:1px solid #e6eaef;border-radius:8px;background:#fbfbf9;height:74px;display:flex;align-items:center;justify-content:center;padding:10px 14px">
+          <div style="font-size:9.5px;line-height:1.4;text-align:center;color:#2a2a28;font-family:Georgia,serif">O que foi a Revolução Gloriosa?</div>
+        </div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div style="padding:0 15px 16px;display:flex;gap:8px">
+        <button class="ghost" style="flex:1">Salvar e sair</button>
+        <button class="primary" style="flex:1.3;opacity:.4">Salvar e criar outro</button>
+      </div>
+    </div>
+
+    <!-- 18 · GERAR POR TÓPICO -->
+    <div class="frame" data-screen-label="18 Gerar por tópico">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 15px 0">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1c3557" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 5 8l4.5 4.5"></path></svg>
+        <div class="lead">Gerar por tópico</div>
+        <div style="width:15px"></div>
+      </div>
+
+      <!-- Indicador de cota, visível aqui e não escondido em ajustes (§5.13) -->
+      <div style="margin:14px 12px 0;border-radius:12px;background:#f7fafc;padding:10px 12px;display:flex;align-items:center;gap:9px">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="#4a7ba7" stroke-width="1.3"><path d="M8 1.6 11.8 3.3v3.9c0 2.8-2 4.6-3.8 5.2-1.8-.6-3.8-2.4-3.8-5.2V3.3z"></path></svg>
+        <div style="flex:1;font-size:9.5px;color:#4a7ba7">1 geração grátis disponível</div>
+      </div>
+
+      <div style="padding:14px 15px 0">
+        <div class="label">Tópico</div>
+        <div style="border:1px solid #e6eaef;border-radius:11px;padding:10px 11px;margin-top:6px;min-height:54px">
+          <div style="font-size:11px;line-height:1.45">Revolução Gloriosa e a consolidação do parlamentarismo inglês</div>
+        </div>
+      </div>
+
+      <div style="padding:14px 15px 0">
+        <div class="label">Baralho de destino</div>
+        <div style="border:1px solid #e6eaef;border-radius:11px;padding:10px 11px;margin-top:6px;display:flex;align-items:center">
+          <div class="body" style="flex:1">História do Brasil</div>
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="#c1ccd8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5 7 8.5l3-3"></path></svg>
+        </div>
+      </div>
+
+      <div style="padding:14px 15px 0">
+        <div class="label">Nível</div>
+        <div style="display:flex;gap:6px;margin-top:7px">
+          <div style="flex:1;height:28px;border-radius:9px;background:#f3f6f9;color:#7d8fa2;font-size:9px;display:flex;align-items:center;justify-content:center">Introdutório</div>
+          <div style="flex:1;height:28px;border-radius:9px;background:#204066;color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center">Intermediário</div>
+          <div style="flex:1;height:28px;border-radius:9px;background:#f3f6f9;color:#7d8fa2;font-size:9px;display:flex;align-items:center;justify-content:center">Avançado</div>
+        </div>
+      </div>
+
+      <div style="padding:14px 15px 0;display:flex;align-items:center;gap:10px">
+        <div class="label" style="flex:1">Quantidade aproximada</div>
+        <div class="body" style="font-weight:500">15 cards</div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div style="padding:0 15px 20px"><button class="primary">Gerar</button></div>
+    </div>
+
+    <!-- 19 · GERANDO (progresso por estágio nomeado, §7.3) -->
+    <div class="frame" data-screen-label="19 Gerando">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 26px">
+        <div style="width:132px;height:132px;position:relative">
+          <svg viewBox="0 0 132 132" style="width:100%;height:100%">
+            <circle cx="66" cy="66" r="56" fill="none" stroke="#eef2f6" stroke-width="5"></circle>
+            <circle cx="66" cy="66" r="56" fill="none" stroke="#204066" stroke-width="5" stroke-linecap="round" stroke-dasharray="176 352" transform="rotate(-90 66 66)"></circle>
+          </svg>
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">
+            <svg width="34" height="34" viewBox="0 0 40 40" fill="none">
+              <path d="M6 34 20 8l14 26z" fill="#ccdae9"></path>
+              <path d="M20 8l5 9-3 1-2-2-2 1-2-1z" fill="#fbfdff"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="lead" style="margin-top:22px">Lendo o material</div>
+        <div class="caption" style="margin-top:8px;text-align:center;line-height:1.55">
+          Costuma levar de 10 a 30 segundos.<br>Pode sair desta tela — avisamos quando terminar.
+        </div>
+        <div style="display:flex;gap:5px;margin-top:18px">
+          <div style="width:5px;height:5px;border-radius:50%;background:#204066"></div>
+          <div style="width:5px;height:5px;border-radius:50%;background:#204066"></div>
+          <div style="width:5px;height:5px;border-radius:50%;background:#dde5ee"></div>
+        </div>
+        <div class="caption" style="margin-top:8px">Lendo · Gerando · Pronto</div>
+      </div>
+      <div style="padding:0 15px 20px"><button class="ghost">Continuar em segundo plano</button></div>
+    </div>
+
+    <!-- 20 · CAPTURAR MATERIAL -->
+    <div class="frame" data-screen-label="20 Capturar material">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 15px 0">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1c3557" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 5 8l4.5 4.5"></path></svg>
+        <div class="lead">Capturar material</div>
+        <div style="width:15px"></div>
+      </div>
+      <div style="padding:14px 15px 0" class="caption">De onde vem o conteúdo?</div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;padding:14px 12px 0">
+        <div style="border:1px solid #e6eaef;border-radius:14px;padding:13px 13px;display:flex;align-items:center;gap:12px">
+          <div style="width:36px;height:36px;border-radius:11px;background:#eaf1f8;display:flex;align-items:center;justify-content:center;flex:none">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#4a7ba7" stroke-width="1.4" stroke-linecap="round"><rect x="4" y="3" width="12" height="14" rx="2"></rect><line x1="7" y1="7" x2="13" y2="7"></line><line x1="7" y1="10" x2="13" y2="10"></line><line x1="7" y1="13" x2="11" y2="13"></line></svg>
+          </div>
+          <div style="flex:1">
+            <div class="body" style="font-weight:500">Colar texto</div>
+            <div class="caption" style="margin-top:2px">Resumo, anotação, artigo</div>
+          </div>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#c1ccd8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l4 4-4 4"></path></svg>
+        </div>
+
+        <div style="border:1px solid #e6eaef;border-radius:14px;padding:13px 13px;display:flex;align-items:center;gap:12px">
+          <div style="width:36px;height:36px;border-radius:11px;background:#f2f0e8;display:flex;align-items:center;justify-content:center;flex:none">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#bca77e" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7z"></path><path d="M12 3v4h4"></path></svg>
+          </div>
+          <div style="flex:1">
+            <div class="body" style="font-weight:500">Enviar PDF</div>
+            <div class="caption" style="margin-top:2px">Escolha o intervalo de páginas</div>
+          </div>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#c1ccd8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l4 4-4 4"></path></svg>
+        </div>
+
+        <div style="border:1px solid #e6eaef;border-radius:14px;padding:13px 13px;display:flex;align-items:center;gap:12px">
+          <div style="width:36px;height:36px;border-radius:11px;background:#eaf1ec;display:flex;align-items:center;justify-content:center;flex:none">
+            <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="#7ea888" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h2L8 4h4l1.5 2h2A1.5 1.5 0 0 1 17 7.5v7A1.5 1.5 0 0 1 15.5 16h-11A1.5 1.5 0 0 1 3 14.5z"></path><circle cx="10" cy="10.5" r="2.8"></circle></svg>
+          </div>
+          <div style="flex:1">
+            <div class="body" style="font-weight:500">Tirar foto</div>
+            <div class="caption" style="margin-top:2px">Caderno, livro ou quadro</div>
+          </div>
+          <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="#c1ccd8" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3l4 4-4 4"></path></svg>
+        </div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div style="margin:0 12px 18px;border-radius:12px;background:#f7fafc;padding:11px 12px">
+        <div style="font-size:9px;color:#5c7d9c;line-height:1.55;text-wrap:pretty">
+          Fotos e PDFs são apagados assim que os cards ficam prontos. Só os cards permanecem.
+        </div>
+      </div>
+    </div>
+
+    <!-- 21 · CAPTURA · CONTEÚDO DETECTADO -->
+    <div class="frame" data-screen-label="21 Conteúdo detectado">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 15px 0">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="#1c3557" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3.5 5 8l4.5 4.5"></path></svg>
+        <div class="lead">Conteúdo detectado</div>
+        <div style="width:15px"></div>
+      </div>
+
+      <div style="display:flex;gap:8px;padding:14px 12px 0">
+        <div style="width:52px;height:68px;border-radius:8px;background:#f0eee6;border:1px solid #e4e0d4;flex:none;position:relative;overflow:hidden">
+          <div style="position:absolute;inset:8px 7px;display:flex;flex-direction:column;gap:3px">
+            <div style="height:2px;background:#cfc8b6;border-radius:1px;width:70%"></div>
+            <div style="height:2px;background:#ddd8c9;border-radius:1px"></div>
+            <div style="height:2px;background:#ddd8c9;border-radius:1px"></div>
+            <div style="height:2px;background:#ddd8c9;border-radius:1px;width:85%"></div>
+            <div style="height:2px;background:#ddd8c9;border-radius:1px"></div>
+          </div>
+        </div>
+        <div style="width:52px;height:68px;border-radius:8px;background:#f0eee6;border:1px solid #e4e0d4;flex:none"></div>
+        <div style="width:52px;height:68px;border-radius:8px;border:1px dashed #d6dde5;display:flex;align-items:center;justify-content:center;flex:none">
+          <svg width="14" height="14" viewBox="0 0 14 14" stroke="#a9b6c4" stroke-width="1.4" stroke-linecap="round"><line x1="7" y1="3" x2="7" y2="11"></line><line x1="3" y1="7" x2="11" y2="7"></line></svg>
+        </div>
+      </div>
+
+      <div style="margin:14px 12px 0;border:1px solid #eef1f5;border-radius:13px;padding:11px 12px;max-height:118px;overflow:hidden">
+        <div class="label">Texto reconhecido</div>
+        <div style="font-size:9.5px;line-height:1.5;margin-top:6px;color:#43596f;text-wrap:pretty">
+          Na Divina Comédia, Dante definiu a fome como o pior desastre. E ele sabia do
+          que falava, pois viu a Europa ser varrida pela Peste Negra no século XIV. A
+          mesma Idade Média que conheceu períodos de fome conheceu regras que
+          regulamentaram a ingestão de alimentos…
+        </div>
+      </div>
+
+      <div style="padding:13px 15px 0;display:flex;align-items:center">
+        <div class="label" style="flex:1">Baralho de destino</div>
+        <div class="body" style="font-weight:500">História</div>
+      </div>
+      <div style="padding:10px 15px 0;display:flex;align-items:center">
+        <div class="label" style="flex:1">Quantidade aproximada</div>
+        <div class="body" style="font-weight:500">12 cards</div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div style="padding:0 15px 20px"><button class="primary">Gerar cards</button></div>
+    </div>
+
+    <!-- 22 · COTA ESGOTADA (paywall) -->
+    <div class="frame" data-screen-label="22 Cota esgotada">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;justify-content:flex-end;padding:10px 14px 0">
+        <svg width="15" height="15" viewBox="0 0 16 16" stroke="#a3b1c0" stroke-width="1.4" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"></line><line x1="12" y1="4" x2="4" y2="12"></line></svg>
+      </div>
+      <div style="height:118px;position:relative;margin:4px 12px 0;border-radius:14px;overflow:hidden">
+        <svg viewBox="0 0 232 118" preserveAspectRatio="xMidYMax slice" style="position:absolute;inset:0;width:100%;height:100%">
+          <rect width="232" height="118" fill="#f6fafd"></rect>
+          <path d="M-8 118 48 40l38 40 26-26 44 42 84-40v62z" fill="#e4ecf4"></path>
+          <path d="M14 118 116 12l104 106z" fill="#ccdae9"></path>
+          <path d="M116 12l24 44-11 5-9-8-9 6-9-5z" fill="#fbfdff"></path>
+          <line x1="116" y1="12" x2="116" y2="-2" stroke="#204066" stroke-width="2"></line>
+        </svg>
+      </div>
+
+      <div style="padding:18px 18px 0;text-align:center">
+        <div style="font-size:17px;font-weight:500;line-height:1.3">Você usou sua<br>geração grátis</div>
+        <div style="font-size:10px;color:#7d8fa2;line-height:1.55;margin-top:9px;text-wrap:pretty">
+          Criar cards à mão e estudar continuam livres, sempre. A assinatura libera gerar por IA sem limite.
+        </div>
+      </div>
+
+      <div style="margin:16px 12px 0;border:1px solid #eef1f5;border-radius:14px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid #f1f4f7">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#5c9455" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.4 5.7 10 11 4.2"></path></svg>
+          <div style="font-size:9.5px">Gerar por tópico, PDF e foto</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid #f1f4f7">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#5c9455" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.4 5.7 10 11 4.2"></path></svg>
+          <div style="font-size:9.5px">Backup e sincronização entre aparelhos</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;padding:10px 12px">
+          <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="#5c9455" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.4 5.7 10 11 4.2"></path></svg>
+          <div style="font-size:9.5px">Modos extras: múltipla escolha, simulado, áudio</div>
+        </div>
+      </div>
+
+      <div style="flex:1"></div>
+      <div style="padding:0 15px 10px"><button class="primary">Assinar</button></div>
+      <div style="padding:0 15px 20px;text-align:center">
+        <a href="#" style="font-size:9.5px;color:#7d8fa2;text-decoration:none">Continuar sem assinar</a>
+      </div>
+    </div>
+
+    <!-- 23 · ESTADOS DE ERRO -->
+    <div class="frame" data-screen-label="23 Estados de erro">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:14px 15px 0" class="title">Erros a desenhar</div>
+      <div style="padding:6px 15px 0" class="caption">§5.5, §5.6 e §10 — todos com código legível por máquina.</div>
+
+      <div style="display:flex;flex-direction:column;gap:9px;padding:14px 12px 0">
+        <div style="border-radius:12px;background:#fdf4e6;padding:11px 12px">
+          <div style="font-size:9.5px;font-weight:500;color:#b7842f">Tópico vago demais</div>
+          <div style="font-size:9px;color:#9c7a3d;margin-top:3px;line-height:1.5">"história" abrange muita coisa. Diga o período ou o recorte.</div>
+        </div>
+        <div style="border-radius:12px;background:#fdf4e6;padding:11px 12px">
+          <div style="font-size:9.5px;font-weight:500;color:#b7842f">Foto ilegível</div>
+          <div style="font-size:9px;color:#9c7a3d;margin-top:3px;line-height:1.5">Tente com mais luz e o caderno mais reto.</div>
+        </div>
+        <div style="border-radius:12px;background:#fdf4e6;padding:11px 12px">
+          <div style="font-size:9.5px;font-weight:500;color:#b7842f">Arquivo grande demais</div>
+          <div style="font-size:9px;color:#9c7a3d;margin-top:3px;line-height:1.5">Máximo de 32 MB e 600 páginas. Escolha um intervalo menor.</div>
+        </div>
+        <div style="border-radius:12px;background:#eaf1f8;padding:11px 12px">
+          <div style="font-size:9.5px;font-weight:500;color:#4a7ba7">Sem conexão</div>
+          <div style="font-size:9px;color:#5c7d9c;margin-top:3px;line-height:1.5">Gerar precisa de internet. Estudar e criar à mão continuam funcionando.</div>
+        </div>
+        <div style="border-radius:12px;background:#f3f6f9;padding:11px 12px">
+          <div style="font-size:9.5px;font-weight:500;color:#5f7386">Não consegui gerar deste material</div>
+          <div style="font-size:9px;color:#7d8fa2;margin-top:3px;line-height:1.5">Sua geração não foi consumida. Tente outro trecho.</div>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="margin:0 12px 18px;border-radius:12px;background:#f7fafc;padding:10px 12px">
+        <div style="font-size:8.5px;color:#7d8fa2;line-height:1.5">Nenhum destes cobra a geração grátis.</div>
+      </div>
+    </div>
+
+    <!-- 24 · RESTAURAR HISTÓRICO -->
+    <div class="frame" data-screen-label="24 Restaurar histórico">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px">
+        <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+          <circle cx="36" cy="36" r="30" stroke="#e4ecf4" stroke-width="4"></circle>
+          <path d="M36 6a30 30 0 0 1 30 30" stroke="#204066" stroke-width="4" stroke-linecap="round"></path>
+          <path d="M24 38l8 8 16-18" stroke="#4a7ba7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        <div class="lead" style="margin-top:20px">Trazendo seu histórico</div>
+        <div class="caption" style="margin-top:8px;text-align:center;line-height:1.55">
+          3 anos e 2 meses de memória guardada.<br>Isso leva alguns instantes.
+        </div>
+        <div style="width:100%;height:5px;border-radius:3px;background:#eceff2;margin-top:18px;overflow:hidden">
+          <div style="width:64%;height:100%;border-radius:3px;background:#204066"></div>
+        </div>
+        <div class="caption" style="margin-top:8px">1.248 de 1.940 revisões</div>
+      </div>
+      <div style="padding:0 15px 20px">
+        <div style="text-align:center;font-size:8.5px;color:#9aaabb;line-height:1.5">Seus cards não se perdem: o histórico fica no servidor.</div>
+      </div>
+    </div>
+
+    <!-- 25 · HOJE com botão de criar (§5.2) -->
+    <div class="frame" data-screen-label="25 Hoje com criar">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:12px 15px 0">
+        <div class="label">Sua memória acumulada</div>
+        <div style="font-size:20px;font-weight:500;margin-top:4px;letter-spacing:-.2px">3 anos e 2 meses</div>
+        <div class="caption" style="margin-top:3px">de conhecimento guardado</div>
+      </div>
+      <div style="position:relative;flex:1;margin:12px 12px 0;border-radius:18px;overflow:hidden;background:#f5f9fc">
+        <svg viewBox="0 0 232 300" preserveAspectRatio="xMidYMax slice" style="position:absolute;inset:0;width:100%;height:100%">
+          <rect width="232" height="300" fill="#f6fafd"></rect>
+          <path d="M-8 300 54 138l40 50 26-32 46 56 74-52v140z" fill="#e4ecf4"></path>
+          <path d="M14 300 116 86l104 214z" fill="#ccdae9"></path>
+          <path d="M116 86l28 62-13 6-10-9-11 7-11-6-10 6z" fill="#fbfdff"></path>
+          <path d="M40 294c34-14 28-50 56-72s32-52 24-80" stroke="#fff" stroke-width="2.4" stroke-dasharray="5 6" fill="none" stroke-linecap="round"></path>
+        </svg>
+        <!-- Botão flutuante de criar: entrada de conteúdo que faltava na nav -->
+        <div style="position:absolute;right:12px;bottom:12px;width:44px;height:44px;border-radius:50%;background:#204066;box-shadow:0 4px 12px rgba(32,64,102,.32);display:flex;align-items:center;justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 18 18" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><line x1="9" y1="4" x2="9" y2="14"></line><line x1="4" y1="9" x2="14" y2="9"></line></svg>
+        </div>
+      </div>
+      <div style="padding:14px 15px 16px"><button class="primary">Estudar agora</button></div>
+      <div class="tabs">
+        <div class="tab-on">Hoje</div><div>Baralhos</div><div>Progresso</div><div>Você</div>
+      </div>
+    </div>
+
+    <!-- 26 · CARD VERSO CORRIGIDO (§5.8.3 — intervalos nos botões) -->
+    <div class="frame" data-screen-label="26 Card verso corrigido">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 15px 0">
+        <div style="flex:1">
+          <div style="font-size:10.5px;font-weight:500;text-align:center">12 / 24</div>
+          <div style="height:3px;border-radius:2px;background:#e7ebf0;margin-top:7px;overflow:hidden">
+            <div style="width:50%;height:100%;background:#204066;border-radius:2px"></div>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1;margin:16px 14px 0;border-radius:18px;background:#fff;border:1px solid #edf0f4;box-shadow:0 2px 12px rgba(28,53,87,.06);display:flex;align-items:center;justify-content:center;padding:24px 22px">
+        <div style="text-align:center;font-size:12.5px;line-height:1.6;color:#24405f;text-wrap:pretty">Revolução inglesa de 1688 que depôs Jaime II e estabeleceu uma monarquia parlamentar.</div>
+      </div>
+      <div style="text-align:center;font-size:8.5px;color:#a3b1c0;padding:16px 0 0">Como você lembrou?</div>
+      <div style="display:flex;gap:7px;padding:12px 14px 18px">
+        <div style="flex:1;border-radius:13px;background:#fdeeec;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:5px">
+          <div style="font-size:7.5px;color:#c25a50;text-align:center;line-height:1.25">Errei</div>
+          <div style="font-size:9px;color:#c25a50;font-weight:500">10 min</div>
+        </div>
+        <div style="flex:1;border-radius:13px;background:#fdf4e6;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:5px">
+          <div style="font-size:7.5px;color:#b7842f;text-align:center;line-height:1.25">Difícil</div>
+          <div style="font-size:9px;color:#b7842f;font-weight:500">3 dias</div>
+        </div>
+        <div style="flex:1;border-radius:13px;background:#eef6ec;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:5px">
+          <div style="font-size:7.5px;color:#5c9455;text-align:center;line-height:1.25">Bom</div>
+          <div style="font-size:9px;color:#5c9455;font-weight:500">2 semanas</div>
+        </div>
+        <div style="flex:1;border-radius:13px;background:#eaf2f9;padding:9px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:5px">
+          <div style="font-size:7.5px;color:#4a7ba7;text-align:center;line-height:1.25">Fácil</div>
+          <div style="font-size:9px;color:#4a7ba7;font-weight:500">1 mês</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;gap:20px;align-items:stretch;flex-wrap:wrap">
+
+    <!-- INTRO MODOS -->
+    <div style="width:200px;flex:none;display:flex;flex-direction:column">
+      <div style="font-size:23px;font-weight:600;line-height:1.12;letter-spacing:.6px;color:#1c3557">3. MODOS<br>ALTERNATIVOS</div>
+      <div style="width:34px;height:2px;background:#c3d2e2;margin:14px 0"></div>
+      <div style="font-size:11px;line-height:1.55;color:#7d8fa2;text-wrap:pretty">
+        §5.9. Todos partem dos mesmos cards. A regra inteira da seção é uma linha:
+        <b style="color:#1c3557">só a múltipla escolha entra no cronograma</b>.
+      </div>
+      <div style="margin-top:16px;padding:11px 12px;border-radius:11px;background:#fdf4e6">
+        <div style="font-size:9px;font-weight:600;color:#b7842f;line-height:1.4">O selo é obrigatório</div>
+        <div style="font-size:9px;line-height:1.55;color:#b7842f;margin-top:4px;text-wrap:pretty">
+          §5.9 exige rótulo ou cor consistente. Verde = conta. Âmbar = treino extra.
+          Sem isso o usuário distorce o próprio cronograma achando que adiantou trabalho.
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:9px;line-height:1.6;color:#9aaabb">
+        Nenhuma tela âmbar tem barra de graus — não há o que registrar.
+      </div>
+    </div>
+
+    <!-- 27 · MODOS DE ESTUDO -->
+    <div class="frame" data-screen-label="27 Modos de estudo">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:6px 18px 0"><div class="title">Outros modos</div></div>
+      <div style="padding:8px 18px 0;font-size:9.5px;line-height:1.5;color:#7d8fa2;text-wrap:pretty">
+        Todos partem dos mesmos cards. Só a múltipla escolha entra no seu cronograma.
+      </div>
+      <div style="flex:1;padding:16px 14px 0;display:flex;flex-direction:column;gap:9px">
+
+        <div style="border:1px solid #eef1f5;border-radius:14px;padding:12px 12px 11px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font-size:11px;font-weight:500;flex:1">Múltipla escolha</div>
+            <div style="background:#eef6ec;color:#5c9455;font-size:7px;font-weight:500;padding:3px 7px;border-radius:20px">Conta para o agendamento</div>
+          </div>
+          <div style="font-size:8.5px;line-height:1.45;color:#7d8fa2;margin-top:7px">Alternativas montadas com respostas de outros cards do mesmo baralho.</div>
+        </div>
+
+        <div style="border:1px solid #eef1f5;border-radius:14px;padding:12px 12px 11px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font-size:11px;font-weight:500;flex:1">Só os que erro muito</div>
+            <div style="background:#fdf4e6;color:#b7842f;font-size:7px;font-weight:500;padding:3px 7px;border-radius:20px">Treino extra</div>
+          </div>
+          <div style="font-size:8.5px;line-height:1.45;color:#7d8fa2;margin-top:7px">Os cards que mais voltaram para o começo.</div>
+        </div>
+
+        <div style="border:1px solid #eef1f5;border-radius:14px;padding:12px 12px 11px">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font-size:11px;font-weight:500;flex:1">Simulado cronometrado</div>
+            <div style="background:#fdf4e6;color:#b7842f;font-size:7px;font-weight:500;padding:3px 7px;border-radius:20px">Treino extra</div>
+          </div>
+          <div style="font-size:8.5px;line-height:1.45;color:#7d8fa2;margin-top:7px">Formato de prova: sem resposta durante, resultado só no fim.</div>
+        </div>
+
+        <div style="border:1px solid #eef1f5;border-radius:14px;padding:12px 12px 11px;opacity:.5">
+          <div style="display:flex;align-items:center;gap:7px">
+            <div style="font-size:11px;font-weight:500;flex:1">Áudio</div>
+            <div style="background:#fdf4e6;color:#b7842f;font-size:7px;font-weight:500;padding:3px 7px;border-radius:20px">Treino extra</div>
+          </div>
+          <div style="font-size:8.5px;line-height:1.45;color:#7d8fa2;margin-top:7px">Nada vencendo agora.</div>
+        </div>
+
+      </div>
+      <div class="tabs"><span class="tab-on">Hoje</span><span>Baralhos</span><span>Criar</span><span>Progresso</span></div>
+    </div>
+
+    <!-- 28 · MÚLTIPLA ESCOLHA -->
+    <div class="frame" data-screen-label="28 Múltipla escolha">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;align-items:center;gap:8px;padding:2px 18px 0">
+        <div style="font-size:9px;color:#7d8fa2">3 / 12</div>
+        <div style="flex:1"></div>
+        <div style="background:#eef6ec;color:#5c9455;font-size:7px;font-weight:500;padding:3px 7px;border-radius:20px">Conta para o agendamento</div>
+      </div>
+      <div style="padding:20px 18px 0;font-size:13.5px;line-height:1.35;color:#1c3557;text-wrap:pretty">
+        O que estabeleceu a Declaração de Direitos de 1689?
+      </div>
+      <div style="flex:1;padding:20px 14px 0;display:flex;flex-direction:column;gap:8px">
+        <div style="border:1px solid #eef1f5;border-radius:12px;padding:11px 12px;font-size:9.5px;line-height:1.35;color:#1c3557">Unificou as coroas da Inglaterra e da Escócia.</div>
+        <div style="border:1.5px solid #5c9455;background:#eef6ec;border-radius:12px;padding:11px 12px;font-size:9.5px;line-height:1.35;color:#5c9455">Limitou o poder real e deu ao Parlamento controle sobre tributação e exército.</div>
+        <div style="border:1.5px solid #c25a50;background:#fdeeec;border-radius:12px;padding:11px 12px;font-size:9.5px;line-height:1.35;color:#c25a50">Aboliu a monarquia e instaurou a república.</div>
+        <div style="border:1px solid #eef1f5;border-radius:12px;padding:11px 12px;font-size:9.5px;line-height:1.35;color:#9aaabb">Transferiu a corte para Hanôver.</div>
+      </div>
+      <div style="padding:0 14px 8px;font-size:8px;color:#9aaabb;text-align:center;line-height:1.5;text-wrap:pretty">
+        Acerto rápido vale <b style="color:#5c9455">bom</b>, acerto devagar vale <b style="color:#b7842f">difícil</b>. Nunca <b>fácil</b>.
+      </div>
+      <div style="padding:0 14px 18px"><button class="primary">Continuar</button></div>
+    </div>
+
+    <!-- 29 · SÓ OS QUE ERRO MUITO -->
+    <div class="frame" data-screen-label="29 Só os que erro muito">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:4px 18px 0"><div class="title">Só os que erro muito</div></div>
+      <div style="margin:12px 14px 0;background:#fdf4e6;border-radius:11px;padding:10px 11px;display:flex;gap:7px">
+        <div style="font-size:10px;color:#b7842f;line-height:1">⌁</div>
+        <div>
+          <div style="font-size:8.5px;font-weight:600;color:#b7842f">Treino extra</div>
+          <div style="font-size:8px;line-height:1.45;color:#b7842f;margin-top:2px;text-wrap:pretty">Nada aqui altera seu cronograma. É prática a mais, não revisão.</div>
+        </div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 22px">
+        <div style="font-size:8px;color:#b7842f">errado 6 vezes</div>
+        <div style="font-size:14px;line-height:1.35;color:#1c3557;text-align:center;margin-top:14px;text-wrap:pretty">Por que a revolução foi chamada de "Gloriosa"?</div>
+        <div style="width:34px;height:1.5px;background:#eef1f5;margin:22px 0"></div>
+        <div style="font-size:10.5px;line-height:1.5;color:#7d8fa2;text-align:center;text-wrap:pretty">Por ter ocorrido praticamente sem derramamento de sangue na Inglaterra.</div>
+      </div>
+      <!-- Um botão, não quatro: não há grau a dar porque nada é registrado. -->
+      <div style="padding:0 14px 18px"><button class="primary">Próximo · 2/8</button></div>
+    </div>
+
+    <!-- 30 · SIMULADO PREPARAR -->
+    <div class="frame" data-screen-label="30 Simulado preparar">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:4px 18px 0"><div class="title">Simulado</div></div>
+      <div style="margin:12px 14px 0;background:#fdf4e6;border-radius:11px;padding:10px 11px">
+        <div style="font-size:8.5px;font-weight:600;color:#b7842f">Treino extra</div>
+        <div style="font-size:8px;line-height:1.45;color:#b7842f;margin-top:2px;text-wrap:pretty">É aferição, não estudo. O resultado não muda quando nenhum card volta.</div>
+      </div>
+      <div style="flex:1;padding:20px 18px 0">
+        <div class="label">Baralho</div>
+        <div style="margin-top:6px;border:1px solid #e6eaef;border-radius:11px;padding:10px 12px;display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:10.5px">História do Brasil</span><span style="font-size:8px;color:#9aaabb">▾</span>
+        </div>
+        <div style="display:flex;align-items:center;margin-top:22px">
+          <div style="flex:1;font-size:11px">Questões</div>
+          <div style="font-size:12px;color:#c3d2e2">−</div>
+          <div style="width:36px;text-align:center;font-size:12px;font-weight:500">20</div>
+          <div style="font-size:12px;color:#204066">+</div>
+        </div>
+        <div style="display:flex;align-items:center;margin-top:14px">
+          <div style="flex:1;font-size:11px">Minutos</div>
+          <div style="font-size:12px;color:#c3d2e2">−</div>
+          <div style="width:36px;text-align:center;font-size:12px;font-weight:500">20</div>
+          <div style="font-size:12px;color:#204066">+</div>
+        </div>
+        <div style="margin-top:18px;font-size:8px;line-height:1.5;color:#9aaabb;text-wrap:pretty">
+          Cards suspensos ficam de fora. Uma prova não é lugar de reverter "não quero ver isto".
+        </div>
+      </div>
+      <div style="padding:0 14px 18px"><button class="primary">Começar</button></div>
+    </div>
+
+    <!-- 31 · SIMULADO PROVA -->
+    <div class="frame" data-screen-label="31 Simulado prova">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="display:flex;align-items:center;padding:2px 18px 0">
+        <div style="font-size:9px;color:#7d8fa2;flex:1">7 / 20</div>
+        <div style="font-size:11px;font-weight:600;color:#204066">12:38</div>
+      </div>
+      <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:0 24px">
+        <div style="font-size:14.5px;line-height:1.4;color:#1c3557;text-align:center;text-wrap:pretty">
+          Quem assumiu o trono após Jaime II?
+        </div>
+      </div>
+      <div style="padding:0 24px;font-size:8px;color:#9aaabb;text-align:center;line-height:1.5;text-wrap:pretty">
+        Responda de cabeça. As respostas aparecem só no fim.
+      </div>
+      <div style="padding:14px 14px 18px"><button class="primary">Próxima</button></div>
+    </div>
+
+    <!-- 32 · SIMULADO CORREÇÃO -->
+    <div class="frame" data-screen-label="32 Simulado correção">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:4px 18px 0"><div class="title">Correção</div></div>
+      <div style="text-align:center;padding:14px 0 0">
+        <div style="font-size:26px;font-weight:500;color:#204066;line-height:1">80%</div>
+        <div style="font-size:8.5px;color:#9aaabb;margin-top:5px">16 de 20 certas · 3 não respondidas</div>
+      </div>
+      <!-- Não respondida não é errada: acabar o tempo não diz nada sobre saber. -->
+      <div style="flex:1;padding:16px 14px 0;display:flex;flex-direction:column;gap:8px;overflow:hidden">
+        <div style="border:1px solid #eef1f5;border-radius:13px;padding:11px 12px">
+          <div style="font-size:10px;line-height:1.35">Quem assumiu o trono após Jaime II?</div>
+          <div style="font-size:8.5px;line-height:1.4;color:#7d8fa2;margin-top:6px">Guilherme de Orange e Maria II, em reinado conjunto.</div>
+          <div style="display:flex;gap:7px;margin-top:9px">
+            <div style="flex:1;text-align:center;border:1px solid #eef1f5;border-radius:9px;padding:6px 0;font-size:8.5px;color:#7d8fa2">Errei</div>
+            <div style="flex:1;text-align:center;border:1px solid #5c9455;background:#eef6ec;border-radius:9px;padding:6px 0;font-size:8.5px;color:#5c9455;font-weight:600">Acertei</div>
+          </div>
+        </div>
+        <div style="border:1px solid #eef1f5;border-radius:13px;padding:11px 12px">
+          <div style="font-size:10px;line-height:1.35">O que foi a Revolução Gloriosa?</div>
+          <div style="font-size:8.5px;line-height:1.4;color:#7d8fa2;margin-top:6px">Revolução inglesa de 1688 que depôs Jaime II.</div>
+          <div style="display:flex;gap:7px;margin-top:9px">
+            <div style="flex:1;text-align:center;border:1px solid #c25a50;background:#fdeeec;border-radius:9px;padding:6px 0;font-size:8.5px;color:#c25a50;font-weight:600">Errei</div>
+            <div style="flex:1;text-align:center;border:1px solid #eef1f5;border-radius:9px;padding:6px 0;font-size:8.5px;color:#7d8fa2">Acertei</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 14px 18px"><button class="primary">Terminar</button></div>
+    </div>
+
+    <!-- 33 · ÁUDIO -->
+    <div class="frame" data-screen-label="33 Áudio">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:4px 18px 0"><div class="title">Áudio</div></div>
+      <div style="margin:12px 14px 0;background:#fdf4e6;border-radius:11px;padding:10px 11px">
+        <div style="font-size:8.5px;font-weight:600;color:#b7842f">Treino extra</div>
+        <div style="font-size:8px;line-height:1.45;color:#b7842f;margin-top:2px;text-wrap:pretty">Sessão passiva, sem botão de grau. Nada aqui altera seu cronograma.</div>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 24px">
+        <div style="font-size:8px;color:#9aaabb">pergunta</div>
+        <div style="font-size:14px;line-height:1.4;color:#1c3557;text-align:center;margin-top:12px;text-wrap:pretty">
+          O que foi a Revolução Gloriosa?
+        </div>
+        <div style="margin-top:26px;display:flex;gap:5px;align-items:flex-end;height:22px">
+          <div style="width:3px;height:8px;background:#c3d2e2;border-radius:2px"></div>
+          <div style="width:3px;height:16px;background:#a9c0d6;border-radius:2px"></div>
+          <div style="width:3px;height:22px;background:#204066;border-radius:2px"></div>
+          <div style="width:3px;height:13px;background:#a9c0d6;border-radius:2px"></div>
+          <div style="width:3px;height:7px;background:#c3d2e2;border-radius:2px"></div>
+        </div>
+        <div style="font-size:8px;color:#9aaabb;margin-top:14px">pausa de 3 s antes da resposta</div>
+      </div>
+      <div style="display:flex;justify-content:center;padding:0 0 26px">
+        <div style="width:52px;height:52px;border-radius:26px;background:#204066;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px">❚❚</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:flex;gap:20px;align-items:stretch;flex-wrap:wrap">
+
+    <!-- INTRO -->
+    <div style="width:200px;flex:none;display:flex;flex-direction:column">
+      <div style="font-size:23px;font-weight:600;line-height:1.12;letter-spacing:.6px;color:#1c3557">4. AS DUAS<br>QUE FALTAVAM</div>
+      <div style="width:34px;height:2px;background:#c3d2e2;margin:14px 0"></div>
+      <div style="font-size:11px;line-height:1.55;color:#7d8fa2;text-wrap:pretty">
+        Gerenciar baralho (§5.10) e assinatura (§5.13) — as últimas sem desenho.
+        Cada uma existe por causa de uma distinção que é cara de errar.
+      </div>
+      <div style="margin-top:16px;padding:11px 12px;border-radius:11px;background:#fdf4e6">
+        <div style="font-size:9px;font-weight:600;color:#b7842f;line-height:1.4">Arquivar ≠ apagar</div>
+        <div style="font-size:9px;line-height:1.55;color:#b7842f;margin-top:4px;text-wrap:pretty">
+          "Terminei esse curso" é o que quase todo mundo quer dizer quando
+          procura o botão de apagar. Arquivar guarda tudo; apagar leva o
+          histórico junto, e o §3 diz que o histórico é a fonte da verdade.
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:11px 12px;border-radius:11px;background:#eef6ec">
+        <div style="font-size:9px;font-weight:600;color:#5c9455;line-height:1.4">Assinatura ≠ paywall</div>
+        <div style="font-size:9px;line-height:1.55;color:#5c9455;margin-top:4px;text-wrap:pretty">
+          O paywall é o momento de pedir. Esta tela é para quem já paga —
+          conferir, restaurar num aparelho novo, ou sair. Misturar as duas
+          vende para quem já comprou.
+        </div>
+      </div>
+    </div>
+
+    <!-- 34 · GERENCIAR BARALHO -->
+    <div class="frame" data-screen-label="34 Gerenciar baralho">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:4px 18px 0"><div class="title">História do Brasil</div></div>
+      <div style="padding:8px 18px 0;font-size:8.5px;color:#9aaabb">12 de 48 maduros</div>
+
+      <div style="padding:20px 18px 0;font-size:8px;font-weight:600;color:#9aaabb;letter-spacing:.3px">ADICIONAR CARDS</div>
+      <div style="padding:8px 18px 0;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="font-size:11px;color:#204066;line-height:1">✎</div>
+          <div><div style="font-size:10.5px">Escrever um card</div><div style="font-size:8px;color:#9aaabb;margin-top:1px">Livre, sempre</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="font-size:11px;color:#204066;line-height:1">✦</div>
+          <div><div style="font-size:10.5px">Gerar por tópico</div><div style="font-size:8px;color:#9aaabb;margin-top:1px">Usa sua cota de geração</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="font-size:11px;color:#204066;line-height:1">▣</div>
+          <div><div style="font-size:10.5px">Foto ou PDF</div><div style="font-size:8px;color:#9aaabb;margin-top:1px">Usa sua cota de geração</div></div>
+        </div>
+      </div>
+
+      <div style="padding:22px 18px 0;font-size:8px;font-weight:600;color:#9aaabb;letter-spacing:.3px">O BARALHO</div>
+      <div style="padding:8px 18px 0;display:flex;flex-direction:column;gap:13px">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="font-size:11px;color:#204066;line-height:1">↻</div>
+          <div style="font-size:10.5px">Renomear</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="font-size:11px;color:#204066;line-height:1">⊟</div>
+          <div><div style="font-size:10.5px">Arquivar</div><div style="font-size:8px;line-height:1.4;color:#9aaabb;margin-top:1px;text-wrap:pretty">Some da lista e para de agendar. Volta inteiro.</div></div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <div style="font-size:11px;color:#c25a50;line-height:1">✕</div>
+          <div><div style="font-size:10.5px;color:#c25a50">Apagar</div><div style="font-size:8px;line-height:1.4;color:#9aaabb;margin-top:1px">Leva os cards e o histórico junto.</div></div>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+    </div>
+
+    <!-- 35 · APAGAR BARALHO -->
+    <div class="frame" data-screen-label="35 Apagar baralho">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="flex:1;background:rgba(28,53,87,.32);display:flex;align-items:center;justify-content:center;padding:0 16px">
+        <div style="background:#fff;border-radius:16px;padding:18px 16px;width:100%;box-shadow:0 6px 20px rgba(28,53,87,.18)">
+          <div style="font-size:12.5px;font-weight:500">Apagar o baralho?</div>
+          <div style="font-size:9.5px;line-height:1.55;color:#4a5b6e;margin-top:9px;text-wrap:pretty">
+            Apaga 48 cards e todo o histórico de revisão deles. Não dá para desfazer.
+          </div>
+          <div style="font-size:9.5px;line-height:1.55;color:#4a5b6e;margin-top:8px;text-wrap:pretty">
+            Se você só terminou o assunto, <b>arquivar guarda tudo</b>.
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+            <div style="font-size:10px;color:#4a7ba7;padding:7px 10px">Cancelar</div>
+            <div style="font-size:10px;color:#fff;background:#c25a50;border-radius:9px;padding:7px 14px">Apagar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 36 · ASSINATURA -->
+    <div class="frame" data-screen-label="36 Assinatura">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:4px 18px 0"><div class="title">Assinatura</div></div>
+
+      <div style="margin:14px 14px 0;background:#f3f6f9;border-radius:13px;padding:14px">
+        <div style="font-size:12px;font-weight:500">Plano grátis</div>
+        <div style="font-size:9px;color:#7d8fa2;margin-top:4px">Sua geração grátis já foi usada.</div>
+      </div>
+
+      <div style="padding:20px 18px 0;font-size:10.5px;font-weight:500">O que continua se você não assinar</div>
+      <div style="padding:10px 18px 0;display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;gap:8px"><span style="color:#5c9455;font-size:9px">✓</span><span style="font-size:9.5px">Todos os seus cards, para sempre</span></div>
+        <div style="display:flex;gap:8px"><span style="color:#5c9455;font-size:9px">✓</span><span style="font-size:9.5px">Todo o histórico e o agendamento</span></div>
+        <div style="display:flex;gap:8px"><span style="color:#5c9455;font-size:9px">✓</span><span style="font-size:9.5px">Escrever cards à mão, sem limite</span></div>
+        <div style="display:flex;gap:8px"><span style="color:#5c9455;font-size:9px">✓</span><span style="font-size:9.5px">Exportar tudo quando quiser</span></div>
+      </div>
+      <div style="padding:10px 18px 0;font-size:8px;line-height:1.5;color:#9aaabb;text-wrap:pretty">
+        A assinatura paga a geração por IA, que custa por uso. O resto é seu e roda no seu aparelho.
+      </div>
+
+      <div style="flex:1"></div>
+      <div style="padding:0 14px 6px"><button class="primary">Ver a assinatura</button></div>
+      <div style="padding:0 14px 4px"><button class="ghost" style="color:#a3b1c0">Restaurar compras</button></div>
+      <div style="text-align:center;font-size:7.5px;color:#a3b1c0;padding:0 14px 16px">A loja ainda não está ligada nesta build.</div>
+    </div>
+
+    <!-- 37 · SEUS DADOS -->
+    <div class="frame" data-screen-label="37 Seus dados">
+      <div class="bar"><span>9:41</span><span>▮▮▮</span></div>
+      <div style="padding:4px 18px 0"><div class="title">Seus dados</div></div>
+
+      <div style="padding:18px 18px 0">
+        <div style="font-size:11px;font-weight:500">Exportar seus dados</div>
+        <div style="font-size:9px;line-height:1.55;color:#7d8fa2;margin-top:6px;text-wrap:pretty">
+          Um arquivo JSON com seus baralhos, seus cards e todo o histórico de
+          revisões. É o suficiente para reconstruir tudo — inclusive se você
+          parar de pagar.
+        </div>
+        <div style="margin-top:12px"><button class="ghost">Exportar</button></div>
+      </div>
+
+      <div style="margin:24px 18px 0;height:1px;background:#eef1f5"></div>
+
+      <div style="padding:18px 18px 0">
+        <div style="font-size:11px;font-weight:500">Apagar a conta</div>
+        <div style="font-size:9px;line-height:1.55;color:#7d8fa2;margin-top:6px;text-wrap:pretty">
+          Apaga os cards, o histórico e a conta, no servidor e neste aparelho.
+          Não dá para desfazer, e não guardamos cópia.
+        </div>
+        <!-- §8.1 contra §8.4: dito na hora, não descoberto depois. -->
+        <div style="font-size:8px;line-height:1.5;color:#9aaabb;margin-top:7px;text-wrap:pretty">
+          Sua geração grátis não volta — ela é uma por aparelho, para sempre.
+        </div>
+        <div style="margin-top:12px">
+          <button class="ghost" style="color:#c25a50;border-color:#e8b4ae">Apagar minha conta</button>
+        </div>
+      </div>
+      <div style="flex:1"></div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

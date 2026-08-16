@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/card-state/v1.json",
+  "title": "Mnemos Card State v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "cardId",
+    "dueAt",
+    "repetitions",
+    "lapses",
+    "revision"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mnemos.card-state/v1"
+    },
+    "cardId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "dueAt": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lastReviewedAt": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "intervalSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "repetitions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lapses": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lastRating": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "scheduler": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

@@ -1,0 +1,62 @@
+name: Backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'shared/**'
+      - 'compose.yaml'
+      - '.dockerignore'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'shared/**'
+      - 'compose.yaml'
+      - '.dockerignore'
+      - '.github/workflows/backend.yml'
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flashcards
+          POSTGRES_PASSWORD: ci-password
+          POSTGRES_DB: flashcards
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flashcards -d flashcards"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install backend
+        working-directory: backend
+        run: python -m pip install -e '.[dev]'
+      - name: Ruff
+        working-directory: backend
+        run: ruff check .
+      - name: Architecture contracts
+        working-directory: backend
+        run: lint-imports
+      - name: Tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://flashcards:ci-password@localhost:5432/flashcards
+          ENVIRONMENT: test
+        run: pytest -q

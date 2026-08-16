@@ -1,0 +1,21 @@
+# Static analysis for the app.
+#
+# Run from the command line with `flutter analyze`, and by CI's `flutter` job.
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    # The local packages are analyzed by their own job, with their own
+    # `analysis_options.yaml` and `--fatal-infos` — stricter than this file.
+    #
+    # They are excluded here because `flutter analyze` walks into them and
+    # their test directories import `package:test`, which is a dev dependency
+    # of each package and not of the app. Locally that resolves, because every
+    # package has had `dart pub get` run in it at some point; on a fresh
+    # checkout it does not, and CI failed with several hundred
+    # "The function 'test' isn't defined". A green analyze that depends on the
+    # state of somebody's working tree is not a check.
+    - packages/**
+
+linter:
+  rules:

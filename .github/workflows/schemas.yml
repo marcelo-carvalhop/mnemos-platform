@@ -1,0 +1,39 @@
+name: Schemas and shared contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'spec/**'
+      - 'shared/**'
+      - 'app/mobile/packages/domain/lib/src/contract.g.dart'
+      - 'backend/app/contract.py'
+      - 'tools/schema-validator/**'
+      - '.github/workflows/schemas.yml'
+  pull_request:
+    paths:
+      - 'spec/**'
+      - 'shared/**'
+      - 'app/mobile/packages/domain/lib/src/contract.g.dart'
+      - 'backend/app/contract.py'
+      - 'tools/schema-validator/**'
+      - '.github/workflows/schemas.yml'
+
+concurrency:
+  group: schemas-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install validators
+        run: python -m pip install 'jsonschema>=4' referencing pyyaml
+      - name: Validate public schemas and canonical example
+        run: python tools/schema-validator/validate_mnemos_examples.py
+      - name: Verify generated shared contract
+        run: python shared/generate.py --check

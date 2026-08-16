@@ -1,0 +1,75 @@
+# Single source of truth for values both the Flutter client and the FastAPI
+# server must agree on. Generated into Dart and Python by shared/generate.py.
+#
+# Spec: docs/superpowers/specs/2026-08-08-arquitetura-tecnica-design.md §4
+# A constant duplicated across two languages diverges; §7.6 depends on it not
+# diverging. Edit this file, never the generated ones.
+
+version: 1
+
+# §7.6 — provisional, tuned when the device screen is final.
+# Counted in GRAPHEME CLUSTERS over NFC-normalised text, not code units.
+card_limits:
+  front_max_graphemes: 120
+  back_max_graphemes: 240
+
+# §5.2 — smallint 1..4, never a string, never renumbered.
+grades:
+  - { value: 1, name: errei,   dart: again, label_pt: "Errei" }
+  - { value: 2, name: dificil, dart: hard,  label_pt: "Difícil" }
+  - { value: 3, name: bom,     dart: good,  label_pt: "Bom" }
+  - { value: 4, name: facil,   dart: easy,  label_pt: "Fácil" }
+
+# §5.2 — a row exists only for modes that feed the scheduler.
+# The leech drill, timed simulado and TTS write no review row at all.
+review_sources:
+  - standard
+  - multiple_choice
+
+# §5.1
+card_statuses:
+  - active
+  - suspended
+  - buried
+
+# §4 — maturity is a query predicate, never a column.
+scheduling:
+  mature_interval_days: 21
+  desired_retention: 0.90
+  graduation_milestone_days: [180, 365]
+  # §5.7 — the day rolls over at 04:00 local, not midnight.
+  default_day_cutoff_hour: 4
+
+# §5.9 — alternative study modes. These are scheduling decisions, not interface
+# ones, which is why they live here and not in a widget.
+modes:
+  multiple_choice_options: 4
+  # Conservative mapping: wrong → errei, correct-and-slow → dificil,
+  # correct-and-fast → bom. `facil` is NEVER inferred — a 1-in-4 guess must not
+  # be able to inflate stability.
+  multiple_choice_fast_answer_ms: 10000
+  # "Só os que erro muito": the recorte, not a status. Writes no review row.
+  leech_min_lapses: 4
+  simulado_default_questions: 20
+  simulado_default_minutes: 20
+  # Between the front and the back, so the listener can answer in their head.
+  tts_answer_pause_ms: 3000
+
+# §7.7 — the free tier is ONE generation for the lifetime of the account, not a
+# monthly allowance. Measured cost of that single generation: ~US$ 0.03.
+quota:
+  free_generations_lifetime: 1
+  max_jobs_in_flight: 2
+
+# §10 / §5.5 / §5.6 — machine-readable, so the client maps codes to copy
+# instead of matching on server prose.
+error_codes:
+  - quota_exhausted
+  - topic_too_vague
+  - material_insufficient
+  - file_too_large
+  - page_limit_exceeded
+  - photo_unreadable
+  - model_refused
+  - network_unavailable
+  - resync_required

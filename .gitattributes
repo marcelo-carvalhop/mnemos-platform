@@ -1,0 +1,21 @@
+* text=auto eol=lf
+
+*.sh text eol=lf
+*.py text eol=lf
+*.dart text eol=lf
+*.cpp text eol=lf
+*.h text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.kts text eol=lf
+*.properties text eol=lf
+
+*.g.dart linguist-generated=true
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.docx binary
+*.zip binary

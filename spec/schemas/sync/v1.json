@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/sync/v1.json",
+  "title": "Mnemos Sync Snapshot v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "exportedAt",
+    "decks",
+    "cards"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mnemos.sync/v1"
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cursor": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "decks": {
+      "type": "array",
+      "items": {
+        "$ref": "https://mnemos.dev/schema/deck/v1.json"
+      }
+    },
+    "cards": {
+      "type": "array",
+      "items": {
+        "$ref": "https://mnemos.dev/schema/card/v1.json"
+      }
+    },
+    "states": {
+      "type": "array",
+      "items": {
+        "$ref": "https://mnemos.dev/schema/card-state/v1.json"
+      }
+    }
+  }
+}

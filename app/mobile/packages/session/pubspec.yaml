@@ -1,0 +1,21 @@
+name: session
+description: The study loop — records reviews, replays them into card_state, and queues rows for push.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  domain:
+    path: ../domain
+  scheduler:
+    path: ../scheduler
+  store:
+    path: ../store
+  drift: ^2.20.0
+
+dev_dependencies:
+  sqlite3: ^2.4.0
+  test: ^1.25.0
+  timezone: ^0.9.4

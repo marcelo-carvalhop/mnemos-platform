@@ -1,0 +1,295 @@
+from __future__ import annotations
+
+import hashlib
+import secrets
+from datetime import datetime, timezone
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.models import Card, CardFlags, Deck, TerminalCredential
+from app.sync import service as sync_service
+
+
+class TerminalAuthError(Exception):
+    pass
+
+
+class TerminalScopeError(Exception):
+    pass
+
+
+class TerminalCapacityError(Exception):
+    pass
+
+
+def _hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _owned_active_decks(session: Session, user_id: str, deck_ids: list[str]) -> list[str]:
+    requested = list(dict.fromkeys(deck_ids))
+    if not requested:
+        raise TerminalScopeError("at least one deck must be assigned to a terminal")
+
+    owned = set(
+        session.execute(
+            select(Deck.id).where(
+                Deck.user_id == user_id,
+                Deck.id.in_(requested),
+                Deck.deleted_at.is_(None),
+                Deck.archived_at.is_(None),
+            )
+        ).scalars()
+    )
+    missing = [deck_id for deck_id in requested if deck_id not in owned]
+    if missing:
+        raise TerminalScopeError(f"decks are not available to this user: {missing}")
+    return requested
+
+
+def register_terminal(
+    session: Session,
+    user_id: str,
+    device_id: str,
+    model: str,
+    firmware: str,
+    deck_ids: list[str],
+) -> str:
+    """Creates or rotates a credential scoped to one physical terminal."""
+    selected_decks = _owned_active_decks(session, user_id, deck_ids)
+    token = secrets.token_urlsafe(32)
+    row = session.get(TerminalCredential, device_id)
+    if row is None:
+        row = TerminalCredential(
+            device_id=device_id,
+            user_id=user_id,
+            token_hash=_hash(token),
+            model=model,
+            firmware=firmware,
+            deck_ids=selected_decks,
+            revoked=False,
+        )
+        session.add(row)
+    else:
+        if row.user_id != user_id:
+            raise TerminalAuthError("terminal belongs to another user")
+        row.token_hash = _hash(token)
+        row.model = model
+        row.firmware = firmware
+        row.deck_ids = selected_decks
+        row.revoked = False
+    session.commit()
+    return token
+
+
+def authenticate_terminal(session: Session, token: str) -> TerminalCredential:
+    digest = _hash(token)
+    row = session.execute(
+        select(TerminalCredential).where(
+            TerminalCredential.token_hash == digest,
+            TerminalCredential.revoked.is_(False),
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise TerminalAuthError("invalid terminal credential")
+    row.last_seen_at = datetime.now(timezone.utc)
+    session.commit()
+    return row
+
+
+def _iso(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) -> dict:
+    """Returns the full canonical content snapshot assigned to a terminal.
+
+    A snapshot is never silently truncated. If the assigned library no longer
+    fits the declared device capacity, the server reports a capacity conflict
+    and the terminal keeps its previous atomic snapshot.
+    """
+    limit = max(1, min(limit, 256))
+    user_id = credential.user_id
+    selected_decks = set(credential.deck_ids or [])
+
+    deck_rows = session.execute(
+        select(Deck).where(
+            Deck.user_id == user_id,
+            Deck.id.in_(selected_decks),
+            Deck.deleted_at.is_(None),
+            Deck.archived_at.is_(None),
+        ).order_by(Deck.name)
+    ).scalars().all()
+    deck_by_id = {d.id: d for d in deck_rows}
+
+    if not deck_by_id:
+        return {
+            "schema": "mnemos.sync/v1",
+            "exportedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "decks": [],
+            "cards": [],
+            "states": [],
+        }
+
+    active_flags = select(CardFlags.card_id).where(
+        CardFlags.user_id == user_id,
+        CardFlags.status != "active",
+    )
+    card_rows = session.execute(
+        select(Card).where(
+            Card.user_id == user_id,
+            Card.deck_id.in_(deck_by_id.keys()),
+            Card.deleted_at.is_(None),
+            ~Card.id.in_(active_flags),
+        ).order_by(Card.updated_at.desc(), Card.id).limit(limit + 1)
+    ).scalars().all()
+
+    if len(card_rows) > limit:
+        raise TerminalCapacityError(
+            f"assigned library exceeds terminal capacity ({limit} cards)"
+        )
+
+    used_deck_ids = {c.deck_id for c in card_rows}
+    decks = []
+    for deck_id in sorted(used_deck_ids, key=lambda x: deck_by_id[x].name.lower()):
+        d = deck_by_id[deck_id]
+        decks.append(
+            {
+                "schema": "mnemos.deck/v1",
+                "id": d.id,
+                "name": d.name,
+                "description": d.description,
+                "metadata": {
+                    "language": "pt-BR",
+                    "updatedAt": _iso(d.updated_at),
+                    "revision": max(1, int(d.server_seq)),
+                },
+            }
+        )
+
+    cards = []
+    for c in card_rows:
+        cards.append(
+            {
+                "schema": "mnemos.card/v1",
+                "id": c.id,
+                "deckId": c.deck_id,
+                "type": "basic",
+                "content": {
+                    "prompt": {"format": "plain", "text": c.front},
+                    "answer": {"format": "plain", "text": c.back},
+                },
+                "tags": list(c.tags or []),
+                "metadata": {
+                    "language": "pt-BR",
+                    # The current app database does not have an independent
+                    # creation timestamp. v0.3 uses updatedAt as a compatibility
+                    # value until createdAt becomes first-class persistence.
+                    "createdAt": _iso(c.updated_at),
+                    "updatedAt": _iso(c.updated_at),
+                    "revision": max(1, int(c.server_seq)),
+                },
+            }
+        )
+
+    return {
+        "schema": "mnemos.sync/v1",
+        "exportedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "decks": decks,
+        "cards": cards,
+        "states": [],
+    }
+
+
+def _validate_terminal_review(review: dict) -> None:
+    required = {"schema", "id", "cardId", "reviewedAt", "rating", "source"}
+    missing = sorted(required - review.keys())
+    if missing:
+        raise ValueError(f"missing review fields: {missing}")
+    if review.get("schema") != "mnemos.review/v1":
+        raise ValueError("unsupported review schema")
+    if review.get("source") != "terminal":
+        raise ValueError("terminal endpoint only accepts source=terminal")
+    if not isinstance(review.get("id"), str) or not (1 <= len(review["id"]) <= 36):
+        raise ValueError("invalid review id")
+    if not isinstance(review.get("cardId"), str) or not (1 <= len(review["cardId"]) <= 36):
+        raise ValueError("invalid card id")
+    if not isinstance(review.get("reviewedAt"), int) or review["reviewedAt"] < 0:
+        raise ValueError("invalid reviewedAt")
+    if not isinstance(review.get("rating"), int) or not (1 <= review["rating"] <= 4):
+        raise ValueError("invalid rating")
+    for name in ("responseTimeMs", "intervalBeforeSeconds", "intervalAfterSeconds"):
+        value = review.get(name, 0)
+        if not isinstance(value, int) or value < 0:
+            raise ValueError(f"invalid {name}")
+    confidence = review.get("confidence", 0)
+    if not isinstance(confidence, int) or not (0 <= confidence <= 3):
+        raise ValueError("invalid confidence")
+
+
+def ingest_reviews(session: Session, credential: TerminalCredential, reviews: list[dict]) -> dict:
+    for review in reviews:
+        _validate_terminal_review(review)
+
+    card_ids = {str(review["cardId"]) for review in reviews}
+    if card_ids:
+        allowed = set(
+            session.execute(
+                select(Card.id).where(
+                    Card.user_id == credential.user_id,
+                    Card.deck_id.in_(credential.deck_ids or []),
+                    Card.deleted_at.is_(None),
+                    Card.id.in_(card_ids),
+                )
+            ).scalars()
+        )
+        outside_scope = sorted(card_ids - allowed)
+        if outside_scope:
+            raise TerminalScopeError(
+                f"reviews reference cards outside terminal scope: {outside_scope}"
+            )
+
+    rows: list[dict] = []
+    for review in reviews:
+        rows.append(
+            {
+                "id": str(review["id"]),
+                "card_id": str(review["cardId"]),
+                "reviewed_at": int(review["reviewedAt"]) * 1000,
+                "grade": int(review["rating"]),
+                "source": "terminal",
+                "elapsed_ms": int(review.get("responseTimeMs", 0)),
+                "device_id": credential.device_id,
+                "interval_days_after": int(review.get("intervalAfterSeconds", 0)) // 86400,
+                "stability_after": None,
+                "difficulty_after": None,
+                "scheduler_version": 1,
+                "app_version": credential.firmware,
+            }
+        )
+    result = sync_service.push(session, credential.user_id, "reviews", rows)
+    session.commit()
+    return {
+        "accepted": result.applied,
+        "duplicates": result.skipped_stale,
+        "highWater": result.high_water,
+    }
+
+
+def list_terminals(session: Session, user_id: str) -> list[TerminalCredential]:
+    return list(
+        session.execute(
+            select(TerminalCredential).where(
+                TerminalCredential.user_id == user_id
+            ).order_by(TerminalCredential.created_at.desc(), TerminalCredential.device_id)
+        ).scalars()
+    )
+
+
+def revoke_terminal(session: Session, user_id: str, device_id: str) -> None:
+    row = session.get(TerminalCredential, device_id)
+    if row is None or row.user_id != user_id:
+        raise TerminalScopeError("terminal is not registered to this user")
+    row.revoked = True
+    session.commit()

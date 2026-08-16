@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/review/v1.json",
+  "title": "Mnemos Review v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "cardId",
+    "reviewedAt",
+    "rating",
+    "source"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mnemos.review/v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "cardId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 36
+    },
+    "reviewedAt": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix epoch seconds UTC"
+    },
+    "rating": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4
+    },
+    "responseTimeMs": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "confidence": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3
+    },
+    "intervalBeforeSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "intervalAfterSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "terminal",
+        "mobile",
+        "web",
+        "import"
+      ]
+    },
+    "deviceId": {
+      "type": "string"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

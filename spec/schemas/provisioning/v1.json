@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/provision/v1.json",
+  "title": "Mnemos Provision Request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "wifi"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mnemos.provision/v1"
+    },
+    "wifi": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ssid",
+        "password"
+      ],
+      "properties": {
+        "ssid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "password": {
+          "type": "string",
+          "anyOf": [
+            {
+              "maxLength": 0
+            },
+            {
+              "minLength": 8,
+              "maxLength": 63
+            }
+          ],
+          "description": "Empty for an open network; otherwise an 8-63 character personal Wi-Fi passphrase."
+        }
+      }
+    },
+    "backend": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "baseUrl",
+        "deviceToken"
+      ],
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "deviceToken": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 512
+        }
+      }
+    },
+    "syncIntervalSeconds": {
+      "type": "integer",
+      "minimum": 300,
+      "maximum": 86400
+    },
+    "clockEpochSeconds": {
+      "type": "integer",
+      "minimum": 1700000000
+    }
+  }
+}

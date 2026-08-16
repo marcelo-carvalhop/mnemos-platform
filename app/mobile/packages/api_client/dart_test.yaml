@@ -1,0 +1,9 @@
+# The live test needs a running stack, so it is skipped by default and CI —
+# which runs a plain `dart test` for every package — never picks it up.
+# Run it deliberately:
+#
+#     docker compose up -d
+#     dart test --tags live --run-skipped
+tags:
+  live:
+    skip: "needs a running server: dart test --tags live --run-skipped"

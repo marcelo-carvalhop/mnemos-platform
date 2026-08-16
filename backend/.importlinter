@@ -1,0 +1,23 @@
+[importlinter]
+root_package = app
+include_external_packages = True
+
+[importlinter:contract:1]
+name = Domain and persistence must not import fastapi (§4.2)
+type = forbidden
+source_modules =
+    app.models
+    app.db
+    app.contract
+    app.config
+forbidden_modules =
+    fastapi
+    starlette
+
+[importlinter:contract:2]
+name = The worker must not import the HTTP app (§4.2)
+type = forbidden
+source_modules =
+    app.worker
+forbidden_modules =
+    app.main

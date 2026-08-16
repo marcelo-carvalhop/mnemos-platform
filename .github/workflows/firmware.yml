@@ -1,0 +1,30 @@
+name: Firmware CYD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firmware/cyd/**'
+      - '.github/workflows/firmware.yml'
+  pull_request:
+    paths:
+      - 'firmware/cyd/**'
+      - '.github/workflows/firmware.yml'
+
+concurrency:
+  group: firmware-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-cyd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install PlatformIO
+        run: python -m pip install --upgrade platformio
+      - name: Build firmware
+        working-directory: firmware/cyd
+        run: pio run

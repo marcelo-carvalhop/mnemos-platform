@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/review-batch/v1.json",
+  "title": "Mnemos Review Batch v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "reviews"
+  ],
+  "properties": {
+    "schema": {
+      "const": "mnemos.review-batch/v1"
+    },
+    "reviews": {
+      "type": "array",
+      "maxItems": 500,
+      "items": {
+        "$ref": "https://mnemos.dev/schema/review/v1.json"
+      }
+    }
+  }
+}

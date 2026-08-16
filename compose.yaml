@@ -1,0 +1,145 @@
+# Development stack: postgres, minio, server, worker.
+# There is no Redis — the job queue is a Postgres table claimed with
+# SELECT ... FOR UPDATE SKIP LOCKED (§4.2).
+#
+#   cp .env.example .env
+#   docker compose up -d
+#   docker compose run --rm migrate     # separate step, by design
+
+name: mnemos
+
+services:
+  postgres:
+    # Major pinned and identical in dev, CI and production (§11.7).
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flashcards}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      POSTGRES_DB: ${POSTGRES_DB:-flashcards}
+    ports:
+      - "${POSTGRES_PORT:-5435}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flashcards} -d ${POSTGRES_DB:-flashcards}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-change-me-locally}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Creates the uploads bucket so a fresh clone works with one command.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-change-me-locally}
+      S3_BUCKET: ${S3_BUCKET:-uploads}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$S3_ACCESS_KEY $$S3_SECRET_KEY &&
+      mc mb --ignore-existing local/$$S3_BUCKET &&
+      echo 'bucket ready: '$$S3_BUCKET
+      "
+    restart: "no"
+
+  server:
+    build:
+      context: .
+      dockerfile: backend/docker/server.Dockerfile
+    command: ["api-reload"]
+    environment: &app-env
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-flashcards}:${POSTGRES_PASSWORD:-change-me-locally}@postgres:5432/${POSTGRES_DB:-flashcards}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://minio:9000}
+      # Where the phone uploads to. `minio` is a container hostname no device
+      # can resolve, and a pre-signed URL is signed against its host — so this
+      # has to be the address the client really uses. An Android emulator
+      # reaches the host at 10.0.2.2; a physical device needs the LAN address.
+      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-change-me-locally}
+      S3_BUCKET: ${S3_BUCKET:-uploads}
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      ENABLE_DOCS: ${ENABLE_DOCS:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "${SERVER_PORT:-8000}:8000"
+    volumes:
+      # Development only — the image already contains the source.
+      - ./backend:/srv/server
+      - ./shared:/srv/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/docker/server.Dockerfile
+    command: ["worker"]
+    environment: *app-env
+    volumes:
+      - ./backend:/srv/server
+      - ./shared:/srv/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # The image's HEALTHCHECK probes the HTTP port, which only the API serves.
+    # The worker proves liveness with a heartbeat file it rewrites each loop —
+    # that shows the loop is turning, where checking the process only shows it
+    # has not exited.
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os,sys,time
+          p = os.getenv("WORKER_HEARTBEAT", "/tmp/worker-heartbeat")
+          age = time.time() - os.path.getmtime(p)
+          sys.exit(0 if age < 30 else 1)
+      interval: 10s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
+
+  # One-shot. Never part of `up`, never in an entrypoint (§11.7).
+  #   docker compose run --rm migrate
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/docker/server.Dockerfile
+    command: ["migrate"]
+    environment: *app-env
+    volumes:
+      - ./backend:/srv/server
+      - ./shared:/srv/shared
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
+volumes:
+  postgres-data:
+  minio-data:

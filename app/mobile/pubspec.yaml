@@ -1,0 +1,63 @@
+name: flashcards
+description: Mnemos — terminal físico-digital para estudo deliberado e revisão adaptativa.
+publish_to: none
+version: 0.3.0
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The logic lives in packages; lib/ is composition and screens (§4.4).
+  domain:
+    path: packages/domain
+  scheduler:
+    path: packages/scheduler
+  store:
+    path: packages/store
+  session:
+    path: packages/session
+  authoring:
+    path: packages/authoring
+  api_client:
+    path: packages/api_client
+  modes:
+    path: packages/modes
+  progress:
+    path: packages/progress
+  sync_client:
+    path: packages/sync_client
+
+  # §4.4 — providers are testable without a widget tree, which is what makes
+  # "light on widget tests" honest rather than a gap.
+  flutter_riverpod: ^2.6.0
+  drift: ^2.20.0
+  drift_flutter: ^0.2.0
+  path_provider: ^2.1.0
+  timezone: ^0.9.4
+  # §11.6 — on-device, offline, nothing sent to the server.
+  # §8.2 — tokens are credentials; they live in the platform keychain, not
+  # in the database next to the study data.
+  # §5.6 — camera and gallery for a photo, a file picker for a PDF.
+  file_picker: ^8.1.0
+  flutter_secure_storage: ^9.2.0
+  image_picker: ^1.1.0
+  # §8.4 — an export has to be able to leave the phone.
+  share_plus: ^10.0.0
+  flutter_tts: ^4.2.0
+  flutter_local_notifications: ^18.0.0
+  mobile_scanner: ^7.4.0
+  http: ^1.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  # In-memory database for tests, so composition is exercised without a device.
+  sqlite3: ^2.4.0
+  sqlite3_flutter_libs: ^0.5.0
+
+flutter:
+  uses-material-design: true

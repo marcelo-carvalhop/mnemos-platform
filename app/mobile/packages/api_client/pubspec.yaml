@@ -1,0 +1,24 @@
+name: api_client
+description: HTTP transport for §6 sync and §7 generation, plus §8 tokens.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  domain:
+    path: ../domain
+  http: ^1.2.0
+  sync_client:
+    path: ../sync_client
+
+dev_dependencies:
+  authoring:
+    path: ../authoring
+  lints: ^5.0.0
+  drift: ^2.20.0
+  sqlite3: ^2.4.0
+  store:
+    path: ../store
+  test: ^1.25.0

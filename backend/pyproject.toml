@@ -1,0 +1,57 @@
+[project]
+name = "mnemos-server"
+version = "0.3.0"
+description = "FastAPI service: accounts, sync, generation, quota, billing."
+requires-python = ">=3.12"
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0",
+    "alembic>=1.14",
+    "psycopg[binary]>=3.2",
+    "pydantic[email]>=2.9",
+    "pydantic-settings>=2.6",
+    "pyyaml>=6.0",
+    "boto3>=1.35",
+    "anthropic>=0.40",
+    "pyjwt>=2.9",
+    # §8.1 — App Attest is a CBOR attestation object holding an X.509 chain
+    # that has to be validated against Apple's root, and Play Integrity is a
+    # server-to-server call authorised by a service account.
+    "cbor2>=5.6",
+    "cryptography>=44.0",
+    "google-auth[requests]>=2.36",
+    "regex>=2024.11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.8",
+    "import-linter>=2.1",
+]
+
+# Declared, not discovered. With the whole tree present, setuptools' flat
+# layout sees `app` and `migrations` as two top-level packages and refuses to
+# guess — which is why `pip install -e .` failed in CI while the image built
+# fine: the Dockerfile copies only this file before installing, so there was
+# nothing there to be ambiguous about. `migrations` is alembic's, and is run
+# from source rather than shipped.
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+# §12.1 — architecture contracts live in .importlinter (single config file).

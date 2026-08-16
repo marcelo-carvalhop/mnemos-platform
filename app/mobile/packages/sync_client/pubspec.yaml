@@ -1,0 +1,23 @@
+name: sync_client
+description: Drains the outbox into the server and applies deltas back (§6).
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.8.0
+
+dependencies:
+  domain:
+    path: ../domain
+  store:
+    path: ../store
+  drift: ^2.20.0
+
+dev_dependencies:
+  scheduler:
+    path: ../scheduler
+  session:
+    path: ../session
+  sqlite3: ^2.4.0
+  test: ^1.25.0
+  timezone: ^0.9.4
