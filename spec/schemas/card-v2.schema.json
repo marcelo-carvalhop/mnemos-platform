@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/card/v2.json",
+  "title": "Mnemos Card v2",
+  "type": "object",
+  "required": ["schema", "id", "deckId", "type", "content", "metadata"],
+  "properties": {
+    "schema": {"const": "mnemos.card/v2"},
+    "id": {"type": "string", "minLength": 1, "maxLength": 64},
+    "deckId": {"type": "string", "minLength": 1},
+    "type": {"enum": ["open_recall", "cloze", "multiple_choice", "true_false", "application"]},
+    "content": {
+      "type": "object",
+      "required": ["prompt", "answer"],
+      "properties": {
+        "prompt": {"$ref": "#/$defs/contentBlock"},
+        "answer": {"$ref": "#/$defs/contentBlock"}
+      },
+      "additionalProperties": false
+    },
+    "options": {"type": "array", "minItems": 2, "maxItems": 4, "items": {"type": "string", "minLength": 1}},
+    "evaluation": {
+      "type": "object",
+      "properties": {
+        "mode": {"enum": ["self_assessed", "automatic_choice"]},
+        "correctOptionIndex": {"type": "integer", "minimum": 0, "maximum": 3},
+        "correctValue": {"type": "boolean"}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["revision"],
+      "properties": {"revision": {"type": "integer", "minimum": 1}}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"type": {"const": "multiple_choice"}}},
+      "then": {"required": ["options", "evaluation"], "properties": {"evaluation": {"required": ["mode", "correctOptionIndex"], "properties": {"mode": {"const": "automatic_choice"}}}}}
+    },
+    {
+      "if": {"properties": {"type": {"const": "true_false"}}},
+      "then": {"required": ["evaluation"]}
+    }
+  ],
+  "$defs": {
+    "contentBlock": {
+      "type": "object",
+      "required": ["format", "text"],
+      "properties": {"format": {"const": "plain"}, "text": {"type": "string"}},
+      "additionalProperties": false
+    }
+  }
+}

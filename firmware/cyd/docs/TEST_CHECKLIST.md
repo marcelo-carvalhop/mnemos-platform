@@ -1,68 +1,19 @@
-# Roteiro de validacao da v0.1
+# Checklist físico CYD v0.5.0-preview.3
 
-## 1. Inicializacao
-
-- [ ] A placa aparece como porta serial.
-- [ ] O firmware e gravado sem erro.
-- [ ] O monitor serial abre em 115200 bit/s.
-- [ ] A tela acende e exibe a calibracao no primeiro boot.
-- [ ] Os quatro alvos de calibracao aceitam o toque.
-- [ ] A tela inicial aparece apos a calibracao.
-
-## 2. Touchscreen
-
-- [ ] O botao `INICIAR SESSAO` responde em toda a sua area.
-- [ ] Cada opcao de confianca pode ser selecionada.
-- [ ] A opcao selecionada recebe destaque visual.
-- [ ] `MOSTRAR RESPOSTA` permanece desabilitado antes da confianca.
-- [ ] Os quatro botoes de avaliacao acionam apenas a opcao tocada.
-- [ ] Manter o dedo pressionado nao gera varios eventos consecutivos.
-
-## 3. Fluxo de estudo
-
-- [ ] A sessao inicia com dez cartoes no primeiro uso.
-- [ ] A pergunta e exibida antes da resposta.
-- [ ] A resposta aparece somente apos selecionar a confianca.
-- [ ] O progresso avanca de 1/10 ate 10/10.
-- [ ] O resumo apresenta os totais corretos por avaliacao.
-- [ ] O tempo total da sessao e apresentado.
-
-## 4. Persistencia
-
-- [ ] Concluir pelo menos uma revisao.
-- [ ] Reiniciar a placa.
-- [ ] Verificar que o numero de revisoes pendentes foi preservado.
-- [ ] Aguardar o intervalo comprimido do modo demonstracao.
-- [ ] Verificar que o cartao volta a ficar pendente.
-
-## 5. Relogio
-
-### Sem Wi-Fi
-
-- [ ] A tela inicial indica `hora aprox.`.
-- [ ] O agendamento funciona enquanto a placa permanece ligada.
-- [ ] O sistema continua com um valor monotonicamente crescente apos reiniciar.
-
-### Com Wi-Fi configurado
-
-- [ ] O monitor serial informa conexao a rede.
-- [ ] O monitor serial informa sincronizacao NTP.
-- [ ] A tela inicial indica `hora online`.
-
-## 6. Recuperacao
-
-- [ ] Manter `BOOT` pressionado durante a inicializacao refaz a calibracao.
-- [ ] Desligar durante a tela de pergunta nao corrompe o estado anterior.
-- [ ] Desligar depois de avaliar um cartao preserva a avaliacao.
-
-## 7. Evidencias para o relatorio
-
-Registrar:
-
-- fotografia da tela inicial;
-- fotografia de uma pergunta;
-- fotografia da avaliacao;
-- fotografia do resumo;
-- trecho do monitor serial com calibracao;
-- conteudo de um evento de `/reviews.ndjson`;
-- tabela com os resultados de pelo menos cinco sessoes de teste.
+1. `pio run` termina com SUCCESS e registra RAM/Flash e tamanho máximo do slot.
+2. O build usa `partitions/mnemos_ota.csv` e o máximo de aplicação é compatível com um slot de 1,5 MiB.
+3. Home mantém somente ação primária e Menu; quando não há revisão vencida, mostra a próxima revisão se existir.
+4. Home diferencia revisão vencida de card novo; card `dueAt=0` não aparece como revisão vencida na Agenda.
+5. `MENU > AGENDA` mostra Agora, Ainda hoje, Amanhã, Próximos 7 dias e Próxima revisão sem alterar estado.
+6. Após uma Review, o terminal mostra o `dueAt` recém-calculado antes do próximo card/resumo.
+7. Após uma primeira falha, o card só volta a ficar vencido quando o intervalo de reforço expira; com `DEMO_INTERVALS=true`, Again deve respeitar aproximadamente 30 s.
+8. Sessão Review completa e imediatamente depois Practice continua disponível quando não há conteúdo agendado/novo obrigatório.
+9. Practice não altera D/S/dueAt; Review e Practice avançam sem tela de agendamento individual.
+10. Multiple choice e true/false registram resultado automaticamente após confiança.
+11. Open recall solicita confiança, mostra referência, pede ERREI/ACERTEI e esforço somente após acerto.
+12. A tela de conclusão mostra revisões ainda vencidas; na ausência delas, mostra cards novos disponíveis ou a próxima revisão global.
+13. Reboot preserva `dueAt` e a Agenda reproduz os mesmos horários, salvo avanço natural do relógio.
+14. Provisionamento cria `MNEMOS-*`, grava perfil e volta à rede conhecida após `/v4/complete`.
+15. DirectSync funciona sem roteador e não oferece rota de provisionamento.
+16. ACK limpa outbox e preserva history.
+17. `/v4/metrics` retorna `mnemos.metrics/v1` após reviews.

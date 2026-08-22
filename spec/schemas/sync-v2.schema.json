@@ -1,0 +1,12 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://mnemos.dev/schema/sync/v2.json",
+  "type":"object",
+  "required":["schema","decks","cards"],
+  "properties":{
+    "schema":{"const":"mnemos.sync/v2"},
+    "libraryRevision":{"type":"integer","minimum":0},
+    "decks":{"type":"array","items":{"type":"object","required":["id","name"],"properties":{"id":{"type":"string"},"name":{"type":"string"}}}},
+    "cards":{"type":"array","items":{"$ref":"card-v2.schema.json"}}
+  }
+}

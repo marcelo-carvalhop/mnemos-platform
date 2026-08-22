@@ -14,24 +14,32 @@ struct TouchPoint {
 
 enum class UiAction : uint8_t {
     None = 0,
-    Start,
+    PrimaryStudy,
+    OpenMenu,
     OpenSync,
+    OpenAgenda,
     OpenConnection,
     SyncBackend,
-    SyncBluetooth,
+    SyncPhone,
     ConfigureNetwork,
     ToggleWifi,
     Back,
-    CancelPairing,
-    CancelBluetooth,
-    ConfidenceDontKnow,
-    ConfidenceMaybe,
-    ConfidenceCertain,
-    Reveal,
-    RateAgain,
-    RateHard,
-    RateGood,
-    RateEasy,
+    CancelLocalLink,
+    AnswerReady,
+    Choice0,
+    Choice1,
+    Choice2,
+    Choice3,
+    ConfidenceLow,
+    ConfidenceMedium,
+    ConfidenceHigh,
+    SelfIncorrect,
+    SelfCorrect,
+    EffortDifficult,
+    EffortNormal,
+    EffortEasy,
+    Continue,
+    StudyAgain,
     Home,
 };
 
@@ -43,19 +51,20 @@ public:
     UiAction pollAction();
 
     void showBoot(const String& message);
-    void showHome(uint16_t due, size_t total, bool trustedClock, bool canResume);
+    void showHome(uint16_t due, uint16_t newCards, size_t total, bool trustedClock, bool canResume, const String& nextReview);
+    void showMainMenu();
+    void showAgenda(uint16_t dueNow, uint16_t laterToday, uint16_t tomorrow,
+                    uint16_t next7Days, const String& nextReview);
     void showSyncMenu(size_t total, uint16_t pendingReviews, bool wifiConnected);
     void showConnectionMenu(bool wifiEnabled, bool wifiConnected, const String& ssid, size_t knownNetworks);
-    void showBluetoothSync(const String& deviceId, bool connected);
-    void showPairing(const String& qrPayload, const String& ssid, const String& password);
-    void showQuestion(const CardDefinition& card,
-                      uint8_t position,
-                      uint8_t total,
-                      Confidence confidence);
-    void showAnswer(const CardDefinition& card,
-                    uint8_t position,
-                    uint8_t total);
-    void showSummary(const SessionStats& stats, uint16_t remainingDue);
+    void showLocalLink(const String& qrPayload, const String& ssid, const String& password, bool provisioning);
+    void showQuestion(const CardDefinition& card, uint8_t position, uint8_t total);
+    void showConfidence(const CardDefinition& card, uint8_t position, uint8_t total);
+    void showSelfAssessment(const CardDefinition& card, uint8_t position, uint8_t total);
+    void showObjectiveFeedback(const CardDefinition& card, uint8_t position, uint8_t total,
+                               int8_t selectedOptionIndex, Outcome outcome);
+    void showEffort(uint8_t position, uint8_t total);
+    void showSummary(const SessionStats& stats, uint16_t remainingDue, uint16_t remainingNew, const String& nextReview);
 
 private:
     struct Calibration {
@@ -75,11 +84,7 @@ private:
         UiAction action = UiAction::None;
 
         Button() = default;
-        Button(int16_t xValue,
-               int16_t yValue,
-               int16_t widthValue,
-               int16_t heightValue,
-               UiAction actionValue)
+        Button(int16_t xValue, int16_t yValue, int16_t widthValue, int16_t heightValue, UiAction actionValue)
             : x(xValue), y(yValue), w(widthValue), h(heightValue), action(actionValue) {}
     };
 
@@ -91,7 +96,6 @@ private:
     XPT2046_Touchscreen touch_;
     Preferences preferences_;
     Calibration calibration_;
-
     Button buttons_[MAX_BUTTONS];
     uint8_t buttonCount_ = 0;
     bool touchWasDown_ = false;

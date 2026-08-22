@@ -1,0 +1,17 @@
+{
+  "schema": "mnemos.sync/v2",
+  "libraryRevision": 2,
+  "decks": [{"id": "demo-redes", "name": "Redes de Computadores"}],
+  "cards": [
+    {"schema":"mnemos.card/v2","id":"demo-redes-1","deckId":"demo-redes","type":"open_recall","content":{"prompt":{"format":"plain","text":"Qual e a funcao principal da camada de enlace?"},"answer":{"format":"plain","text":"Entregar quadros entre nos diretamente conectados ao mesmo enlace."}},"evaluation":{"mode":"self_assessed"},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-2","deckId":"demo-redes","type":"multiple_choice","content":{"prompt":{"format":"plain","text":"Qual protocolo resolve nomes em enderecos IP?"},"answer":{"format":"plain","text":"DNS"}},"options":["ARP","DNS","DHCP","ICMP"],"evaluation":{"mode":"automatic_choice","correctOptionIndex":1},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-3","deckId":"demo-redes","type":"true_false","content":{"prompt":{"format":"plain","text":"TCP oferece entrega orientada a conexao e ordenada."},"answer":{"format":"plain","text":"Verdadeiro"}},"evaluation":{"mode":"automatic_choice","correctOptionIndex":0},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-4","deckId":"demo-redes","type":"cloze","content":{"prompt":{"format":"plain","text":"Complete: SYN, ____ e ACK."},"answer":{"format":"plain","text":"SYN-ACK"}},"evaluation":{"mode":"self_assessed"},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-5","deckId":"demo-redes","type":"application","content":{"prompt":{"format":"plain","text":"Qual protocolo descobre o MAC a partir de um IPv4 na LAN?"},"answer":{"format":"plain","text":"ARP"}},"evaluation":{"mode":"self_assessed"},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-6","deckId":"demo-redes","type":"open_recall","content":{"prompt":{"format":"plain","text":"Para que serve DHCP?"},"answer":{"format":"plain","text":"Fornecer automaticamente parametros de rede."}},"evaluation":{"mode":"self_assessed"},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-7","deckId":"demo-redes","type":"multiple_choice","content":{"prompt":{"format":"plain","text":"Qual equipamento encaminha pacotes entre redes IP?"},"answer":{"format":"plain","text":"Roteador"}},"options":["Hub","Roteador","Repetidor","Patch panel"],"evaluation":{"mode":"automatic_choice","correctOptionIndex":1},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-8","deckId":"demo-redes","type":"true_false","content":{"prompt":{"format":"plain","text":"UDP garante retransmissao e ordem."},"answer":{"format":"plain","text":"Falso"}},"evaluation":{"mode":"automatic_choice","correctOptionIndex":1},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-9","deckId":"demo-redes","type":"open_recall","content":{"prompt":{"format":"plain","text":"O que significa NAT?"},"answer":{"format":"plain","text":"Network Address Translation."}},"evaluation":{"mode":"self_assessed"},"metadata":{"revision":2}},
+    {"schema":"mnemos.card/v2","id":"demo-redes-10","deckId":"demo-redes","type":"application","content":{"prompt":{"format":"plain","text":"192.168.1.20 e 192.168.1.80 pertencem a mesma rede /24?"},"answer":{"format":"plain","text":"Sim, ambos pertencem a 192.168.1.0/24."}},"evaluation":{"mode":"self_assessed"},"metadata":{"revision":2}}
+  ]
+}

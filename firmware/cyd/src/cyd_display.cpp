@@ -14,18 +14,17 @@ constexpr int TOUCH_CLK = 25;
 constexpr int TOUCH_CS = 33;
 constexpr int BOOT_BUTTON = 0;
 
-constexpr uint16_t COLOR_BG = 0xF79D;       // Marfim Calmo #F4F1E8
-constexpr uint16_t COLOR_TEXT = 0x18E3;     // Grafite Profundo #1F1F1F
-constexpr uint16_t COLOR_MUTED = 0x7C4E;    // Salvia Analogica #7A8B72
-constexpr uint16_t COLOR_ACCENT = 0x32AC;   // Azul Petroleo #365462
-constexpr uint16_t COLOR_BORDER = 0xDEB9;   // Cinza Nevoa #D9D5CC
-constexpr uint16_t COLOR_SELECTED = 0xBD0F; // Latao Fosco #B8A27A
+constexpr uint16_t COLOR_BG = 0xF79D;       // Marfim Calmo
+constexpr uint16_t COLOR_TEXT = 0x18E3;     // Grafite Profundo
+constexpr uint16_t COLOR_MUTED = 0x7C4E;    // Salvia Analogica
+constexpr uint16_t COLOR_ACCENT = 0x32AC;   // Azul Petroleo
+constexpr uint16_t COLOR_BORDER = 0xDEB9;   // Cinza Nevoa
+constexpr uint16_t COLOR_SELECTED = 0xBD0F; // Latao Fosco
 constexpr uint16_t COLOR_DISABLED = 0xDEB9;
-constexpr uint16_t COLOR_DANGER = 0xB36A;   // Terracota Contida #B56E52
+constexpr uint16_t COLOR_DANGER = 0xB36A;   // Terracota Contida
 }
 
-CydDisplay::CydDisplay()
-    : touch_(TOUCH_CS, TOUCH_IRQ) {}
+CydDisplay::CydDisplay() : touch_(TOUCH_CS, TOUCH_IRQ) {}
 
 void CydDisplay::begin() {
     pinMode(BOOT_BUTTON, INPUT_PULLUP);
@@ -36,8 +35,6 @@ void CydDisplay::begin() {
     tft_.setRotation(0);
     tft_.setTextWrap(false);
 
-    // O TFT usa HSPI (USE_HSPI_PORT). O touch usa o objeto SPI global,
-    // que no ESP32 corresponde ao VSPI, inicializado com a pinagem própria do CYD.
     SPI.begin(TOUCH_CLK, TOUCH_MISO, TOUCH_MOSI, TOUCH_CS);
     touch_.begin();
 
@@ -58,9 +55,7 @@ void CydDisplay::clear(uint16_t color) {
     clearButtons();
 }
 
-void CydDisplay::clearButtons() {
-    buttonCount_ = 0;
-}
+void CydDisplay::clearButtons() { buttonCount_ = 0; }
 
 void CydDisplay::drawCentered(const String& text, int16_t y, uint8_t font, uint16_t color) {
     tft_.setTextFont(font);
@@ -114,7 +109,6 @@ int16_t CydDisplay::drawWrappedText(const String& text,
     String line;
     String word;
     uint8_t lines = 0;
-
     auto flushLine = [&]() {
         if (lines >= maxLines) return;
         tft_.drawString(line, x, y + lines * lineHeight);
@@ -128,7 +122,6 @@ int16_t CydDisplay::drawWrappedText(const String& text,
             word += c;
             continue;
         }
-
         if (word.length() != 0) {
             const String candidate = line.length() == 0 ? word : line + " " + word;
             if (tft_.textWidth(candidate) > maxWidth && line.length() != 0) {
@@ -140,13 +133,11 @@ int16_t CydDisplay::drawWrappedText(const String& text,
             }
             word = "";
         }
-
         if (c == '\n' && line.length() != 0) {
             flushLine();
             if (lines >= maxLines) break;
         }
     }
-
     if (line.length() != 0 && lines < maxLines) flushLine();
     return y + lines * lineHeight;
 }
@@ -159,30 +150,79 @@ void CydDisplay::showBoot(const String& message) {
     drawCentered(String("v") + Config::APP_VERSION, 286, 2, COLOR_MUTED);
 }
 
-void CydDisplay::showHome(uint16_t due, size_t total, bool trustedClock, bool canResume) {
+void CydDisplay::showHome(uint16_t due, uint16_t newCards, size_t total, bool trustedClock, bool canResume,
+                          const String& nextReview) {
     clear();
     drawHeader("MNEMOS");
+    const String headline = canResume ? "Sessao interrompida" :
+                            (due > 0 ? String(due) + " revisoes" :
+                             (newCards > 0 ? String(newCards) + " novos" : "Nada pendente"));
+    drawCentered(headline, 68, 3, (due > 0 || newCards > 0 || canResume) ? COLOR_ACCENT : COLOR_MUTED);
+    drawCentered(String(total) + " cards", 108, 2, COLOR_MUTED);
 
-    drawCentered(due == 0 ? "Nada pendente" : String(due) + " revisoes", 72, 3,
-                 due == 0 ? COLOR_MUTED : COLOR_ACCENT);
-    drawCentered(String(total) + " cards no dispositivo", 112, 2, COLOR_MUTED);
-    if (!trustedClock) drawCentered("Relogio aproximado", 136, 2, COLOR_MUTED);
+    if (!canResume && due == 0 && nextReview.length() > 0) {
+        drawCentered("Proxima revisao", 136, 2, COLOR_MUTED);
+        drawCentered(nextReview, 158, 2, COLOR_TEXT);
+    } else if (!trustedClock) {
+        drawCentered("Relogio aproximado", 148, 2, COLOR_MUTED);
+    }
 
-    drawButton(24, 174, 192, 38, canResume ? "CONTINUAR SESSAO" : "INICIAR SESSAO",
-               UiAction::Start, false, canResume || due > 0);
-    drawButton(24, 220, 192, 38, "SINCRONIZACAO", UiAction::OpenSync);
-    drawButton(24, 266, 192, 38, "CONEXAO", UiAction::OpenConnection);
+    const String primary = canResume ? "CONTINUAR" : ((due > 0 || newCards > 0) ? "ESTUDAR" : "PRATICAR");
+    drawButton(24, 190, 192, 44, primary, UiAction::PrimaryStudy, false, total > 0 || canResume);
+    drawButton(24, 248, 192, 44, "MENU", UiAction::OpenMenu);
+}
+
+void CydDisplay::showMainMenu() {
+    clear();
+    drawHeader("Menu");
+    drawButton(24, 70, 192, 44, "SINCRONIZAR", UiAction::OpenSync);
+    drawButton(24, 126, 192, 44, "AGENDA", UiAction::OpenAgenda);
+    drawButton(24, 182, 192, 44, "CONEXAO", UiAction::OpenConnection);
+    drawButton(40, 266, 160, 34, "VOLTAR", UiAction::Back);
+}
+
+void CydDisplay::showAgenda(uint16_t dueNow, uint16_t laterToday, uint16_t tomorrow,
+                            uint16_t next7Days, const String& nextReview) {
+    clear();
+    drawHeader("Agenda");
+
+    tft_.setTextFont(2);
+    tft_.setTextColor(COLOR_TEXT, COLOR_BG);
+    tft_.drawString("Agora", 18, 58);
+    tft_.setTextDatum(TR_DATUM);
+    tft_.drawString(String(dueNow), WIDTH - 18, 58);
+    tft_.setTextDatum(TL_DATUM);
+
+    tft_.drawString("Ainda hoje", 18, 90);
+    tft_.setTextDatum(TR_DATUM);
+    tft_.drawString(String(laterToday), WIDTH - 18, 90);
+    tft_.setTextDatum(TL_DATUM);
+
+    tft_.drawString("Amanha", 18, 122);
+    tft_.setTextDatum(TR_DATUM);
+    tft_.drawString(String(tomorrow), WIDTH - 18, 122);
+    tft_.setTextDatum(TL_DATUM);
+
+    tft_.drawString("Proximos 7 dias", 18, 154);
+    tft_.setTextDatum(TR_DATUM);
+    tft_.drawString(String(next7Days), WIDTH - 18, 154);
+    tft_.setTextDatum(TL_DATUM);
+
+    tft_.drawFastHLine(18, 190, WIDTH - 36, COLOR_BORDER);
+    drawCentered("Proxima revisao", 208, 2, COLOR_MUTED);
+    drawCentered(nextReview.length() > 0 ? nextReview : "Sem revisao agendada", 232, 2, COLOR_ACCENT);
+    drawButton(40, 272, 160, 34, "VOLTAR", UiAction::Back);
 }
 
 void CydDisplay::showSyncMenu(size_t total, uint16_t pendingReviews, bool wifiConnected) {
     clear();
-    drawHeader("Sincronizacao", wifiConnected ? "Wi-Fi" : "Offline");
-    drawCentered(String(total) + " cards no Mnemos", 62, 2, COLOR_TEXT);
-    drawCentered(String(pendingReviews) + " revisoes aguardando", 88, 2,
+    drawHeader("Sincronizar", wifiConnected ? "Wi-Fi" : "Offline");
+    drawCentered(String(total) + " cards no Mnemos", 66, 2, COLOR_TEXT);
+    drawCentered(String(pendingReviews) + " revisoes aguardando", 94, 2,
                  pendingReviews > 0 ? COLOR_ACCENT : COLOR_MUTED);
 
-    drawButton(24, 146, 192, 40, "SINCRONIZAR AGORA", UiAction::SyncBackend, false, wifiConnected);
-    drawButton(24, 196, 192, 40, "CELULAR / BLUETOOTH", UiAction::SyncBluetooth);
+    drawButton(24, 142, 192, 42, "PELA REDE", UiAction::SyncBackend, false, wifiConnected);
+    drawButton(24, 198, 192, 42, "COM O CELULAR", UiAction::SyncPhone);
     drawButton(40, 270, 160, 34, "VOLTAR", UiAction::Back);
 }
 
@@ -196,34 +236,26 @@ void CydDisplay::showConnectionMenu(bool wifiEnabled,
                          (wifiConnected ? "Conectado" : "Sem conexao");
     drawCentered(state, 62, 2, wifiConnected ? COLOR_ACCENT : COLOR_MUTED);
     if (wifiConnected && ssid.length() > 0) drawCentered(ssid, 88, 2, COLOR_TEXT);
-    drawCentered(String(knownNetworks) + " redes conhecidas", 114, 2, COLOR_MUTED);
+    drawCentered(String(knownNetworks) + " redes conhecidas", 116, 2, COLOR_MUTED);
 
-    drawButton(24, 164, 192, 40, "CONFIGURAR REDE", UiAction::ConfigureNetwork);
-    drawButton(24, 214, 192, 40,
+    drawButton(24, 160, 192, 42, "CONFIGURAR REDE", UiAction::ConfigureNetwork);
+    drawButton(24, 214, 192, 42,
                wifiEnabled ? "DESLIGAR WI-FI" : "LIGAR WI-FI", UiAction::ToggleWifi);
     drawButton(40, 270, 160, 34, "VOLTAR", UiAction::Back);
 }
 
-void CydDisplay::showBluetoothSync(const String& deviceId, bool connected) {
+void CydDisplay::showLocalLink(const String& qrPayload,
+                               const String& ssid,
+                               const String& password,
+                               bool provisioning) {
     clear();
-    drawHeader("Bluetooth", connected ? "Conectado" : "Aguardando");
-    drawCentered("Sincronizacao local", 70, 2, COLOR_TEXT);
-    drawCentered(deviceId, 98, 2, COLOR_ACCENT);
-    drawWrappedText("Abra Sincronizacao no app e escolha Bluetooth. O radio sera desligado ao concluir.",
-                    18, 132, 204, 2, COLOR_MUTED, 20, 5);
-    drawButton(40, 270, 160, 34, "CANCELAR", UiAction::CancelBluetooth);
-}
-
-void CydDisplay::showPairing(const String& qrPayload, const String& ssid, const String& password) {
-    clear();
-    drawHeader("Configurar Mnemos", "5 min");
+    drawHeader(provisioning ? "Configurar rede" : "Sincronizar celular", "5 min");
 
     constexpr uint8_t QR_VERSION = 8;
     const uint16_t qrBufferSize = qrcode_getBufferSize(QR_VERSION);
     std::unique_ptr<uint8_t[]> qrcodeData(new uint8_t[qrBufferSize]);
     QRCode qrcode;
     const int8_t status = qrcode_initText(&qrcode, qrcodeData.get(), QR_VERSION, ECC_LOW, qrPayload.c_str());
-
     if (status == 0) {
         const int scale = 3;
         const int quiet = 2;
@@ -244,74 +276,110 @@ void CydDisplay::showPairing(const String& qrPayload, const String& ssid, const 
         drawCentered("Falha ao gerar QR Code", 90, 2, COLOR_DANGER);
     }
 
-    drawCentered("Escaneie para configurar", 202, 2, COLOR_TEXT);
+    drawCentered(provisioning ? "Escaneie no app" : "Conecte o app ao Mnemos", 202, 2, COLOR_TEXT);
     drawCentered(ssid, 224, 2, COLOR_ACCENT);
     drawCentered("Senha: " + password, 244, 2, COLOR_MUTED);
-    drawButton(40, 278, 160, 34, "CANCELAR", UiAction::CancelPairing);
+    drawButton(40, 278, 160, 34, "CANCELAR", UiAction::CancelLocalLink);
 }
 
-void CydDisplay::showQuestion(const CardDefinition& card,
-                              uint8_t position,
-                              uint8_t total,
-                              Confidence confidence) {
+void CydDisplay::showQuestion(const CardDefinition& card, uint8_t position, uint8_t total) {
     clear();
     drawHeader(card.deck, String(position + 1) + "/" + String(total));
+    const int16_t bottom = drawWrappedText(card.question, 12, 48, 216, 2, COLOR_TEXT, 22, 7);
 
-    drawWrappedText(card.question, 12, 46, 216, 2, COLOR_TEXT, 22, 6);
-
-    tft_.drawFastHLine(12, 184, 216, COLOR_BORDER);
-    drawCentered("Voce acredita que sabe?", 194, 2, COLOR_MUTED);
-
-    drawButton(8, 220, 70, 38, "Nao sei", UiAction::ConfidenceDontKnow,
-               confidence == Confidence::DontKnow);
-    drawButton(85, 220, 70, 38, "Talvez", UiAction::ConfidenceMaybe,
-               confidence == Confidence::Maybe);
-    drawButton(162, 220, 70, 38, "Certeza", UiAction::ConfidenceCertain,
-               confidence == Confidence::Certain);
-
-    const bool enabled = confidence != Confidence::None;
-    drawButton(24, 270, 192, 42, "MOSTRAR RESPOSTA", UiAction::Reveal, false, enabled);
+    if (card.isObjective()) {
+        const uint8_t count = std::min<uint8_t>(card.optionCount, 4);
+        int16_t y = std::max<int16_t>(150, bottom + 12);
+        const int16_t h = count <= 2 ? 52 : 36;
+        const int16_t gap = count <= 2 ? 12 : 6;
+        const UiAction actions[4] = {UiAction::Choice0, UiAction::Choice1, UiAction::Choice2, UiAction::Choice3};
+        for (uint8_t i = 0; i < count; ++i) {
+            String label = String(static_cast<char>('A' + i)) + "  " + card.options[i];
+            if (label.length() > 28) label = label.substring(0, 27) + "...";
+            drawButton(12, y, 216, h, label, actions[i]);
+            y += h + gap;
+        }
+    } else {
+        drawWrappedText("Formule a resposta antes de continuar.", 18, 204, 204, 2, COLOR_MUTED, 20, 3);
+        drawButton(24, 258, 192, 44, "RESPONDI", UiAction::AnswerReady);
+    }
 }
 
-void CydDisplay::showAnswer(const CardDefinition& card,
-                            uint8_t position,
-                            uint8_t total) {
+void CydDisplay::showConfidence(const CardDefinition& card, uint8_t position, uint8_t total) {
+    clear();
+    drawHeader("Confianca", String(position + 1) + "/" + String(total));
+    drawWrappedText(card.question, 14, 50, 212, 2, COLOR_TEXT, 21, 4);
+    drawCentered("Antes do feedback:", 154, 2, COLOR_MUTED);
+    drawCentered("quanto voce acredita na resposta?", 178, 2, COLOR_MUTED);
+    drawButton(12, 218, 66, 42, "BAIXA", UiAction::ConfidenceLow);
+    drawButton(87, 218, 66, 42, "MEDIA", UiAction::ConfidenceMedium);
+    drawButton(162, 218, 66, 42, "ALTA", UiAction::ConfidenceHigh);
+}
+
+void CydDisplay::showSelfAssessment(const CardDefinition& card, uint8_t position, uint8_t total) {
     clear();
     drawHeader("Resposta", String(position + 1) + "/" + String(total));
-
-    drawWrappedText(card.answer, 12, 46, 216, 2, COLOR_TEXT, 21, 7);
-    tft_.drawFastHLine(12, 190, 216, COLOR_BORDER);
-    drawCentered("Como foi sua resposta?", 198, 2, COLOR_MUTED);
-
-    drawButton(8, 224, 108, 40, "1  Errei", UiAction::RateAgain);
-    drawButton(124, 224, 108, 40, "2  Dificil", UiAction::RateHard);
-    drawButton(8, 272, 108, 40, "3  Acertei", UiAction::RateGood);
-    drawButton(124, 272, 108, 40, "4  Facil", UiAction::RateEasy);
+    drawWrappedText(card.answer, 12, 48, 216, 2, COLOR_TEXT, 21, 7);
+    tft_.drawFastHLine(12, 212, 216, COLOR_BORDER);
+    drawCentered("Sua resposta estava correta?", 224, 2, COLOR_MUTED);
+    drawButton(12, 258, 102, 44, "ERREI", UiAction::SelfIncorrect);
+    drawButton(126, 258, 102, 44, "ACERTEI", UiAction::SelfCorrect);
 }
 
-void CydDisplay::showSummary(const SessionStats& stats, uint16_t remainingDue) {
+void CydDisplay::showObjectiveFeedback(const CardDefinition& card,
+                                       uint8_t position,
+                                       uint8_t total,
+                                       int8_t selectedOptionIndex,
+                                       Outcome outcome) {
     clear();
-    drawHeader("Sessao concluida");
+    drawHeader("Resultado", String(position + 1) + "/" + String(total));
+    drawCentered(outcome == Outcome::Correct ? "CORRETO" : "INCORRETO", 58, 4,
+                 outcome == Outcome::Correct ? COLOR_ACCENT : COLOR_DANGER);
 
-    drawCentered(String(stats.reviewed) + " revisoes", 54, 4, COLOR_ACCENT);
+    if (selectedOptionIndex >= 0 && selectedOptionIndex < card.optionCount) {
+        drawWrappedText("Voce marcou: " + card.options[selectedOptionIndex], 14, 112, 212, 2, COLOR_TEXT, 21, 3);
+    }
+    if (card.correctOptionIndex >= 0 && card.correctOptionIndex < card.optionCount) {
+        drawWrappedText("Resposta: " + card.options[card.correctOptionIndex], 14, 178, 212, 2,
+                        outcome == Outcome::Correct ? COLOR_MUTED : COLOR_ACCENT, 21, 3);
+    }
+    drawButton(40, 268, 160, 38, "CONTINUAR", UiAction::Continue);
+}
 
+void CydDisplay::showEffort(uint8_t position, uint8_t total) {
+    clear();
+    drawHeader("Esforco", String(position + 1) + "/" + String(total));
+    drawCentered("Como foi lembrar?", 90, 3, COLOR_TEXT);
+    drawCentered("Avalie o esforco de recuperacao.", 142, 2, COLOR_MUTED);
+    drawButton(12, 220, 66, 42, "DIFICIL", UiAction::EffortDifficult);
+    drawButton(87, 220, 66, 42, "NORMAL", UiAction::EffortNormal);
+    drawButton(162, 220, 66, 42, "FACIL", UiAction::EffortEasy);
+}
+
+void CydDisplay::showSummary(const SessionStats& stats, uint16_t remainingDue, uint16_t remainingNew, const String& nextReview) {
+    clear();
+    drawHeader(stats.mode == SessionMode::Practice ? "Pratica concluida" : "Sessao concluida");
+    drawCentered(String(stats.reviewed) + " cards", 54, 4, COLOR_ACCENT);
+    drawCentered(String(stats.correct) + " corretos  |  " + String(stats.incorrect) + " erros", 100, 2, COLOR_TEXT);
     const uint32_t minutes = stats.durationSeconds() / 60U;
     const uint32_t seconds = stats.durationSeconds() % 60U;
-    drawCentered("Tempo: " + String(minutes) + "m " + String(seconds) + "s", 102, 2, COLOR_MUTED);
+    drawCentered("Tempo: " + String(minutes) + "m " + String(seconds) + "s", 130, 2, COLOR_MUTED);
+    if (remainingDue > 0) {
+        drawCentered(String(remainingDue) + " revisoes ainda pendentes", 166, 2, COLOR_MUTED);
+    } else if (remainingNew > 0) {
+        drawCentered(String(remainingNew) + " cards novos disponiveis", 166, 2, COLOR_MUTED);
+        if (nextReview.length() > 0 && nextReview != "Sem revisao agendada") {
+            drawCentered("Proxima revisao: " + nextReview, 190, 2, COLOR_MUTED);
+        }
+    } else {
+        drawCentered("Proxima revisao", 158, 2, COLOR_MUTED);
+        drawCentered(nextReview.length() > 0 ? nextReview : "Sem revisao agendada", 182, 2, COLOR_TEXT);
+    }
 
-    tft_.setTextFont(2);
-    tft_.setTextColor(COLOR_TEXT, COLOR_BG);
-    tft_.drawString("Errei", 24, 144);
-    tft_.drawRightString(String(stats.ratingCounts[0]), 216, 144, 2);
-    tft_.drawString("Dificil", 24, 168);
-    tft_.drawRightString(String(stats.ratingCounts[1]), 216, 168, 2);
-    tft_.drawString("Acertei", 24, 192);
-    tft_.drawRightString(String(stats.ratingCounts[2]), 216, 192, 2);
-    tft_.drawString("Facil", 24, 216);
-    tft_.drawRightString(String(stats.ratingCounts[3]), 216, 216, 2);
-
-    drawCentered(String(remainingDue) + " revisoes ainda pendentes", 246, 2, COLOR_MUTED);
-    drawButton(24, 274, 192, 38, "VOLTAR AO INICIO", UiAction::Home);
+    const String nextAction = remainingDue > 0 ? "CONTINUAR REVISOES" :
+                              (remainingNew > 0 ? "ESTUDAR NOVOS" : "PRATICAR NOVAMENTE");
+    drawButton(24, 220, 192, 42, nextAction, UiAction::StudyAgain);
+    drawButton(40, 274, 160, 34, "CONCLUIR", UiAction::Home);
 }
 
 int16_t CydDisplay::mapAxis(int32_t value, int32_t from0, int32_t from1, int16_t toMax) const {
@@ -332,13 +400,11 @@ bool CydDisplay::readMappedTouch(TouchPoint& point) {
 
     TS_Point raw = touch_.getPoint();
     if (raw.z < Config::TOUCH_PRESSURE_MIN) return false;
-
     if (touchWasDown_) return false;
     if (millis() - lastTouchMs_ < Config::TOUCH_DEBOUNCE_MS) return false;
 
     touchWasDown_ = true;
     lastTouchMs_ = millis();
-
     const int32_t rawX = calibration_.swapAxes ? raw.y : raw.x;
     const int32_t rawY = calibration_.swapAxes ? raw.x : raw.y;
     point.x = mapAxis(rawX, calibration_.x0, calibration_.x1, WIDTH - 1);
@@ -352,13 +418,10 @@ bool CydDisplay::readMappedTouch(TouchPoint& point) {
 UiAction CydDisplay::pollAction() {
     TouchPoint point;
     if (!readMappedTouch(point)) return UiAction::None;
-
     for (uint8_t i = 0; i < buttonCount_; ++i) {
         const Button& b = buttons_[i];
         if (point.x >= b.x && point.x < b.x + b.w &&
-            point.y >= b.y && point.y < b.y + b.h) {
-            return b.action;
-        }
+            point.y >= b.y && point.y < b.y + b.h) return b.action;
     }
     return UiAction::None;
 }
@@ -375,25 +438,19 @@ TS_Point CydDisplay::collectCalibrationPoint(int16_t x, int16_t y, const char* l
     while (touch_.touched()) delay(10);
     while (!touch_.touched()) delay(10);
 
-    int64_t sx = 0;
-    int64_t sy = 0;
-    int64_t sz = 0;
+    int64_t sx = 0, sy = 0, sz = 0;
     int samples = 0;
     const uint32_t started = millis();
     while (millis() - started < 700U && samples < 20) {
         if (touch_.touched()) {
             TS_Point p = touch_.getPoint();
             if (p.z >= Config::TOUCH_PRESSURE_MIN) {
-                sx += p.x;
-                sy += p.y;
-                sz += p.z;
-                ++samples;
+                sx += p.x; sy += p.y; sz += p.z; ++samples;
             }
         }
         delay(15);
     }
     while (touch_.touched()) delay(10);
-
     if (samples == 0) return TS_Point(0, 0, 0);
     return TS_Point(static_cast<int16_t>(sx / samples),
                     static_cast<int16_t>(sy / samples),

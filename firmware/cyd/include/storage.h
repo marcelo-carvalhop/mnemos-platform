@@ -17,6 +17,7 @@ public:
                      const uint8_t* queue,
                      uint8_t sessionCount,
                      uint8_t currentPosition,
+                     SessionMode mode,
                      const SessionStats& stats);
     bool loadSession(const CardDefinition* cards,
                      size_t cardCount,
@@ -24,14 +25,20 @@ public:
                      uint8_t maxQueue,
                      uint8_t& sessionCount,
                      uint8_t& currentPosition,
+                     SessionMode& mode,
                      SessionStats& stats);
     bool clearSession();
 
     bool appendReview(const ReviewEvent& event);
-    String reviewsNdjson() const;
-    bool clearReviews();
+    String reviewOutboxNdjson() const;
+    String reviewHistoryNdjson() const;
+    bool clearReviewOutbox();
+    uint16_t pendingReviewCount() const;
+
     bool resetAll();
 
 private:
-    uint32_t reviewSequence_ = 0;
+    bool appendReviewToPath(const char* path, const ReviewEvent& event);
+    bool migrateLegacyReviewLog();
+    String readTextFile(const char* path) const;
 };

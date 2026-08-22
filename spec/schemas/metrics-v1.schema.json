@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://mnemos.dev/schema/metrics/v1.json",
+  "type":"object",
+  "required":["schema","generatedAt","retentionTarget","retention30d","metacognition","consistency30d","maturity","reviewForecast30d","retentionByDeck","difficultyHistogram"],
+  "properties":{
+    "schema":{"const":"mnemos.metrics/v1"},
+    "generatedAt":{"type":"integer"},
+    "retentionTarget":{"type":"number","minimum":0.8,"maximum":0.95},
+    "retention30d":{"type":"object","required":["total","correct","percent"]},
+    "metacognition":{"type":"object","required":["incorrect","overconfidentIncorrect","overconfidencePercent"]},
+    "responseTime30d":{"type":"object"},
+    "consistency30d":{"type":"array","minItems":30,"maxItems":30,"items":{"type":"integer","minimum":0}},
+    "weeklyRetention":{"type":"array","minItems":8,"maxItems":8},
+    "maturity":{"type":"object","required":["new","learning","young","mature"]},
+    "reviewForecast30d":{"type":"array","minItems":30,"maxItems":30,"items":{"type":"integer","minimum":0}},
+    "retentionByDeck":{"type":"array"},
+    "difficultyHistogram":{"type":"array","minItems":10,"maxItems":10,"items":{"type":"integer","minimum":0}},
+    "readinessIndex":{"type":"number","minimum":0,"maximum":100}
+  }
+}

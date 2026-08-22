@@ -4,11 +4,11 @@
 #include <HTTPClient.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
-#include <new>
 
 #include "config.h"
 #include "network_service.h"
 #include "storage.h"
+#include "sync_codec.h"
 
 BackendSyncService::BackendSyncService(NetworkService& network,
                                        Storage& storage,
@@ -70,39 +70,16 @@ bool BackendSyncService::request(const String& method,
     http.setTimeout(12000);
     http.addHeader("Authorization", "Bearer " + network_.deviceToken());
     http.addHeader("Content-Type", "application/json");
-    if (method == "GET") {
-        status = http.GET();
-    } else {
-        status = http.POST(body);
-    }
+    if (method == "GET") status = http.GET();
+    else status = http.POST(body);
     if (status > 0) response = http.getString();
     http.end();
     return status > 0;
 }
 
 bool BackendSyncService::pushReviews() {
-    const String ndjson = storage_.reviewsNdjson();
-    if (ndjson.length() == 0) return true;
-
-    JsonDocument batch;
-    batch["schema"] = "mnemos.review-batch/v1";
-    JsonArray reviews = batch["reviews"].to<JsonArray>();
-
-    int start = 0;
-    while (start < static_cast<int>(ndjson.length())) {
-        int end = ndjson.indexOf('\n', start);
-        if (end < 0) end = ndjson.length();
-        const String line = ndjson.substring(start, end);
-        if (line.length() > 0) {
-            JsonDocument row;
-            if (!deserializeJson(row, line)) reviews.add(row.as<JsonObject>());
-        }
-        start = end + 1;
-    }
-    if (reviews.size() == 0) return true;
-
-    String body;
-    serializeJson(batch, body);
+    if (storage_.pendingReviewCount() == 0) return true;
+    const String body = SyncCodec::buildReviewBatchV2(storage_);
     int status = 0;
     String response;
     if (!request("POST", "/v1/terminal/reviews", body, status, response)) return false;
@@ -110,101 +87,24 @@ bool BackendSyncService::pushReviews() {
         Serial.printf("[backend] reviews HTTP %d\n", status);
         return false;
     }
-    return storage_.clearReviews();
+    return storage_.clearReviewOutbox();
 }
 
 bool BackendSyncService::pullSnapshot() {
     int status = 0;
     String body;
-    const String path = "/v1/terminal/snapshot?limit=" + String(maxCards_);
+    const String path = "/v1/terminal/snapshot?limit=" + String(maxCards_) + "&schema=mnemos.sync%2Fv2";
     if (!request("GET", path, "", status, body)) return false;
     if (status < 200 || status >= 300) {
         Serial.printf("[backend] snapshot HTTP %d\n", status);
         return false;
     }
 
-    JsonDocument doc;
-    if (deserializeJson(doc, body)) return false;
-    if (String(doc["schema"] | "") != "mnemos.sync/v1") return false;
-    JsonArrayConst items = doc["cards"].as<JsonArrayConst>();
-    if (items.size() > maxCards_) return false;
-
-    auto deckName = [&](const String& deckId) -> String {
-        for (JsonObjectConst deck : doc["decks"].as<JsonArrayConst>()) {
-            if (String(deck["id"] | "") == deckId) return String(deck["name"] | "");
-        }
-        return String();
-    };
-
-    // Validate the complete snapshot before mutating the active library.
-    for (JsonObjectConst item : items) {
-        const String id = item["id"] | "";
-        const String deckId = item["deckId"] | "";
-        const String type = item["type"] | "";
-        const String promptFormat = item["content"]["prompt"]["format"] | "";
-        const String answerFormat = item["content"]["answer"]["format"] | "";
-        const String prompt = item["content"]["prompt"]["text"] | "";
-        const String answer = item["content"]["answer"]["text"] | "";
-        if (String(item["schema"] | "") != "mnemos.card/v1" ||
-            id.length() == 0 || id.length() > 36 || deckId.length() == 0 ||
-            prompt.length() == 0 || answer.length() == 0 || deckName(deckId).length() == 0) {
-            return false;
-        }
-        if (type != "basic" || promptFormat != "plain" || answerFormat != "plain") return false;
-    }
-
-    // Build the replacement in temporary arrays first. The live library is
-    // changed only after the complete snapshot has validated and persisted.
-    CardDefinition* nextCards = new (std::nothrow) CardDefinition[maxCards_];
-    CardState* nextStates = new (std::nothrow) CardState[maxCards_];
-    if (nextCards == nullptr || nextStates == nullptr) {
-        delete[] nextCards;
-        delete[] nextStates;
+    String error;
+    if (!SyncCodec::applySnapshotV2(body, cards_, states_, maxCards_, cardCount_, storage_, error)) {
+        Serial.printf("[backend] snapshot rejeitado: %s\n", error.c_str());
         return false;
     }
-    const size_t oldCount = cardCount_;
-
-    size_t next = 0;
-    for (JsonObjectConst item : items) {
-        const String id = item["id"] | "";
-        nextCards[next].id = id;
-        nextCards[next].deckId = item["deckId"] | "";
-        nextCards[next].deck = deckName(nextCards[next].deckId);
-        nextCards[next].type = "basic";
-        nextCards[next].format = "plain";
-        nextCards[next].question = item["content"]["prompt"]["text"] | "";
-        nextCards[next].answer = item["content"]["answer"]["text"] | "";
-        nextCards[next].revision = item["metadata"]["revision"] | 1ULL;
-
-        CardState state{};
-        state.id = id;
-        for (size_t old = 0; old < oldCount; ++old) {
-            if (states_[old].id == id) {
-                state = states_[old];
-                break;
-            }
-        }
-        nextStates[next] = state;
-        ++next;
-    }
-
-    // State is written first. If library persistence then fails, old library
-    // loading ignores state rows for unknown cards. This avoids exposing a
-    // half-applied snapshot in RAM while keeping crash recovery conservative.
-    if (!storage_.saveStates(nextStates, next) ||
-        !storage_.saveLibrary(nextCards, nextStates, next)) {
-        delete[] nextCards;
-        delete[] nextStates;
-        return false;
-    }
-
-    for (size_t i = 0; i < next; ++i) {
-        cards_[i] = nextCards[i];
-        states_[i] = nextStates[i];
-    }
-    cardCount_ = next;
-    delete[] nextCards;
-    delete[] nextStates;
     libraryUpdated_ = true;
     return true;
 }
@@ -221,12 +121,17 @@ bool BackendSyncService::reportStatus(bool synced) {
         }
         if (!exists && cards_[i].deckId.length() > 0) deckIds.add(cards_[i].deckId);
     }
+    doc["firmware"] = Config::APP_VERSION;
+    doc["protocol"] = Config::DEVICE_PROTOCOL_VERSION;
     doc["card_count"] = cardCount_;
     doc["max_cards"] = maxCards_;
+    doc["pending_reviews"] = storage_.pendingReviewCount();
     doc["connectivity"] = network_.connected() ? "wifi" : "offline";
     doc["wifi_ssid"] = network_.ssid();
     doc["library_revision"] = revision;
     doc["synced"] = synced;
+    doc["capabilities"]["directWifiSync"] = true;
+    doc["capabilities"]["bleSync"] = false;
     String body;
     serializeJson(doc, body);
     int status = 0;

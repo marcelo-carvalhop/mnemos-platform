@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mnemos.dev/schema/review/v2.json",
+  "title": "Mnemos Review v2",
+  "type": "object",
+  "required": ["schema","id","cardId","deckId","reviewedAt","responseTimeMs","confidence","outcome","effort","schedulerRating","sessionMode","affectsSchedule","automaticEvaluation"],
+  "properties": {
+    "schema": {"const": "mnemos.review/v2"},
+    "id": {"type":"string","minLength":1},
+    "cardId": {"type":"string","minLength":1},
+    "deckId": {"type":"string"},
+    "cardType": {"type":"string"},
+    "reviewedAt": {"type":"integer","minimum":0},
+    "responseTimeMs": {"type":"integer","minimum":0},
+    "confidence": {"type":"integer","minimum":0,"maximum":100},
+    "outcome": {"enum":["correct","incorrect"]},
+    "effort": {"enum":["none","difficult","normal","easy"]},
+    "schedulerRating": {"type":"integer","minimum":1,"maximum":4},
+    "sessionMode": {"enum":["review","practice","cram"]},
+    "affectsSchedule": {"type":"boolean"},
+    "automaticEvaluation": {"type":"boolean"},
+    "selectedOptionIndex": {"type":"integer","minimum":0,"maximum":3},
+    "difficultyBefore": {"type":"number"}, "difficultyAfter": {"type":"number"},
+    "stabilityBeforeDays": {"type":"number"}, "stabilityAfterDays": {"type":"number"},
+    "retrievabilityBefore": {"type":"number"}, "dueBefore": {"type":"integer"}, "dueAfter": {"type":"integer"}
+  },
+  "allOf": [
+    {"if":{"properties":{"outcome":{"const":"incorrect"}}},"then":{"properties":{"effort":{"const":"none"},"schedulerRating":{"const":1}}}},
+    {"if":{"properties":{"sessionMode":{"const":"practice"}}},"then":{"properties":{"affectsSchedule":{"const":false}}}},
+    {"if":{"properties":{"automaticEvaluation":{"const":true}}},"then":{"required":["selectedOptionIndex"]}}
+  ]
+}
