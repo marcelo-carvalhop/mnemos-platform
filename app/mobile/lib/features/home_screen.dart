@@ -3,95 +3,98 @@ import 'package:flutter/material.dart';
 import '../theme.dart';
 import 'decks_screen.dart';
 import 'device_screen.dart';
-import 'device_sync_screen.dart';
 import 'progress_screen.dart';
 import 'settings_screen.dart';
+import 'today_screen.dart';
 
-/// Home is navigation only. No statistics, reminders, streaks, study queue or
-/// promotional content belongs here.
-class HomeScreen extends StatelessWidget {
+/// A casca do aplicativo.
+///
+/// Quatro destinos numa barra inferior, não uma lista de links. A diferença
+/// não é estética: uma lista custa um toque de ida e um de volta para cada
+/// troca de contexto, e quem estuda todo dia troca de contexto o tempo todo.
+/// Com a barra, qualquer destino está a um toque de qualquer outro.
+///
+/// O princípio que o app já tinha continua valendo — a Home não acumula
+/// métricas, lembretes nem promoção. Ele só deixou de ser implementado como
+/// um índice: agora cada aba é a própria tela, e "Hoje" é onde os números
+/// moram.
+///
+/// `IndexedStack` preserva o estado das quatro: voltar para a Biblioteca não
+/// recarrega a lista nem perde a rolagem, o que é a razão de usá-lo no lugar
+/// de reconstruir a aba a cada troca.
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _index = 0;
+
+  static const _destinations = [
+    NavigationDestination(
+      icon: Icon(Icons.school_outlined),
+      selectedIcon: Icon(Icons.school),
+      label: 'Hoje',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.library_books_outlined),
+      selectedIcon: Icon(Icons.library_books),
+      label: 'Biblioteca',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.devices_other_outlined),
+      selectedIcon: Icon(Icons.devices_other),
+      label: 'Dispositivo',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.insights_outlined),
+      selectedIcon: Icon(Icons.insights),
+      label: 'Progresso',
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mnemos'),
-        actions: [
-          IconButton(
-            tooltip: 'Configurações',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
+      body: IndexedStack(
+        index: _index,
+        children: const [
+          TodayScreen(embedded: true),
+          DecksScreen(),
+          DeviceScreen(),
+          ProgressScreen(),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-        children: [
-          _Destination(
-            title: 'Biblioteca',
-            icon: Icons.library_books_outlined,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const DecksScreen()),
-            ),
-          ),
-          _Destination(
-            title: 'Dispositivo',
-            icon: Icons.devices_other_outlined,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const DeviceScreen()),
-            ),
-          ),
-          _Destination(
-            title: 'Sincronização',
-            icon: Icons.sync_outlined,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const DeviceSyncScreen()),
-            ),
-          ),
-          _Destination(
-            title: 'Estatísticas',
-            icon: Icons.insights_outlined,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ProgressScreen()),
-            ),
-          ),
-        ],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _index,
+        onDestinationSelected: (i) => setState(() => _index = i),
+        destinations: _destinations,
+        backgroundColor: AppColors.ivory,
+        indicatorColor: AppColors.mist,
+        surfaceTintColor: AppColors.ivory,
+        // Rótulos sempre visíveis: um ícone sozinho é um enigma para quem
+        // abre o app duas vezes por semana, que é a maioria.
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        height: 68,
       ),
     );
   }
 }
 
-class _Destination extends StatelessWidget {
-  const _Destination({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
+/// Abre as configurações. Fica no `AppBar` de cada aba, não na barra inferior:
+/// configuração não é um lugar onde se está, é algo que se faz e se fecha.
+class SettingsAction extends StatelessWidget {
+  const SettingsAction({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 20),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.petrol, size: 23),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-            ),
-            const Icon(Icons.chevron_right, color: AppColors.sage),
-          ],
-        ),
+    return IconButton(
+      tooltip: 'Configurações',
+      icon: const Icon(Icons.settings_outlined, size: 22),
+      onPressed: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const SettingsScreen()),
       ),
     );
   }

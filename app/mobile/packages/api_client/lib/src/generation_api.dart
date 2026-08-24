@@ -69,6 +69,38 @@ class PendingCard {
   final String? decision;
 }
 
+/// A generation the user can still return to.
+class OpenGeneration {
+  const OpenGeneration({
+    required this.id,
+    required this.status,
+    required this.stage,
+    required this.deckId,
+    required this.pending,
+    this.topic,
+  });
+
+  factory OpenGeneration.fromJson(Map<String, Object?> json) => OpenGeneration(
+        id: json['id']! as String,
+        status: json['status']! as String,
+        stage: json['stage']! as String,
+        deckId: json['target_deck_id']! as String,
+        topic: json['topic'] as String?,
+        pending: (json['pending'] as num?)?.toInt() ?? 0,
+      );
+
+  final String id;
+  final String status;
+  final String stage;
+  final String deckId;
+  final String? topic;
+
+  /// Cards waiting for a yes or no. Zero while the job is still running.
+  final int pending;
+
+  bool get isWaitingOnMe => pending > 0;
+}
+
 class ApprovalQueue {
   const ApprovalQueue({required this.cards, required this.decided, required this.total});
 
@@ -153,6 +185,20 @@ class GenerationApi {
 
   Future<GenerationJob> get(String jobId) async =>
       GenerationJob.fromJson(await api.get('/v1/generation/jobs/$jobId'));
+
+  /// Generations that still owe an answer (§7.8).
+  ///
+  /// The progress screen says the work continues if you leave it. Without this
+  /// that was not true: the approval queue was reachable only from the screen
+  /// that launched it, so backgrounding the app stranded it — and on the free
+  /// plan that queue holds the one generation the account will ever get.
+  Future<List<OpenGeneration>> open() async {
+    final body = await api.get('/v1/generation/jobs');
+    return [
+      for (final j in body['jobs'] as List<Object?>? ?? const [])
+        OpenGeneration.fromJson(Map<String, Object?>.from(j! as Map<Object?, Object?>)),
+    ];
+  }
 
   Future<ApprovalQueue> queue(String jobId) async =>
       ApprovalQueue.fromJson(await api.get('/v1/generation/jobs/$jobId/queue'));

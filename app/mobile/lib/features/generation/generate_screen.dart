@@ -67,6 +67,14 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
 
     setState(() => _submitting = true);
     try {
+      // Um baralho criado offline ainda não existe no servidor, que recusa o
+      // job com 404. Empurrar antes de pedir.
+      try {
+        await ref.read(syncClientProvider).pushAll();
+      } on Object {
+        // A falha real aparece abaixo, com a copy certa.
+      }
+
       final job = await ref.read(generationApiProvider).create(
             sourceType: 'topic',
             targetDeckId: deckId,
@@ -136,7 +144,7 @@ class _GenerateScreenState extends ConsumerState<GenerateScreen> {
               loading: () => const LinearProgressIndicator(),
               error: (e, _) => Text('$e'),
               data: (rows) => DropdownButtonFormField<String>(
-                value: targetDeck,
+                initialValue: targetDeck,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
                 items: [
                   for (final d in rows) DropdownMenuItem(value: d.id, child: Text(d.name)),

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../device/terminal_local_store.dart';
 import '../providers.dart';
 import '../theme.dart';
+import 'device_sync_screen.dart';
+import 'home_screen.dart' show SettingsAction;
 import 'terminal_screen.dart';
 
 /// Identity and connection entry point for the dedicated terminal.
@@ -44,7 +46,21 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Dispositivo')),
+      appBar: AppBar(
+        title: const Text('Dispositivo'),
+        actions: [
+          // A sincronização deixou de ser um destino da Home: ela é sobre este
+          // aparelho, e é aqui que quem pensa nele já está.
+          IconButton(
+            tooltip: 'Sincronização',
+            icon: const Icon(Icons.sync_outlined, size: 22),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DeviceSyncScreen()),
+            ),
+          ),
+          const SettingsAction(),
+        ],
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
