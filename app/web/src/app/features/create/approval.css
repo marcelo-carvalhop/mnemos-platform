@@ -1,0 +1,168 @@
+:host {
+  display: block;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+.bar p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--mn-text-muted);
+}
+.undo {
+  border: 0;
+  background: none;
+  color: var(--mn-accent);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.undo kbd {
+  font-size: 11px;
+  color: var(--mn-text-muted);
+}
+
+.card {
+  background: var(--mn-surface-raised);
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  padding: 36px 32px;
+  text-align: center;
+  /* Um card longo rola dentro de si mesmo em vez de empurrar os botões para
+   * fora da tela. */
+  max-height: 52vh;
+  overflow-y: auto;
+}
+.front {
+  font-family: var(--mn-font-content);
+  font-size: 21px;
+  line-height: 1.35;
+  margin: 0;
+  font-weight: 600;
+}
+.card hr {
+  width: 34px;
+  border: 0;
+  border-top: 1.4px solid var(--mn-line);
+  margin: 20px auto;
+}
+.back {
+  font-family: var(--mn-font-content);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--mn-text-muted);
+  margin: 0;
+}
+.tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin: 20px 0 0;
+  padding: 0;
+}
+.tags li {
+  font-size: 10.5px;
+  color: var(--mn-text-muted);
+  background: color-mix(in srgb, var(--mn-line) 55%, transparent);
+  border-radius: 20px;
+  padding: 3px 9px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+.actions button {
+  padding: 15px;
+  border-radius: var(--mn-radius-lg);
+  border: 1px solid transparent;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.actions kbd {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.7;
+}
+.discard {
+  background: var(--mn-again-bg);
+  color: var(--mn-again);
+}
+.approve {
+  background: var(--mn-good-bg);
+  color: var(--mn-good);
+}
+.actions button:hover:not(:disabled) {
+  border-color: currentColor;
+}
+
+/* Longe do caminho de propósito: é o botão que se aperta sem ler quando fica
+ * perto demais, e a fila existe justamente para impedir isso. */
+.rest {
+  display: block;
+  margin: 22px auto 0;
+  border: 0;
+  background: none;
+  color: var(--mn-accent);
+  font-size: 13.5px;
+}
+
+.judged {
+  text-align: center;
+  padding: 50px 20px;
+}
+.judged h1 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+.judged p {
+  color: var(--mn-text-muted);
+  margin: 0 auto 26px;
+  max-width: 44ch;
+  line-height: 1.6;
+}
+
+.primary,
+.secondary {
+  padding: 13px 26px;
+  border-radius: var(--mn-radius);
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.primary {
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+}
+.secondary {
+  background: none;
+  border-color: var(--mn-line);
+  color: var(--mn-accent);
+}
+
+.loading,
+.failed {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--mn-text-muted);
+}
+.failed h1 {
+  font-size: 22px;
+  color: var(--mn-text);
+  margin-bottom: 10px;
+}

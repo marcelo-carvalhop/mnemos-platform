@@ -31,6 +31,8 @@ List<Review> randomHistory(int seed, int length) {
 }
 
 void main() {
+  _contractAgreement();
+
   group('no randomness (§4.1)', () {
     test('the same input always produces the same interval', () {
       // The package enables interval fuzzing by default. With it on, this
@@ -327,5 +329,21 @@ void main() {
 
       expect(settle(0.80).interval!, greaterThan(settle(0.95).interval!));
     });
+  });
+}
+
+/// O vetor de pesos que a web também usa.
+///
+/// §4.1 declara o vetor no contrato porque cada plataforma usa um pacote
+/// diferente de FSRS e os padrões **não** coincidem: o `ts-fsrs` do npm traz o
+/// vetor do FSRS-6 e este traz outro. Herdar o padrão de cada pacote fazia o
+/// navegador e o telefone calcularem vencimentos diferentes do mesmo
+/// histórico, sem nada avisar — foi assim que apareceu.
+///
+/// Este teste é a metade Dart do acordo; a outra está em
+/// `app/web/src/app/core/scheduler.spec.ts`.
+void _contractAgreement() {
+  test('o padrão do pacote é o vetor declarado no contrato', () {
+    expect(defaultFsrsWeights, kFsrsWeights);
   });
 }

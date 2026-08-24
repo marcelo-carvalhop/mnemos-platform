@@ -1,0 +1,138 @@
+/* Tokens do Mnemos.
+ *
+ * A paleta vem de `app/mobile/lib/theme.dart` e as correções de contraste de
+ * `docs/design/web-brief/CORES.md`, onde cada valor tem o contraste medido.
+ * Três cores da paleta reprovam WCAG AA como texto pequeno sobre marfim; a web
+ * usa as variantes escurecidas para texto e reserva as originais para
+ * superfícies grandes, onde contraste de texto não se aplica.
+ *
+ * Não há preto puro nem branco puro. É deliberado: o produto tem um terminal
+ * de tinta eletrônica, e a interface na tela combina com o objeto na mesa.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+:root {
+  /* Superfícies */
+  --mn-surface: #f4f1e8;
+  --mn-surface-sunken: #ede9de;
+  --mn-surface-raised: #fbfaf6;
+  --mn-line: #d9d5cc;
+
+  /* Texto */
+  --mn-text: #1f1f1f;
+  --mn-text-muted: #535f4e;
+  --mn-text-on-accent: #f4f1e8;
+
+  /* Ação */
+  --mn-accent: #365462;
+  --mn-accent-hover: #2b4450;
+  --mn-accent-soft: #e4e8e6;
+
+  /* Os quatro graus, sempre nesta ordem: errei, difícil, bom, fácil.
+   * A ordem carrega significado e nunca é alfabética nem por frequência. */
+  --mn-again: #9e5d44;
+  --mn-again-bg: #f3e7e2;
+  --mn-hard: #806b44;
+  --mn-hard-bg: #f1ebde;
+  --mn-good: #535f4e;
+  --mn-good-bg: #e7eae4;
+  --mn-easy: #365462;
+  --mn-easy-bg: #e2e8eb;
+
+  /* Cores de origem — só para preencher área, nunca para texto pequeno. */
+  --mn-sage: #7a8b72;
+  --mn-brass: #b8a27a;
+  --mn-terracotta: #b56e52;
+
+  /* Tipografia. O card é conteúdo para ler, a interface é controle para
+   * operar: serifada no conteúdo, sem serifa na interface, mono no que é
+   * técnico (atalhos, ids, rótulos de seção). */
+  --mn-font-ui: 'Public Sans', system-ui, -apple-system, sans-serif;
+  --mn-font-content: 'Source Serif 4', Georgia, serif;
+  --mn-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --mn-radius: 8px;
+  --mn-radius-lg: 14px;
+
+  /* Uma escala só, para que espaçamento não vire opinião por tela. */
+  --mn-gap-1: 4px;
+  --mn-gap-2: 8px;
+  --mn-gap-3: 12px;
+  --mn-gap-4: 18px;
+  --mn-gap-5: 26px;
+  --mn-gap-6: 40px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--mn-surface);
+  color: var(--mn-text);
+  font-family: var(--mn-font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--mn-font-content);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+a {
+  color: var(--mn-accent);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* O foco visível não é decoração: esta interface é operada pelo teclado, e um
+ * anel de foco removido torna metade dela inutilizável. */
+:focus-visible {
+  outline: 2px solid var(--mn-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.mn-mono {
+  font-family: var(--mn-font-mono);
+}
+
+/* Visível para leitores de tela, invisível na tela — para rótulos que o layout
+ * comunica visualmente e a semântica precisa dizer em voz alta. */
+.mn-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

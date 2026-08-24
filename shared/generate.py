@@ -22,6 +22,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CONTRACT = ROOT / "shared" / "contract.yaml"
 DART_OUT = ROOT / "app" / "mobile" / "packages" / "domain" / "lib" / "src" / "contract.g.dart"
 PY_OUT = ROOT / "backend" / "app" / "contract.py"
+TS_OUT = ROOT / "app" / "web" / "src" / "app" / "core" / "contract.g.ts"
 
 BANNER_LINES = [
     "GENERATED FROM shared/contract.yaml — DO NOT EDIT.",
@@ -48,6 +49,7 @@ def _dart(c: dict) -> str:
     statuses = "\n".join(f"  {_camel(s)}('{s}')," for s in c["card_statuses"])
     errors = "\n".join(f"  {_camel(e)}('{e}')," for e in c["error_codes"])
     milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
+    weights = ", ".join(repr(w) for w in sched["fsrs_weights"])
 
     banner = "\n".join(f"// {line}" for line in BANNER_LINES)
     return f"""{banner}
@@ -63,6 +65,10 @@ const int kBackMaxGraphemes = {limits['back_max_graphemes']};
 const int kMatureIntervalDays = {sched['mature_interval_days']};
 const double kDesiredRetention = {sched['desired_retention']};
 const List<int> kGraduationMilestoneDays = [{milestones}];
+
+/// §4.1 — o vetor FSRS padrão. Declarado no contrato porque cada plataforma
+/// usa um pacote diferente e os padrões deles não coincidem.
+const List<double> kFsrsWeights = [{weights}];
 
 /// §5.7 — the day rolls over at 04:00 local, not midnight.
 const int kDefaultDayCutoffHour = {sched['default_day_cutoff_hour']};
@@ -165,6 +171,7 @@ def _python(c: dict) -> str:
     statuses = "\n".join(f'    {s.upper()} = "{s}"' for s in c["card_statuses"])
     errors = "\n".join(f'    {e.upper()} = "{e}"' for e in c["error_codes"])
     milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
+    weights = ", ".join(repr(w) for w in sched["fsrs_weights"])
 
     banner = "\n".join(f"# {line}" for line in BANNER_LINES)
     return f'''{banner}
@@ -183,6 +190,10 @@ BACK_MAX_GRAPHEMES = {limits['back_max_graphemes']}
 MATURE_INTERVAL_DAYS = {sched['mature_interval_days']}
 DESIRED_RETENTION = {sched['desired_retention']}
 GRADUATION_MILESTONE_DAYS = ({milestones},)
+
+# §4.1 — the default FSRS vector, declared here because each platform's
+# package ships a DIFFERENT default and two clients must not disagree.
+FSRS_WEIGHTS = ({weights},)
 
 # §5.7 — the day rolls over at 04:00 local, not midnight.
 DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']}
@@ -235,6 +246,106 @@ class ErrorCode(StrEnum):
 '''
 
 
+def _typescript(c: dict) -> str:
+    limits = c["card_limits"]
+    sched = c["scheduling"]
+    quota = c["quota"]
+    modes = c["modes"]
+    generation = c["generation"]
+
+    # Uniões de literais em vez de enums do TypeScript: o valor na rede é o
+    # contrato, e uma união faz o compilador recusar uma string que não existe
+    # sem introduzir um objeto em tempo de execução para traduzir de volta.
+    grades = "\n".join(
+        f"  /** {g['label_pt']} */\n  {_camel(g['dart'])}: {g['value']}," for g in c["grades"]
+    )
+    grade_labels = "\n".join(f"  {g['value']}: '{g['label_pt']}'," for g in c["grades"])
+    sources = " | ".join(f"'{s}'" for s in c["review_sources"])
+    statuses = " | ".join(f"'{s}'" for s in c["card_statuses"])
+    errors = " | ".join(f"'{e}'" for e in c["error_codes"])
+    error_list = "\n".join(f"  '{e}'," for e in c["error_codes"])
+    milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
+    weights = ", ".join(repr(w) for w in sched["fsrs_weights"])
+
+    banner = "\n".join(f"// {line}" for line in BANNER_LINES)
+    return f"""{banner}
+
+/** Contract version; bumped when this file's shape changes. */
+export const CONTRACT_VERSION = {c['version']};
+
+/** §7.6 — counted in grapheme clusters over NFC-normalised text. */
+export const FRONT_MAX_GRAPHEMES = {limits['front_max_graphemes']};
+export const BACK_MAX_GRAPHEMES = {limits['back_max_graphemes']};
+
+/** §4 — maturity is a query predicate, never a stored column. */
+export const MATURE_INTERVAL_DAYS = {sched['mature_interval_days']};
+export const DESIRED_RETENTION = {sched['desired_retention']};
+export const GRADUATION_MILESTONE_DAYS = [{milestones}] as const;
+
+/**
+ * §4.1 — o vetor FSRS padrão. Vem do contrato e não do pacote: `ts-fsrs` traz
+ * o vetor do FSRS-6 e o `fsrs` do Dart traz outro, e herdar cada padrão faria
+ * a web e o aplicativo agendarem o mesmo histórico de formas diferentes.
+ */
+export const FSRS_WEIGHTS: readonly number[] = [{weights}];
+
+/** §5.7 — the day rolls over at 04:00 local, not midnight. */
+export const DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']};
+
+/** §7.7 — one generation for the lifetime of the account, not per month. */
+export const FREE_GENERATIONS_LIFETIME = {quota['free_generations_lifetime']};
+export const MAX_JOBS_IN_FLIGHT = {quota['max_jobs_in_flight']};
+
+/** §7.3 — cap on the subject, or on pasted material. */
+export const TOPIC_MAX_CHARS = {generation['topic_max_chars']};
+
+/** §5.9 — alternative modes. Scheduling decisions, not interface ones. */
+export const MULTIPLE_CHOICE_OPTIONS = {modes['multiple_choice_options']};
+export const MULTIPLE_CHOICE_FAST_ANSWER_MS = {modes['multiple_choice_fast_answer_ms']};
+export const LEECH_MIN_LAPSES = {modes['leech_min_lapses']};
+export const SIMULADO_DEFAULT_QUESTIONS = {modes['simulado_default_questions']};
+export const SIMULADO_DEFAULT_MINUTES = {modes['simulado_default_minutes']};
+export const TTS_ANSWER_PAUSE_MS = {modes['tts_answer_pause_ms']};
+
+/** §5.2 — the wire value is the contract. Never renumber. */
+export const Grade = {{
+{grades}
+}} as const;
+
+export type Grade = (typeof Grade)[keyof typeof Grade];
+
+/** The four grades in the order they are always shown: errei → fácil. */
+export const GRADES_IN_ORDER: readonly Grade[] = [
+  {", ".join(f"Grade.{_camel(g['dart'])}" for g in c["grades"])},
+];
+
+export const GRADE_LABELS: Record<Grade, string> = {{
+{grade_labels}
+}};
+
+/** §5.2 — a review row exists only for modes that feed the scheduler. */
+export type ReviewSource = {sources};
+
+/** §5.1 */
+export type CardStatus = {statuses};
+
+/** §10 — the client maps codes to copy; it never shows server prose. */
+export type ErrorCode = {errors};
+
+const ERROR_CODES: readonly string[] = [
+{error_list}
+];
+
+/**
+ * Null for a code this build has never heard of. §5.3 makes that the normal
+ * case, not a corruption — so it is a lookup that can miss, never a throw.
+ */
+export function errorCodeFromWire(wire: string | null | undefined): ErrorCode | null {{
+  return wire != null && ERROR_CODES.includes(wire) ? (wire as ErrorCode) : null;
+}}
+"""
+
+
 def _camel(snake: str) -> str:
     head, *tail = snake.split("_")
     return head + "".join(p.capitalize() for p in tail)
@@ -246,7 +357,11 @@ def main() -> int:
     args = parser.parse_args()
 
     contract = yaml.safe_load(CONTRACT.read_text(encoding="utf-8"))
-    outputs = {DART_OUT: _dart(contract), PY_OUT: _python(contract)}
+    outputs = {
+        DART_OUT: _dart(contract),
+        PY_OUT: _python(contract),
+        TS_OUT: _typescript(contract),
+    }
 
     stale = []
     for path, content in outputs.items():

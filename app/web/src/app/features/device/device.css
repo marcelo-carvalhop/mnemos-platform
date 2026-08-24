@@ -1,0 +1,106 @@
+:host {
+  display: block;
+  max-width: 720px;
+}
+
+h1 {
+  font-size: 32px;
+  margin-bottom: 24px;
+}
+
+h2 {
+  font-size: 18px;
+  font-family: var(--mn-font-ui);
+  letter-spacing: 0;
+}
+
+h3 {
+  font-size: 13px;
+  font-family: var(--mn-font-ui);
+  font-weight: 600;
+  letter-spacing: 0;
+  margin: 22px 0 10px;
+  color: var(--mn-text-muted);
+}
+
+.quiet {
+  color: var(--mn-text-muted);
+  font-size: 12.5px;
+  margin: 6px 0 0;
+}
+
+.terminal {
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  padding: 22px;
+  margin-bottom: 16px;
+}
+
+.decks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.decks li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 10px;
+  border-radius: var(--mn-radius);
+}
+.decks li:hover {
+  background: var(--mn-surface-sunken);
+}
+.decks label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.decks input {
+  accent-color: var(--mn-accent);
+  width: 16px;
+  height: 16px;
+}
+
+/* Latão para o que ainda não chegou, sálvia escurecida para o que está no
+ * aparelho — e sempre com o texto junto, porque a cor sozinha não pode
+ * carregar o significado. */
+.pending {
+  font-size: 11px;
+  color: var(--mn-hard);
+  white-space: nowrap;
+}
+.onboard {
+  font-size: 11px;
+  color: var(--mn-good);
+  white-space: nowrap;
+}
+
+.empty {
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  padding: 40px 24px;
+  text-align: center;
+}
+.empty p {
+  color: var(--mn-text-muted);
+  max-width: 46ch;
+  margin: 10px auto 0;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.problem {
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  background: var(--mn-again-bg);
+  color: var(--mn-again);
+  border-radius: var(--mn-radius);
+  font-size: 13px;
+}

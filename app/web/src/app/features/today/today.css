@@ -1,0 +1,131 @@
+:host {
+  display: block;
+  max-width: 760px;
+}
+
+.head {
+  margin-bottom: 28px;
+}
+.head h1 {
+  font-size: 44px;
+  line-height: 1.1;
+  margin: 6px 0 4px;
+}
+
+.label {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--mn-text-muted);
+}
+
+.goal {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  margin-bottom: 24px;
+}
+
+/* Um anel cônico em vez de SVG: uma propriedade custom controla a fração, e o
+ * navegador desenha sem nenhum JavaScript por trás. */
+.ring {
+  --p: 0;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    conic-gradient(var(--mn-accent) calc(var(--p) * 360deg), var(--mn-surface-raised) 0),
+    var(--mn-surface-raised);
+  position: relative;
+}
+.ring::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--mn-surface);
+}
+.ring span {
+  position: relative;
+  font-size: 11.5px;
+  color: var(--mn-text);
+}
+
+.count {
+  margin: 0 0 2px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  padding: 18px;
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  border: 0;
+  border-radius: var(--mn-radius-lg);
+  font-size: 17px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.primary:hover {
+  background: var(--mn-accent-hover);
+}
+.primary kbd {
+  font-size: 12px;
+  opacity: 0.75;
+  font-weight: 400;
+}
+.primary.inline {
+  width: auto;
+  display: inline-flex;
+  padding: 12px 22px;
+  font-size: 15px;
+}
+
+.done,
+.empty {
+  padding: 30px 24px;
+  border-radius: var(--mn-radius-lg);
+  text-align: center;
+}
+.done {
+  background: var(--mn-good-bg);
+}
+.empty {
+  border: 1px solid var(--mn-line);
+}
+.done h2,
+.empty h2 {
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+.done p,
+.empty p {
+  margin: 0 auto;
+  max-width: 44ch;
+  color: var(--mn-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.empty p {
+  margin-bottom: 20px;
+}
+
+.problem {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-radius: var(--mn-radius);
+  background: var(--mn-again-bg);
+  color: var(--mn-again);
+  font-size: 13.5px;
+}

@@ -1,18 +1,58 @@
-name: Web placeholder
+name: Web
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'app/web/**'
+      - 'shared/**'
+      - '.github/workflows/web.yml'
   pull_request:
     paths:
       - 'app/web/**'
+      - 'shared/**'
       - '.github/workflows/web.yml'
 
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  placeholder:
+  web:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app/web
     steps:
       - uses: actions/checkout@v4
-      - name: Web client status
+
+      - uses: actions/setup-node@v4
+        with:
+          # A versão vem do .nvmrc: o Angular 22 exige 22.22.3+ e um Node velho
+          # falha com uma mensagem que não parece um erro de versão.
+          node-version-file: 'app/web/.nvmrc'
+          cache: npm
+          cache-dependency-path: app/web/package-lock.json
+
+      - name: Instalar
+        run: npm ci
+
+      - name: Contrato em dia
+        working-directory: .
+        # O mesmo passo que o backend faz. `contract.ts` é gerado, e um arquivo
+        # gerado desatualizado é a web e o servidor discordando em silêncio.
         run: |
-          test -f app/web/README.md
-          echo 'app/web is reserved; choose a framework before replacing this workflow.'
+          python -m pip install pyyaml
+          python shared/generate.py --check
+
+      - name: Formatação
+        run: npm run lint:format
+
+      - name: Testes
+        run: npm run test:ci
+
+      - name: Build de produção
+        # Os budgets do angular.json falham aqui: o primeiro carregamento é o
+        # que decide se a landing abre rápido num celular ruim.
+        run: npm run build
