@@ -34,6 +34,7 @@ def _dart(c: dict) -> str:
     sched = c["scheduling"]
     quota = c["quota"]
     modes = c["modes"]
+    generation = c["generation"]
 
     grades ="\n".join(
         f"  /// {g['label_pt']} (wire value {g['value']})\n"
@@ -69,6 +70,10 @@ const int kDefaultDayCutoffHour = {sched['default_day_cutoff_hour']};
 /// §7.7 — one generation for the lifetime of the account, not per month.
 const int kFreeGenerationsLifetime = {quota['free_generations_lifetime']};
 const int kMaxJobsInFlight = {quota['max_jobs_in_flight']};
+
+/// §7.3 — teto do assunto ou do texto colado. Sem ele o corpo da requisição
+/// vira o prompt, e o custo de uma geração é medido em tokens.
+const int kTopicMaxChars = {generation['topic_max_chars']};
 
 /// §5.9 — alternative modes. The grade mapping is a scheduling decision, so
 /// its numbers live in the contract rather than in a widget.
@@ -153,6 +158,7 @@ def _python(c: dict) -> str:
     sched = c["scheduling"]
     quota = c["quota"]
     modes = c["modes"]
+    generation = c["generation"]
 
     grades ="\n".join(f"    {g['name'].upper()} = {g['value']}" for g in c["grades"])
     sources = "\n".join(f'    {s.upper()} = "{s}"' for s in c["review_sources"])
@@ -184,6 +190,10 @@ DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']}
 # §7.7 — one generation for the lifetime of the account, not per month.
 FREE_GENERATIONS_LIFETIME = {quota['free_generations_lifetime']}
 MAX_JOBS_IN_FLIGHT = {quota['max_jobs_in_flight']}
+
+# §7.3 — cap on the subject, or on pasted material. Without it the request body
+# becomes the prompt, and a generation is billed by token.
+TOPIC_MAX_CHARS = {generation['topic_max_chars']}
 
 # §5.9 — alternative modes. Present on the server only so that a future
 # server-side check has the same numbers; the modes themselves are on-device.

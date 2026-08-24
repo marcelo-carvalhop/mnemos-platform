@@ -23,6 +23,10 @@ DEFAULT_DAY_CUTOFF_HOUR = 4
 FREE_GENERATIONS_LIFETIME = 1
 MAX_JOBS_IN_FLIGHT = 2
 
+# §7.3 — cap on the subject, or on pasted material. Without it the request body
+# becomes the prompt, and a generation is billed by token.
+TOPIC_MAX_CHARS = 20000
+
 # §5.9 — alternative modes. Present on the server only so that a future
 # server-side check has the same numbers; the modes themselves are on-device.
 MULTIPLE_CHOICE_OPTIONS = 4

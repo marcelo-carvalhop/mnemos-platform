@@ -61,6 +61,13 @@ quota:
   free_generations_lifetime: 1
   max_jobs_in_flight: 2
 
+# §7.3 — `topic` carrega o assunto (source_type "topic") ou o texto colado
+# (source_type "text"), então o teto tem de caber algumas páginas. Sem teto o
+# corpo da requisição vira o prompt, e o custo de uma geração é medido em
+# tokens: um pedido sem limite é uma conta em aberto.
+generation:
+  topic_max_chars: 20000
+
 # §10 / §5.5 / §5.6 — machine-readable, so the client maps codes to copy
 # instead of matching on server prose.
 error_codes:

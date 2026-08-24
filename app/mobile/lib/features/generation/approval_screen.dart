@@ -55,9 +55,11 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
         // Já decididos ficam fora da pilha, mas contam no total: sair no meio
         // e voltar tem de retomar de onde parou (§7.8).
         _cards = queue.cards.where((c) => c.decision == null).toList();
-        _decided.addAll(queue.cards
-            .where((c) => c.decision != null)
-            .map((c) => (card: c, decision: c.decision!)));
+        _decided.addAll(
+          queue.cards
+              .where((c) => c.decision != null)
+              .map((c) => (card: c, decision: c.decision!)),
+        );
         _loading = false;
       });
     } on Object catch (e) {
@@ -160,9 +162,11 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(28),
-            child: Text('${failure.title}\n\n${failure.detail}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(height: 1.5, color: AppColors.sage)),
+            child: Text(
+              '${failure.title}\n\n${failure.detail}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(height: 1.5, color: AppColors.sage),
+            ),
           ),
         ),
       );
@@ -203,10 +207,7 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
           Expanded(
             child: _cards.isEmpty
                 ? _AllJudged(approved: approved, total: total)
-                : _Stack(
-                    cards: _cards,
-                    onDecide: _decide,
-                  ),
+                : _Stack(cards: _cards, onDecide: _decide),
           ),
           _Footer(
             remaining: _cards.length,
@@ -214,8 +215,13 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
             busy: _busy,
             onApprove: _cards.isEmpty ? null : () => _decide('approved'),
             onDiscard: _cards.isEmpty ? null : () => _decide('discarded'),
-            onApproveRest: _cards.isEmpty ? null : () => _finish(approveRest: true),
-            onCreate: approved == 0 || _busy ? null : () => _finish(approveRest: false),
+            onApproveRest: _cards.isEmpty
+                ? null
+                : () => _finish(approveRest: true),
+            onCreate: approved == 0 || _busy
+                ? null
+                : () => _finish(approveRest: false),
+            onLeave: () => Navigator.of(context).pop(),
           ),
         ],
       ),
@@ -353,78 +359,95 @@ class _Card extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // O selo fica do lado *oposto* ao arrasto. Arrastando para a
-            // direita, a metade do card que continua na tela é a esquerda —
-            // um selo na borda direita nasce fora do visor e nunca é lido, que
-            // foi exatamente o que apareceu no aparelho.
-            if (interactive)
-              SizedBox(
-                height: 24,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _Verdict(
-                      label: 'APROVAR',
-                      colour: AppColors.sage,
-                      opacity: verdict > 0 ? tint : 0,
-                    ),
-                    _Verdict(
-                      label: 'DESCARTAR',
-                      colour: AppColors.terracotta,
-                      opacity: verdict < 0 ? tint : 0,
-                    ),
-                  ],
+        // Um card longo — pergunta grande, resposta grande, muitas etiquetas —
+        // passava da altura disponível e a coluna transbordava. Rolar é
+        // vertical e não briga com o arrasto, que é horizontal.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // O selo fica do lado *oposto* ao arrasto. Arrastando para a
+              // direita, a metade do card que continua na tela é a esquerda —
+              // um selo na borda direita nasce fora do visor e nunca é lido, que
+              // foi exatamente o que apareceu no aparelho.
+              if (interactive)
+                SizedBox(
+                  height: 24,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _Verdict(
+                        label: 'APROVAR',
+                        colour: AppColors.sage,
+                        opacity: verdict > 0 ? tint : 0,
+                      ),
+                      _Verdict(
+                        label: 'DESCARTAR',
+                        colour: AppColors.terracotta,
+                        opacity: verdict < 0 ? tint : 0,
+                      ),
+                    ],
+                  ),
+                ),
+              const SizedBox(height: 12),
+              Text(
+                card.front,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 19,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.graphite,
                 ),
               ),
-            const SizedBox(height: 12),
-            Text(
-              card.front,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 19,
-                height: 1.35,
-                fontWeight: FontWeight.w500,
-                color: AppColors.graphite,
+              const SizedBox(height: 20),
+              Center(
+                child: SizedBox(
+                  width: 34,
+                  child: Divider(color: AppColors.mist, thickness: 1.4),
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Center(
-              child: SizedBox(
-                width: 34,
-                child: Divider(color: AppColors.mist, thickness: 1.4),
+              const SizedBox(height: 20),
+              Text(
+                card.back,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: AppColors.sage,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              card.back,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 15, height: 1.5, color: AppColors.sage),
-            ),
-            if (card.tags.isNotEmpty) ...[
-              const SizedBox(height: 22),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final tag in card.tags)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.mist.withValues(alpha: .5),
-                        borderRadius: BorderRadius.circular(20),
+              if (card.tags.isNotEmpty) ...[
+                const SizedBox(height: 22),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final tag in card.tags)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.mist.withValues(alpha: .5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: AppColors.sage,
+                          ),
+                        ),
                       ),
-                      child: Text(tag,
-                          style: const TextStyle(fontSize: 10.5, color: AppColors.sage)),
-                    ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -432,7 +455,11 @@ class _Card extends StatelessWidget {
 }
 
 class _Verdict extends StatelessWidget {
-  const _Verdict({required this.label, required this.colour, required this.opacity});
+  const _Verdict({
+    required this.label,
+    required this.colour,
+    required this.opacity,
+  });
 
   final String label;
   final Color colour;
@@ -497,6 +524,7 @@ class _Footer extends StatelessWidget {
     required this.onDiscard,
     required this.onApproveRest,
     required this.onCreate,
+    required this.onLeave,
   });
 
   final int remaining;
@@ -506,6 +534,7 @@ class _Footer extends StatelessWidget {
   final VoidCallback? onDiscard;
   final VoidCallback? onApproveRest;
   final VoidCallback? onCreate;
+  final VoidCallback? onLeave;
 
   @override
   Widget build(BuildContext context) {
@@ -546,12 +575,29 @@ class _Footer extends StatelessWidget {
               onPressed: busy ? null : onApproveRest,
               child: Text('Aprovar os $remaining restantes'),
             ),
-          ] else
+          ]
+          // Sem nada aprovado não há o que criar, e um botão morto deixava a
+          // tela sem saída nenhuma: aprovar, descartar e criar desabilitados
+          // ao mesmo tempo. Sair é a ação honesta, e ela funciona.
+          else if (approved == 0)
+            OutlinedButton(
+              onPressed: busy ? null : onLeave,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                side: const BorderSide(color: AppColors.mist),
+                foregroundColor: AppColors.petrol,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Voltar'),
+            )
+          else
             FilledButton(
               onPressed: onCreate,
-              child: Text(approved == 0
-                  ? 'Nada aprovado'
-                  : 'Criar $approved ${approved == 1 ? "card" : "cards"}'),
+              child: Text(
+                'Criar $approved ${approved == 1 ? "card" : "cards"}',
+              ),
             ),
         ],
       ),
@@ -614,25 +660,43 @@ class _AllJudged extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Uma fila que chegou vazia não é uma fila terminada. `approved == total`
+    // é verdadeiro com zero e zero, e virava "Você aprovou todos" para alguém
+    // que não aprovou nada — a geração é que não produziu card algum.
+    final nothingCame = total == 0;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.done_all, size: 34, color: AppColors.sage),
+            Icon(
+              nothingCame ? Icons.inbox_outlined : Icons.done_all,
+              size: 34,
+              color: nothingCame ? AppColors.brass : AppColors.sage,
+            ),
             const SizedBox(height: 18),
             Text(
-              approved == total
+              nothingCame
+                  ? 'Nenhum card chegou'
+                  : approved == total
                   ? 'Você aprovou todos'
                   : '$approved de $total aprovados',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Eles entram no baralho quando você criar.',
+            Text(
+              nothingCame
+                  ? 'Esta geração não produziu nada para aprovar. '
+                        'Sua geração não foi gasta.'
+                  : 'Eles entram no baralho quando você criar.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, color: AppColors.sage),
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: AppColors.sage,
+              ),
             ),
           ],
         ),

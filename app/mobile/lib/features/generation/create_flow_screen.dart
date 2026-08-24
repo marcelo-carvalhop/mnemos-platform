@@ -1,3 +1,4 @@
+import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -142,8 +143,13 @@ class _CreateFlowScreenState extends ConsumerState<CreateFlowScreen> {
   }
 
   /// O nome do baralho sai do que a pessoa escreveu, sem pedir duas vezes.
+  ///
+  /// O campo aceita quatro linhas, e um `\n` no meio do nome quebra a lista de
+  /// baralhos, que reserva uma linha por card. Espaço em branco vira um espaço
+  /// só — o assunto continua sendo o que a pessoa escreveu, com a pontuação
+  /// que ela usou.
   static String _deckNameFrom(String subject) {
-    final trimmed = subject.trim();
+    final trimmed = subject.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (trimmed.length <= 42) return trimmed;
     final cut = trimmed.substring(0, 42);
     final lastSpace = cut.lastIndexOf(' ');
@@ -251,6 +257,11 @@ class _CreateFlowScreenState extends ConsumerState<CreateFlowScreen> {
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
               style: const TextStyle(fontSize: 16, height: 1.4),
+              // O servidor recusa acima disso (§7.3). Cortar na colagem é
+              // melhor que deixar a pessoa pedir e receber um 422 — sem
+              // contador, porque ninguém digita vinte mil caracteres aqui e um
+              // "0/20000" só sujaria a tela.
+              inputFormatters: [LengthLimitingTextInputFormatter(kTopicMaxChars)],
               onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(
                 hintText: 'Ex.: Revolução Gloriosa e o parlamentarismo inglês',

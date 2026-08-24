@@ -23,6 +23,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.contract import TOPIC_MAX_CHARS
 from app.deps import CurrentUser, DbSession, Identity
 from app.generation import service, storage
 from app.models import GenerationJob
@@ -81,7 +82,10 @@ def create_upload(
 class JobRequest(BaseModel):
     source_type: Literal["topic", "text", "pdf", "photo"]
     target_deck_id: str
-    topic: str | None = None
+
+    # Carrega o assunto ("topic") ou o material colado ("text"). O teto vem do
+    # contrato porque as duas pontas precisam concordar sobre ele.
+    topic: str | None = Field(default=None, max_length=TOPIC_MAX_CHARS)
     upload_key: str | None = None
     requested_count: int = Field(default=10, ge=1, le=50)
     level: Literal["basico", "intermediario", "avancado"] = "intermediario"
@@ -126,7 +130,11 @@ def create_job(body: JobRequest, user_id: CurrentUser, session: DbSession) -> Jo
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"{body.source_type} needs an upload_key",
         )
-    if body.source_type in ("topic", "text") and not body.topic:
+    # `not body.topic` deixava passar "   ": espaço em branco é truthy. Um
+    # assunto em branco chega ao modelo como um pedido sobre nada, gasta a
+    # geração da conta e volta com cards sobre nada — §7.7.1 torna isso
+    # irreversível no plano grátis.
+    if body.source_type in ("topic", "text") and not (body.topic or "").strip():
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"{body.source_type} needs a topic",

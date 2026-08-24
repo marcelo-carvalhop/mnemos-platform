@@ -20,6 +20,10 @@ const int kDefaultDayCutoffHour = 4;
 const int kFreeGenerationsLifetime = 1;
 const int kMaxJobsInFlight = 2;
 
+/// §7.3 — teto do assunto ou do texto colado. Sem ele o corpo da requisição
+/// vira o prompt, e o custo de uma geração é medido em tokens.
+const int kTopicMaxChars = 20000;
+
 /// §5.9 — alternative modes. The grade mapping is a scheduling decision, so
 /// its numbers live in the contract rather than in a widget.
 const int kMultipleChoiceOptions = 4;
