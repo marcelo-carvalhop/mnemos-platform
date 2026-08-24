@@ -111,6 +111,7 @@ def test_nothing_in_generation_is_reachable_without_a_token(client):
     for method, path in [
         ("post", "/v1/generation/uploads"),
         ("post", "/v1/generation/jobs"),
+        ("get", "/v1/generation/jobs"),
         ("get", "/v1/generation/jobs/whatever"),
         ("get", "/v1/generation/jobs/whatever/queue"),
         ("post", "/v1/generation/pending/whatever"),
@@ -259,6 +260,82 @@ def test_a_deck_that_is_not_yours_is_not_a_target(client, account: Account):
         },
     )
     assert response.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Getting back to an abandoned queue
+# ---------------------------------------------------------------------------
+
+
+def test_an_unfinished_queue_can_be_found_again(client, account: Account):
+    """The progress screen says the work continues if you leave. This is what
+    makes that true: on the free plan the abandoned queue holds the only
+    generation the account will ever get, and a queue reachable solely from the
+    screen that launched it is lost the moment the app is backgrounded.
+    """
+    created = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "Revolução Gloriosa",
+        },
+    )
+    job_id = created.json()["id"]
+
+    # Still running: open, with nothing to decide yet.
+    running = client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"]
+    assert [j["id"] for j in running] == [job_id]
+    assert running[0]["pending"] == 0
+
+    finish(job_id, sample_cards(3))
+
+    waiting = client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"]
+    assert waiting[0]["pending"] == 3
+    # The deck is how the app knows where to send the person back to.
+    assert waiting[0]["target_deck_id"] == account.deck_id
+    assert waiting[0]["topic"] == "Revolução Gloriosa"
+
+    client.post(f"/v1/generation/jobs/{job_id}/approve-all", headers=account.headers)
+
+    # Nothing is owed any more. Note that `close` never changes the status —
+    # the count is what closes the job, which is why this is a join.
+    assert client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"] == []
+
+
+def test_an_open_queue_belongs_to_one_account(client, account: Account):
+    client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "Revolução Gloriosa",
+        },
+    )
+    other = make_account()
+    assert client.get("/v1/generation/jobs", headers=other.headers).json()["jobs"] == []
+
+
+def test_a_failed_generation_is_not_something_to_come_back_to(client, account: Account):
+    """The quota was released and there is no queue. Listing it would send
+    someone back to a screen with nothing on it.
+    """
+    created = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "Revolução Gloriosa",
+        },
+    )
+    with SessionLocal() as session:
+        generation.fail(session, created.json()["id"], "topic_too_vague")
+        session.commit()
+
+    assert client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"] == []
 
 
 # ---------------------------------------------------------------------------

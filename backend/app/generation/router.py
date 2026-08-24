@@ -158,6 +158,54 @@ def create_job(body: JobRequest, user_id: CurrentUser, session: DbSession) -> Jo
     return _job_response(session, job)
 
 
+class OpenJobResponse(BaseModel):
+    id: str
+    status: str
+    stage: str
+    target_deck_id: str
+    topic: str | None = None
+
+    """Cards still waiting for a yes or no. Zero while the job is running."""
+    pending: int = 0
+
+
+class OpenJobsResponse(BaseModel):
+    """An envelope, not a bare array — so a count or a cursor can be added
+    later without every client having to change shape on the same day."""
+
+    jobs: list[OpenJobResponse]
+
+
+@router.get(
+    "/jobs",
+    operation_id="listOpenGenerations",
+    response_model=OpenJobsResponse,
+    summary="Generations still owed an answer",
+)
+def list_open(user_id: CurrentUser, session: DbSession) -> OpenJobsResponse:
+    """What the progress screen promises when it says the work continues.
+
+    Leaving the generation screen is allowed — the worker does not care whether
+    a phone is watching. But a queue reachable only from the screen that
+    launched it is lost the moment someone backgrounds the app, and on the free
+    plan that is the one generation the account will ever get (§7.7.1). The
+    server knows what is owed; this is it saying so.
+    """
+    return OpenJobsResponse(
+        jobs=[
+            OpenJobResponse(
+                id=job.id,
+                status=job.status,
+                stage=_STAGES.get(job.status, job.status),
+                target_deck_id=job.target_deck_id,
+                topic=job.topic,
+                pending=pending,
+            )
+            for job, pending in service.open_jobs(session, user_id)
+        ]
+    )
+
+
 @router.get(
     "/jobs/{job_id}",
     operation_id="getGenerationJob",
