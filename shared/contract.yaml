@@ -5,7 +5,7 @@
 # A constant duplicated across two languages diverges; §7.6 depends on it not
 # diverging. Edit this file, never the generated ones.
 
-version: 1
+version: 2
 
 # §7.6 — provisional, tuned when the device screen is final.
 # Counted in GRAPHEME CLUSTERS over NFC-normalised text, not code units.
@@ -39,6 +39,12 @@ scheduling:
   graduation_milestone_days: [180, 365]
   # §5.7 — the day rolls over at 04:00 local, not midnight.
   default_day_cutoff_hour: 4
+  # §4.1 — short-term steps also affect dueAt and therefore belong
+  # to the cross-platform deterministic scheduling contract.
+  learning_steps_seconds: [60, 600]
+  relearning_steps_seconds: [600]
+  maximum_interval_days: 36500
+  enable_fuzz: false
 
   # §4.1 — o vetor FSRS padrão, declarado aqui porque é uma ENTRADA da fórmula
   # de intervalo. Cada plataforma usa um pacote diferente (`fsrs` no pub,

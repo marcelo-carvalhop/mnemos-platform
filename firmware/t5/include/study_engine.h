@@ -3,7 +3,6 @@
 #include <cstddef>
 #include "models.h"
 
-class LearningModel;
 class Storage;
 class TimeService;
 
@@ -13,8 +12,7 @@ public:
                 CardState* states,
                 size_t count,
                 Storage& storage,
-                TimeService& clock,
-                LearningModel& model);
+                TimeService& clock);
 
     void initializeStates();
     uint16_t dueCount();
@@ -48,7 +46,7 @@ private:
         uint8_t index = 0;
         bool isNew = false;
         bool illusion = false;
-        uint32_t dueAt = 0;
+        uint64_t dueAtMs = 0;
     };
 
     CardDefinition* cards_;
@@ -56,7 +54,6 @@ private:
     size_t count_;
     Storage& storage_;
     TimeService& clock_;
-    LearningModel& model_;
 
     uint8_t queue_[Config::MAX_DEVICE_CARDS] = {0};
     uint8_t sessionCount_ = 0;
@@ -72,7 +69,7 @@ private:
 
     void resetCardInteraction();
     void persistSession();
-    uint8_t allowedNewCards(uint32_t nowEpoch) const;
+    uint8_t allowedNewCards(uint64_t nowMs) const;
     bool appendCandidateWithInterleaving(const Candidate* candidates,
                                          size_t candidateCount,
                                          bool* used,

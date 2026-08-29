@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from enum import IntEnum, StrEnum
 
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2
 
 # §7.6 — counted in grapheme clusters over NFC-normalised text.
 FRONT_MAX_GRAPHEMES = 120
@@ -22,6 +22,10 @@ FSRS_WEIGHTS = (0.2172, 1.1771, 3.2602, 16.1507, 7.0114, 0.57, 2.0966, 0.0069, 1
 
 # §5.7 — the day rolls over at 04:00 local, not midnight.
 DEFAULT_DAY_CUTOFF_HOUR = 4
+LEARNING_STEPS_SECONDS = tuple([60, 600])
+RELEARNING_STEPS_SECONDS = tuple([600])
+MAXIMUM_INTERVAL_DAYS = 36500
+ENABLE_FSRS_FUZZ = False
 
 # §7.7 — one generation for the lifetime of the account, not per month.
 FREE_GENERATIONS_LIFETIME = 1

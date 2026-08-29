@@ -2,7 +2,7 @@
 // Regenerate with: python shared/generate.py
 
 /** Contract version; bumped when this file's shape changes. */
-export const CONTRACT_VERSION = 1;
+export const CONTRACT_VERSION = 2;
 
 /** §7.6 — counted in grapheme clusters over NFC-normalised text. */
 export const FRONT_MAX_GRAPHEMES = 120;

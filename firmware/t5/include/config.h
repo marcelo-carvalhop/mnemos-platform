@@ -10,7 +10,6 @@ constexpr int DAYLIGHT_OFFSET_SECONDS = 0;
 constexpr uint8_t DAY_CUTOFF_HOUR = MnemosContract::DEFAULT_DAY_CUTOFF_HOUR;
 
 // Bancada: intervalos comprimidos para validar agenda/sessões sem esperar dias.
-constexpr bool DEMO_INTERVALS = true;
 
 constexpr uint8_t SESSION_MAX_CARDS = 10;
 constexpr uint8_t PRACTICE_CARD_LIMIT = 5;
@@ -28,18 +27,6 @@ constexpr char DEVICE_MODEL[] = "LILYGO-T5-4.7-S3-CARDKB";
 constexpr float RETENTION_TARGET = MnemosContract::DESIRED_RETENTION;
 constexpr float MIN_DIFFICULTY = 1.0f;
 constexpr float MAX_DIFFICULTY = 10.0f;
-constexpr float MIN_STABILITY_DAYS = 0.05f;
-constexpr float MAX_STABILITY_DAYS = 36500.0f;
-
-constexpr float DSR_W1 = -0.50f;
-constexpr float DSR_W2 = 0.20f;
-constexpr float DSR_W3 = 1.30f;
-constexpr float DSR_W4 = 1.00f;
-constexpr float DSR_W5 = 0.20f;
-constexpr float DSR_W6 = 0.60f;
-constexpr float DSR_W7 = 0.90f;
-constexpr float CRAM_GAIN_FACTOR = 0.30f;
-constexpr float CRAM_RECONSOLIDATION_MAX_DAYS = 3.0f;
 
 // CardKB v1.1: I2C dedicado, sem conflitar com o barramento do RTC/touch.
 constexpr int CARDKB_SDA = 16;

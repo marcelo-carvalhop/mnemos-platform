@@ -7,21 +7,35 @@
 
 namespace MnemosContract {
 
-constexpr uint32_t CONTRACT_VERSION = 1U;
+constexpr uint32_t CONTRACT_VERSION = 2U;
 
 constexpr size_t FRONT_MAX_GRAPHEMES = 120U;
 constexpr size_t BACK_MAX_GRAPHEMES = 240U;
 
 constexpr uint32_t MATURE_INTERVAL_DAYS = 21U;
-constexpr float DESIRED_RETENTION = 0.9f;
+constexpr double DESIRED_RETENTION = 0.9;
 constexpr uint8_t DEFAULT_DAY_CUTOFF_HOUR = 4U;
+
+constexpr uint32_t LEARNING_STEPS_SECONDS[] = {60U, 600U};
+constexpr size_t LEARNING_STEP_COUNT =
+    sizeof(LEARNING_STEPS_SECONDS) / sizeof(LEARNING_STEPS_SECONDS[0]);
+
+constexpr uint32_t RELEARNING_STEPS_SECONDS[] = {600U};
+constexpr size_t RELEARNING_STEP_COUNT =
+    sizeof(RELEARNING_STEPS_SECONDS) / sizeof(RELEARNING_STEPS_SECONDS[0]);
+
+constexpr uint32_t MAXIMUM_INTERVAL_DAYS =
+    36500U;
+
+constexpr bool ENABLE_FSRS_FUZZ =
+    false;
 
 constexpr uint32_t GRADUATION_MILESTONE_DAYS[] = {180, 365};
 constexpr size_t GRADUATION_MILESTONE_COUNT =
     sizeof(GRADUATION_MILESTONE_DAYS) /
     sizeof(GRADUATION_MILESTONE_DAYS[0]);
 
-constexpr float FSRS_WEIGHTS[] = {0.2172f, 1.1771f, 3.2602f, 16.1507f, 7.0114f, 0.57f, 2.0966f, 0.0069f, 1.5261f, 0.112f, 1.0178f, 1.849f, 0.1133f, 0.3127f, 2.2934f, 0.2191f, 3.0004f, 0.7536f, 0.3332f, 0.1437f, 0.2f};
+constexpr double FSRS_WEIGHTS[] = {0.2172, 1.1771, 3.2602, 16.1507, 7.0114, 0.57, 2.0966, 0.0069, 1.5261, 0.112, 1.0178, 1.849, 0.1133, 0.3127, 2.2934, 0.2191, 3.0004, 0.7536, 0.3332, 0.1437, 0.2};
 constexpr size_t FSRS_WEIGHT_COUNT =
     sizeof(FSRS_WEIGHTS) / sizeof(FSRS_WEIGHTS[0]);
 

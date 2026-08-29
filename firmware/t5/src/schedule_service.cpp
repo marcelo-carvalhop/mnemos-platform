@@ -39,30 +39,79 @@ uint32_t ScheduleService::localDayStartUtc(uint32_t epoch) const {
 
 ScheduleOverview ScheduleService::snapshot() const {
     ScheduleOverview result;
-    const uint32_t nowEpoch = clock_.now();
-    const uint32_t todayStart = localDayStartUtc(nowEpoch);
-    const uint32_t tomorrowStart = todayStart + 86400U;
-    const uint32_t dayAfterTomorrowStart = tomorrowStart + 86400U;
-    const uint32_t sevenDaysEnd = todayStart + 7U * 86400U;
 
-    for (size_t i = 0; i < cardCount_; ++i) {
-        const CardState& state = states_[i];
-        if (state.dueAt == 0) {
+    const uint32_t nowEpoch =
+        clock_.now();
+
+    const uint64_t nowMs =
+        static_cast<uint64_t>(
+            nowEpoch) * 1000ULL;
+
+    const uint32_t todayStart =
+        localDayStartUtc(nowEpoch);
+
+    const uint32_t tomorrowStart =
+        todayStart + 86400U;
+
+    const uint32_t dayAfterTomorrowStart =
+        tomorrowStart + 86400U;
+
+    const uint32_t sevenDaysEnd =
+        todayStart + 7U * 86400U;
+
+
+    for (
+        size_t i = 0;
+        i < cardCount_;
+        ++i
+    ) {
+
+        const CardState& state =
+            states_[i];
+
+        if (!state.fsrsInitialized) {
             ++result.newCards;
             continue;
         }
-        if (state.dueAt <= nowEpoch) {
+
+        if (
+            state.fsrsDueAtMs <=
+            nowMs
+        ) {
             ++result.dueNow;
             continue;
         }
 
-        if (result.nextReviewAt == 0 || state.dueAt < result.nextReviewAt) {
-            result.nextReviewAt = state.dueAt;
+        const uint32_t dueAt =
+            static_cast<uint32_t>(
+                state.fsrsDueAtMs /
+                1000ULL);
+
+        if (
+            result.nextReviewAt == 0 ||
+            dueAt < result.nextReviewAt
+        ) {
+            result.nextReviewAt =
+                dueAt;
         }
-        if (state.dueAt < tomorrowStart) ++result.laterToday;
-        if (state.dueAt >= tomorrowStart && state.dueAt < dayAfterTomorrowStart) ++result.tomorrow;
-        if (state.dueAt < sevenDaysEnd) ++result.next7Days;
+
+        if (dueAt < tomorrowStart) {
+            ++result.laterToday;
+        }
+
+        if (
+            dueAt >= tomorrowStart &&
+            dueAt <
+                dayAfterTomorrowStart
+        ) {
+            ++result.tomorrow;
+        }
+
+        if (dueAt < sevenDaysEnd) {
+            ++result.next7Days;
+        }
     }
+
     return result;
 }
 

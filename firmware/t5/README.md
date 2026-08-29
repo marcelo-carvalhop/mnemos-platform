@@ -113,4 +113,4 @@ A sequência mínima esperada é:
 - política definitiva de deep sleep/energia ainda será calibrada no hardware real;
 - nível/tensão de alimentação definitivo do CardKB precisa ser validado na montagem física;
 - imagens/image occlusion ainda não fazem parte da capability do terminal;
-- `DEMO_INTERVALS=true` continua habilitado para testes de bancada.
+- O agendamento utiliza o mesmo contrato FSRS determinístico compartilhado por T5, aplicativo móvel e cliente web; os intervalos artificiais de demonstração foram removidos.

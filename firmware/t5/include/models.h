@@ -137,6 +137,7 @@ struct ReviewEvent {
     String deckId;
     String cardType;
     uint32_t reviewedAt = 0;
+    uint64_t reviewedAtMs = 0;
     uint32_t responseTimeMs = 0;
     uint8_t confidence = 0;
     Outcome outcome = Outcome::Unknown;
@@ -153,6 +154,8 @@ struct ReviewEvent {
     float retrievabilityBefore = 0.0f;
     uint32_t dueBefore = 0;
     uint32_t dueAfter = 0;
+    uint64_t dueBeforeMs = 0;
+    uint64_t dueAfterMs = 0;
 };
 
 struct SessionStats {

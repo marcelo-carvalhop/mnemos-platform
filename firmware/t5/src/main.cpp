@@ -5,7 +5,6 @@
 #include "cardkb_input.h"
 #include "cards.h"
 #include "config.h"
-#include "learning_model.h"
 #include "local_link_service.h"
 #include "metrics_service.h"
 #include "network_service.h"
@@ -34,7 +33,6 @@ BatteryService batteryService;
 Storage storage;
 NetworkService networkService;
 TimeService clockService;
-LearningModel learningModel;
 T5Display display;
 CardKbInput keyboard;
 CardDefinition cards[Config::MAX_DEVICE_CARDS];
@@ -57,7 +55,12 @@ void rebuildEngine() {
         delete engine;
         engine = nullptr;
     }
-    engine = new StudyEngine(cards, states, cardCount, storage, clockService, learningModel);
+    engine = new StudyEngine(
+        cards,
+        states,
+        cardCount,
+        storage,
+        clockService);
     engine->initializeStates();
 }
 

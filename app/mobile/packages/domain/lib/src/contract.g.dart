@@ -2,7 +2,7 @@
 // Regenerate with: python shared/generate.py
 
 /// Contract version; bumped when this file's shape changes.
-const int kContractVersion = 1;
+const int kContractVersion = 2;
 
 /// §7.6 — counted in grapheme clusters over NFC-normalised text.
 const int kFrontMaxGraphemes = 120;
@@ -19,6 +19,10 @@ const List<double> kFsrsWeights = [0.2172, 1.1771, 3.2602, 16.1507, 7.0114, 0.57
 
 /// §5.7 — the day rolls over at 04:00 local, not midnight.
 const int kDefaultDayCutoffHour = 4;
+const List<int> kLearningStepsSeconds = [60, 600];
+const List<int> kRelearningStepsSeconds = [600];
+const int kMaximumIntervalDays = 36500;
+const bool kEnableFsrsFuzz = false;
 
 /// §7.7 — one generation for the lifetime of the account, not per month.
 const int kFreeGenerationsLifetime = 1;

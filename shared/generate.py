@@ -51,6 +51,12 @@ def _dart(c: dict) -> str:
     errors = "\n".join(f"  {_camel(e)}('{e}')," for e in c["error_codes"])
     milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
     weights = ", ".join(repr(w) for w in sched["fsrs_weights"])
+    learning_steps = ", ".join(
+        f"{seconds}U" for seconds in sched["learning_steps_seconds"]
+    )
+    relearning_steps = ", ".join(
+        f"{seconds}U" for seconds in sched["relearning_steps_seconds"]
+    )
 
     banner = "\n".join(f"// {line}" for line in BANNER_LINES)
     return f"""{banner}
@@ -73,6 +79,10 @@ const List<double> kFsrsWeights = [{weights}];
 
 /// §5.7 — the day rolls over at 04:00 local, not midnight.
 const int kDefaultDayCutoffHour = {sched['default_day_cutoff_hour']};
+const List<int> kLearningStepsSeconds = {sched['learning_steps_seconds']};
+const List<int> kRelearningStepsSeconds = {sched['relearning_steps_seconds']};
+const int kMaximumIntervalDays = {sched['maximum_interval_days']};
+const bool kEnableFsrsFuzz = {str(sched['enable_fuzz']).lower()};
 
 /// §7.7 — one generation for the lifetime of the account, not per month.
 const int kFreeGenerationsLifetime = {quota['free_generations_lifetime']};
@@ -198,6 +208,10 @@ FSRS_WEIGHTS = ({weights},)
 
 # §5.7 — the day rolls over at 04:00 local, not midnight.
 DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']}
+LEARNING_STEPS_SECONDS = tuple({sched['learning_steps_seconds']})
+RELEARNING_STEPS_SECONDS = tuple({sched['relearning_steps_seconds']})
+MAXIMUM_INTERVAL_DAYS = {sched['maximum_interval_days']}
+ENABLE_FSRS_FUZZ = {sched['enable_fuzz']}
 
 # §7.7 — one generation for the lifetime of the account, not per month.
 FREE_GENERATIONS_LIFETIME = {quota['free_generations_lifetime']}
@@ -355,8 +369,18 @@ def _cpp(c: dict) -> str:
     modes = c["modes"]
     generation = c["generation"]
 
+    learning_steps = ", ".join(
+        f"{seconds}U"
+        for seconds in sched["learning_steps_seconds"]
+    )
+
+    relearning_steps = ", ".join(
+        f"{seconds}U"
+        for seconds in sched["relearning_steps_seconds"]
+    )
+
     milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
-    weights = ", ".join(f"{w}f" for w in sched["fsrs_weights"])
+    weights = ", ".join(repr(w) for w in sched["fsrs_weights"])
 
     grade_values = "\n".join(
         f"constexpr uint8_t GRADE_{g['dart'].upper()} = {g['value']}U;"
@@ -394,15 +418,29 @@ constexpr size_t FRONT_MAX_GRAPHEMES = {limits['front_max_graphemes']}U;
 constexpr size_t BACK_MAX_GRAPHEMES = {limits['back_max_graphemes']}U;
 
 constexpr uint32_t MATURE_INTERVAL_DAYS = {sched['mature_interval_days']}U;
-constexpr float DESIRED_RETENTION = {sched['desired_retention']}f;
+constexpr double DESIRED_RETENTION = {sched['desired_retention']};
 constexpr uint8_t DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']}U;
+
+constexpr uint32_t LEARNING_STEPS_SECONDS[] = {{{learning_steps}}};
+constexpr size_t LEARNING_STEP_COUNT =
+    sizeof(LEARNING_STEPS_SECONDS) / sizeof(LEARNING_STEPS_SECONDS[0]);
+
+constexpr uint32_t RELEARNING_STEPS_SECONDS[] = {{{relearning_steps}}};
+constexpr size_t RELEARNING_STEP_COUNT =
+    sizeof(RELEARNING_STEPS_SECONDS) / sizeof(RELEARNING_STEPS_SECONDS[0]);
+
+constexpr uint32_t MAXIMUM_INTERVAL_DAYS =
+    {sched['maximum_interval_days']}U;
+
+constexpr bool ENABLE_FSRS_FUZZ =
+    {str(sched['enable_fuzz']).lower()};
 
 constexpr uint32_t GRADUATION_MILESTONE_DAYS[] = {{{milestones}}};
 constexpr size_t GRADUATION_MILESTONE_COUNT =
     sizeof(GRADUATION_MILESTONE_DAYS) /
     sizeof(GRADUATION_MILESTONE_DAYS[0]);
 
-constexpr float FSRS_WEIGHTS[] = {{{weights}}};
+constexpr double FSRS_WEIGHTS[] = {{{weights}}};
 constexpr size_t FSRS_WEIGHT_COUNT =
     sizeof(FSRS_WEIGHTS) / sizeof(FSRS_WEIGHTS[0]);
 
