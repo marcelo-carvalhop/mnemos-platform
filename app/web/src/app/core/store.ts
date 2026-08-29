@@ -131,19 +131,26 @@ export class Store {
   // ---------------------------------------------------------------------------
 
   /**
-   * Toda escrita entra no outbox: `server_seq` nulo, `updated_at` e `device_id`
-   * preenchidos aqui. São os três campos de que §6.2 depende, e esquecer um
-   * deles faz a linha nunca subir ou nunca ganhar desempate.
+   * Toda escrita entra no outbox: `server_seq` nulo e `device_id` preenchido
+   * aqui. São os campos de que §6.2 depende, e esquecer um deles faz a linha
+   * nunca subir ou nunca ganhar desempate.
+   */
+  private stampHistory<T extends object>(row: T): T & { device_id: string; server_seq: null } {
+    return { ...row, device_id: this.session.deviceId, server_seq: null };
+  }
+
+  /**
+   * Uma entidade leva `updated_at` além disso, porque ele é o critério de
+   * último-a-escrever.
+   *
+   * O histórico **não** leva: ele é imutável, as tabelas nem têm a coluna, e
+   * mandá-la assim mesmo faz o servidor devolver 500. Só descobri isso ao
+   * enviar uma revisão de verdade — contra um mock, um campo a mais passa.
    */
   private stamp<T extends object>(
     row: T,
   ): T & { updated_at: string; device_id: string; server_seq: null } {
-    return {
-      ...row,
-      updated_at: new Date().toISOString(),
-      device_id: this.session.deviceId,
-      server_seq: null,
-    };
+    return { ...this.stampHistory(row), updated_at: new Date().toISOString() };
   }
 
   createDeck(name: string): string {
@@ -208,7 +215,7 @@ export class Store {
   recordReview(cardId: string, grade: Grade, elapsedMs: number | null): void {
     this.reviews.update((rows) => [
       ...rows,
-      this.stamp({
+      this.stampHistory({
         id: crypto.randomUUID(),
         card_id: cardId,
         reviewed_at: new Date().toISOString(),
@@ -345,11 +352,12 @@ export class Store {
     return this.reviews().filter((r) => new Date(r.reviewed_at) >= start).length;
   });
 
+  /** §5.4 — a meta é histórico: vale a mais recente, não a última escrita. */
   readonly dailyGoal = computed(() => {
     const latest = [...this.goals()].sort((a, b) =>
-      b.effective_from.localeCompare(a.effective_from),
+      b.effective_from_local_date.localeCompare(a.effective_from_local_date),
     )[0];
-    return latest?.goal ?? 25;
+    return latest?.daily_goal ?? 25;
   });
 
   // ---------------------------------------------------------------------------

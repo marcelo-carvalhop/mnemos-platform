@@ -31,6 +31,20 @@ describe('Store', () => {
       expect(store.outbox('cards')).toHaveLength(1);
     });
 
+    it('uma revisão não leva updated_at', () => {
+      // Histórico é imutável: as tabelas do servidor não têm a coluna, e mandá-la
+      // faz o push voltar 500 com "unconsumed column names". Contra um mock, um
+      // campo a mais passa despercebido — este teste é o que fecha esse buraco.
+      const deckId = store.createDeck('História');
+      const cardId = store.createCard(deckId, 'a', 'b');
+      store.recordReview(cardId, Grade.good, 900);
+
+      const review = store.outbox('reviews')[0];
+      expect(review['updated_at']).toBeUndefined();
+      expect(review['device_id']).toBeTruthy();
+      expect(review['server_seq']).toBeNull();
+    });
+
     it('carimba updated_at e device_id, que são o critério de conflito', () => {
       store.createDeck('História');
       const deck = store.decks()[0];

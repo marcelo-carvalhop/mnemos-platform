@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { Grade } from '../../core/contract.g';
 import { Store } from '../../core/store';
+import { Sync } from '../../core/sync';
 import { Study } from './study';
 
 /**
@@ -40,6 +41,54 @@ describe('Study', () => {
     fixture = TestBed.createComponent(Study);
     await fixture.whenStable();
     fixture.detectChanges();
+  });
+
+  it('abrir direto pela URL espera a sincronia antes de congelar a fila', async () => {
+    // Duas falhas de uma vez, as duas vistas no navegador. Congelar no
+    // construtor congelava a fila **vazia** — "nada vencendo" enquanto Hoje
+    // mostrava oito. E congelar assim que aparecia o primeiro card congelava
+    // uma fila **grande demais**: `reviews` é a última tabela do pull, e antes
+    // dela todo card parece novo.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideRouter([])],
+    });
+    const store = TestBed.inject(Store);
+    const sync = TestBed.inject(Sync);
+    sync.phase.set('syncing');
+
+    const f = TestBed.createComponent(Study);
+    await f.whenStable();
+    f.detectChanges();
+    expect(f.nativeElement.textContent).not.toContain('Nada vencendo');
+
+    // A sincronia chega com os cards.
+    const deckId = store.createDeck('História');
+    const respondido = store.createCard(deckId, 'Já respondido', 'Resposta');
+    store.createCard(deckId, 'Chegou depois', 'Resposta');
+    // O histórico chega por último, e é ele que tira um card da fila.
+    store.recordReview(respondido, Grade.easy, null);
+    sync.phase.set('idle');
+    await f.whenStable();
+    f.detectChanges();
+
+    expect(f.nativeElement.textContent).toContain('Chegou depois');
+    // Um só na fila: o respondido não conta, e o total não pode inflar.
+    expect(f.nativeElement.textContent).toContain('0 de 1');
+  });
+
+  it('sem nada vencendo e com a sincronia pronta, diz que não há nada', async () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideHttpClient(), provideRouter([])],
+    });
+    TestBed.inject(Sync).phase.set('idle');
+
+    const f = TestBed.createComponent(Study);
+    await f.whenStable();
+    f.detectChanges();
+
+    expect(f.nativeElement.textContent).toContain('Nada vencendo agora');
   });
 
   it('mostra a pergunta e esconde a resposta', () => {

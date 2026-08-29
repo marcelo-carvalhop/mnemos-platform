@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   signal,
   type OnDestroy,
@@ -80,6 +81,8 @@ import { IntervalPipe } from '../../shared/interval-pipe';
           }
         </div>
       }
+    } @else if (loading()) {
+      <p class="loading">Carregando sua fila…</p>
     } @else {
       <section class="finished">
         <h1>{{ answered() > 0 ? 'Sessão concluída' : 'Nada vencendo agora' }}</h1>
@@ -108,23 +111,47 @@ export class Study implements OnDestroy {
   protected readonly answered = signal(0);
 
   /**
-   * A fila é congelada ao abrir a tela.
+   * A fila é congelada — mas só quando existe algo para congelar.
    *
    * `store.due()` é reativo: gradar um card o tira da lista na hora, e a fila
    * encolheria embaixo da pessoa enquanto ela estuda — o contador iria de "12"
    * para "11 de 11" a cada resposta. Congelar dá uma sessão com começo e fim.
+   *
+   * Congelar **no construtor** era errado e apareceu na primeira vez que abri
+   * `/estudar` direto pela URL: nesse caminho o componente nasce antes de a
+   * primeira sincronia terminar, a fila congela vazia, e a tela diz "nada
+   * vencendo" enquanto Hoje mostra oito. Um link salvo, um F5 no meio da
+   * sessão — qualquer entrada que não venha de Hoje caía nisso.
+   *
+   * O congelamento espera a sincronia **terminar**, e não apenas aparecer o
+   * primeiro card. `reviews` é a última tabela do pull (§6.4: o histórico
+   * aponta para cards), então existe uma janela em que os cards já chegaram e o
+   * histórico não — nela todo card parece novo e todo card parece vencido.
+   * Congelar aí deu uma sessão de 12 cards enquanto a barra lateral dizia 8, e
+   * os quatro que sobravam já tinham sido respondidos.
    */
-  private readonly queue = signal<string[]>(this.store.due().map((c) => c.id));
+  private readonly queue = signal<string[] | null>(null);
   private readonly index = signal(0);
 
   /** Quando a resposta apareceu, para medir o tempo até a decisão (§5.2). */
   private revealedAt: number | null = null;
 
-  protected readonly total = computed(() => this.queue().length);
+  constructor() {
+    effect(() => {
+      if (this.queue() !== null) return;
+      if (this.sync.phase() === 'syncing') return;
+      this.queue.set(this.store.due().map((c) => c.id));
+    });
+  }
+
+  /** Nulo enquanto a fila ainda não foi congelada: ainda estamos carregando. */
+  protected readonly loading = computed(() => this.queue() === null);
+
+  protected readonly total = computed(() => this.queue()?.length ?? 0);
   protected readonly done = computed(() => this.index());
 
   protected readonly card = computed(() => {
-    const id = this.queue()[this.index()];
+    const id = this.queue()?.[this.index()];
     return id ? (this.store.liveCards().find((c) => c.id === id) ?? null) : null;
   });
 
@@ -157,7 +184,7 @@ export class Study implements OnDestroy {
     // Enviar ao fim, não a cada card: uma requisição por resposta transformaria
     // vinte decisões em vinte esperas, e o outbox já garante que nada se perde
     // se a aba fechar antes.
-    if (this.index() >= this.queue().length) void this.sync.syncNow();
+    if (this.index() >= this.total()) void this.sync.syncNow();
   }
 
   /**

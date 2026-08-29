@@ -9,14 +9,27 @@ import type { CardStatus, Grade, ReviewSource } from './contract.g';
  * chance de errar em cada direção. A tradução acontece uma vez só, nas visões.
  */
 
+/**
+ * O que toda linha sincronizável carrega.
+ *
+ * `updated_at` fica de fora de propósito: só as **entidades** têm, porque é o
+ * critério de último-a-escrever (§6.2). O histórico é imutável — uma revisão
+ * não tem "última atualização", e as tabelas de histórico nem têm a coluna.
+ * Mandá-la mesmo assim faz o servidor devolver 500 com "unconsumed column
+ * names", que foi o que aconteceu na primeira tentativa de enviar uma revisão.
+ */
 export interface SyncRow {
-  updated_at: string;
   device_id: string;
   /** Nulo enquanto a linha ainda não foi aceita pelo servidor: é o outbox. */
   server_seq: number | null;
 }
 
-export interface DeckRow extends SyncRow {
+/** Uma entidade: muda com o tempo, e por isso desempata por `updated_at`. */
+export interface EntityRow extends SyncRow {
+  updated_at: string;
+}
+
+export interface DeckRow extends EntityRow {
   id: string;
   parent_id: string | null;
   name: string;
@@ -27,7 +40,7 @@ export interface DeckRow extends SyncRow {
   deleted_at: string | null;
 }
 
-export interface CardRow extends SyncRow {
+export interface CardRow extends EntityRow {
   id: string;
   deck_id: string;
   front: string;
@@ -36,7 +49,7 @@ export interface CardRow extends SyncRow {
   deleted_at: string | null;
 }
 
-export interface CardFlagRow extends SyncRow {
+export interface CardFlagRow extends EntityRow {
   card_id: string;
   status: CardStatus;
   buried_until: string | null;
@@ -57,15 +70,16 @@ export interface ProgressResetRow extends SyncRow {
   reset_at: string;
 }
 
-export interface UserSettingRow extends SyncRow {
+export interface UserSettingRow extends EntityRow {
   key: string;
   value: string;
 }
 
 export interface GoalHistoryRow extends SyncRow {
   id: string;
-  goal: number;
-  effective_from: string;
+  daily_goal: number;
+  effective_from_local_date: string;
+  created_at: string;
 }
 
 /**

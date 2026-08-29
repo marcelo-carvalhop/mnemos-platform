@@ -17,11 +17,6 @@ const signedOut: CanMatchFn = () => {
   return true;
 };
 
-const requireSession: CanMatchFn = () => {
-  const session = inject(Session);
-  return session.signedIn() ? true : inject(Router).createUrlTree(['/']);
-};
-
 // Tudo em lazy: quem chega na landing não deve baixar a tela de estudo, e é o
 // que mantém o primeiro carregamento pequeno.
 export const routes: Routes = [
@@ -79,5 +74,12 @@ export const routes: Routes = [
     path: 'entrar',
     loadComponent: () => import('./features/landing/sign-in').then((m) => m.SignIn),
   },
-  { path: '**', canMatch: [requireSession], redirectTo: 'hoje' },
+  // Uma URL desconhecida volta para a raiz, e a raiz já decide entre a landing
+  // e o aplicativo pelos `canMatch` acima.
+  //
+  // `redirectTo` **não** pode vir com `canMatch` (NG04014): redirecionamento
+  // acontece antes dos guardas, e o Angular recusa a configuração inteira em
+  // vez de escolher um dos dois. O erro derruba o roteador inteiro — a tela
+  // fica em branco, não só esta rota.
+  { path: '**', redirectTo: '' },
 ];
