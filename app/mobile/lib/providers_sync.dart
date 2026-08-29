@@ -71,6 +71,23 @@ final quotaProvider = FutureProvider<({int remaining, int limit, String plan})>(
   }
 });
 
+/// Gerações que ainda devem uma resposta (§7.8).
+///
+/// A tela de progresso promete que dá para sair e voltar. Este provider é o
+/// que torna a promessa verdadeira: o servidor sabe o que está pendente, e o
+/// app pergunta em vez de guardar um `jobId` local que some junto com o
+/// aplicativo.
+final openGenerationsProvider = FutureProvider<List<OpenGeneration>>((ref) async {
+  try {
+    return await ref.watch(generationApiProvider).open();
+  } on Offline {
+    // Offline não é erro. O aviso simplesmente não aparece.
+    return const [];
+  } on ApiException {
+    return const [];
+  }
+});
+
 /// First launch: an anonymous account bound to this device (§8.1).
 ///
 /// Called once during bootstrap. It is allowed to fail — the whole app works

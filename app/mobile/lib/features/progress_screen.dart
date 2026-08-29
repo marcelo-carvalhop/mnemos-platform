@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers.dart';
 import '../providers_progress.dart';
 import '../theme.dart';
+import 'home_screen.dart' show SettingsAction;
 
 /// Screen `08 Progresso` — §5.11, §9.
 ///
@@ -28,7 +29,10 @@ class ProgressScreen extends ConsumerWidget {
     final graduations = ref.watch(graduationsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Estatísticas')),
+      appBar: AppBar(
+        title: const Text('Progresso'),
+        actions: const [SettingsAction()],
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref

@@ -23,6 +23,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.contract import TOPIC_MAX_CHARS
 from app.deps import CurrentUser, DbSession, Identity
 from app.generation import service, storage
 from app.models import GenerationJob
@@ -81,7 +82,10 @@ def create_upload(
 class JobRequest(BaseModel):
     source_type: Literal["topic", "text", "pdf", "photo"]
     target_deck_id: str
-    topic: str | None = None
+
+    # Carrega o assunto ("topic") ou o material colado ("text"). O teto vem do
+    # contrato porque as duas pontas precisam concordar sobre ele.
+    topic: str | None = Field(default=None, max_length=TOPIC_MAX_CHARS)
     upload_key: str | None = None
     requested_count: int = Field(default=10, ge=1, le=50)
     level: Literal["basico", "intermediario", "avancado"] = "intermediario"
@@ -126,7 +130,11 @@ def create_job(body: JobRequest, user_id: CurrentUser, session: DbSession) -> Jo
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"{body.source_type} needs an upload_key",
         )
-    if body.source_type in ("topic", "text") and not body.topic:
+    # `not body.topic` deixava passar "   ": espaço em branco é truthy. Um
+    # assunto em branco chega ao modelo como um pedido sobre nada, gasta a
+    # geração da conta e volta com cards sobre nada — §7.7.1 torna isso
+    # irreversível no plano grátis.
+    if body.source_type in ("topic", "text") and not (body.topic or "").strip():
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"{body.source_type} needs a topic",
@@ -156,6 +164,54 @@ def create_job(body: JobRequest, user_id: CurrentUser, session: DbSession) -> Jo
     # so a job that is not committed here is a job the worker never sees.
     session.commit()
     return _job_response(session, job)
+
+
+class OpenJobResponse(BaseModel):
+    id: str
+    status: str
+    stage: str
+    target_deck_id: str
+    topic: str | None = None
+
+    """Cards still waiting for a yes or no. Zero while the job is running."""
+    pending: int = 0
+
+
+class OpenJobsResponse(BaseModel):
+    """An envelope, not a bare array — so a count or a cursor can be added
+    later without every client having to change shape on the same day."""
+
+    jobs: list[OpenJobResponse]
+
+
+@router.get(
+    "/jobs",
+    operation_id="listOpenGenerations",
+    response_model=OpenJobsResponse,
+    summary="Generations still owed an answer",
+)
+def list_open(user_id: CurrentUser, session: DbSession) -> OpenJobsResponse:
+    """What the progress screen promises when it says the work continues.
+
+    Leaving the generation screen is allowed — the worker does not care whether
+    a phone is watching. But a queue reachable only from the screen that
+    launched it is lost the moment someone backgrounds the app, and on the free
+    plan that is the one generation the account will ever get (§7.7.1). The
+    server knows what is owed; this is it saying so.
+    """
+    return OpenJobsResponse(
+        jobs=[
+            OpenJobResponse(
+                id=job.id,
+                status=job.status,
+                stage=_STAGES.get(job.status, job.status),
+                target_deck_id=job.target_deck_id,
+                topic=job.topic,
+                pending=pending,
+            )
+            for job, pending in service.open_jobs(session, user_id)
+        ]
+    )
 
 
 @router.get(

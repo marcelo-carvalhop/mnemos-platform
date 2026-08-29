@@ -137,23 +137,12 @@ class _DeckManageScreenState extends ConsumerState<DeckManageScreen> {
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
           const _Section('Adicionar cards'),
-          _Action(
-            icon: Icons.edit_outlined,
-            title: 'Escrever um card',
-            detail: 'Livre, sempre',
-            onTap: _busy
-                ? null
-                : () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => EditorScreen(
-                        deckId: widget.deckId,
-                        deckName: widget.deckName,
-                      ),
-                    )),
-          ),
-          _Action(
-            icon: Icons.auto_awesome_outlined,
-            title: 'Gerar por tópico',
-            detail: 'Usa sua cota de geração',
+          const SizedBox(height: 10),
+          // A IA primeiro, e com tamanho: é o caminho que produz vinte cards
+          // em vinte segundos, contra vinte minutos digitando.
+          _Primary(
+            title: 'Gerar com IA',
+            detail: 'Mais cards sobre este assunto, aprovados um a um.',
             onTap: _busy
                 ? null
                 : () => Navigator.of(context).push(MaterialPageRoute(
@@ -163,15 +152,36 @@ class _DeckManageScreenState extends ConsumerState<DeckManageScreen> {
                       ),
                     )),
           ),
-          _Action(
-            icon: Icons.photo_camera_outlined,
-            title: 'Foto ou PDF',
-            detail: 'Usa sua cota de geração',
-            onTap: _busy
-                ? null
-                : () => Navigator.of(context).push(MaterialPageRoute(
-                      builder: (_) => CaptureScreen(deckId: widget.deckId),
-                    )),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _Secondary(
+                  icon: Icons.photo_camera_outlined,
+                  label: 'Foto ou PDF',
+                  onTap: _busy
+                      ? null
+                      : () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => CaptureScreen(deckId: widget.deckId),
+                          )),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _Secondary(
+                  icon: Icons.edit_outlined,
+                  label: 'Escrever',
+                  onTap: _busy
+                      ? null
+                      : () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => EditorScreen(
+                              deckId: widget.deckId,
+                              deckName: widget.deckName,
+                            ),
+                          )),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           const _Section('O baralho'),
@@ -244,6 +254,93 @@ class _Action extends StatelessWidget {
           : Text(detail!,
               style: const TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.faint)),
       onTap: onTap,
+    );
+  }
+}
+
+
+/// A ação que o produto quer que seja escolhida: grande, com a cor da ação e
+/// espaço para explicar o que faz.
+class _Primary extends StatelessWidget {
+  const _Primary({required this.title, required this.detail, required this.onTap});
+
+  final String title;
+  final String detail;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Material(
+      color: enabled ? AppColors.petrol : AppColors.mist,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 16, 18),
+          child: Row(
+            children: [
+              const Icon(Icons.auto_awesome, color: AppColors.ivory, size: 22),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.ivory)),
+                    const SizedBox(height: 3),
+                    Text(detail,
+                        style: TextStyle(
+                            fontSize: 12.5,
+                            height: 1.35,
+                            color: AppColors.ivory.withValues(alpha: .8))),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: AppColors.ivory.withValues(alpha: .7), size: 22),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Secondary extends StatelessWidget {
+  const _Secondary({required this.icon, required this.label, required this.onTap});
+
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.mist),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 19, color: enabled ? AppColors.petrol : AppColors.mist),
+            const SizedBox(height: 7),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12.5,
+                    color: enabled ? AppColors.graphite : AppColors.mist)),
+          ],
+        ),
+      ),
     );
   }
 }

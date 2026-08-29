@@ -93,6 +93,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     setState(() => _busy = true);
     final api = ref.read(generationApiProvider);
     try {
+      // O baralho de destino pode ter nascido offline e ainda não existir no
+      // servidor, que então recusa o job com 404. Empurrar antes de pedir.
+      try {
+        await ref.read(syncClientProvider).pushAll();
+      } on Object {
+        // A falha real aparece abaixo, com a copy certa.
+      }
+
       final target = await api.createUpload(picked.contentType);
       await api.upload(target.url, picked.bytes, picked.contentType);
 
@@ -189,7 +197,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   style: TextStyle(fontSize: 12, color: AppColors.faint)),
               const SizedBox(height: 6),
               DropdownButtonFormField<String>(
-                value: target,
+                initialValue: target,
                 decoration: const InputDecoration(border: OutlineInputBorder()),
                 items: [
                   for (final d in decks) DropdownMenuItem(value: d.id, child: Text(d.name)),

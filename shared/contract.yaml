@@ -40,6 +40,18 @@ scheduling:
   # §5.7 — the day rolls over at 04:00 local, not midnight.
   default_day_cutoff_hour: 4
 
+  # §4.1 — o vetor FSRS padrão, declarado aqui porque é uma ENTRADA da fórmula
+  # de intervalo. Cada plataforma usa um pacote diferente (`fsrs` no pub,
+  # `ts-fsrs` no npm) e os padrões deles NÃO são iguais: o do npm traz o vetor
+  # do FSRS-6, o do pub traz outro. Deixar cada lado herdar o próprio padrão
+  # faz dois clientes calcularem vencimentos diferentes do mesmo histórico —
+  # §3.1 exige o contrário, e nada avisaria. Um teste de cada lado compara o
+  # padrão do seu pacote com este vetor.
+  fsrs_weights:
+    [0.2172, 1.1771, 3.2602, 16.1507, 7.0114, 0.57, 2.0966, 0.0069, 1.5261,
+     0.112, 1.0178, 1.849, 0.1133, 0.3127, 2.2934, 0.2191, 3.0004, 0.7536,
+     0.3332, 0.1437, 0.2]
+
 # §5.9 — alternative study modes. These are scheduling decisions, not interface
 # ones, which is why they live here and not in a widget.
 modes:
@@ -60,6 +72,13 @@ modes:
 quota:
   free_generations_lifetime: 1
   max_jobs_in_flight: 2
+
+# §7.3 — `topic` carrega o assunto (source_type "topic") ou o texto colado
+# (source_type "text"), então o teto tem de caber algumas páginas. Sem teto o
+# corpo da requisição vira o prompt, e o custo de uma geração é medido em
+# tokens: um pedido sem limite é uma conta em aberto.
+generation:
+  topic_max_chars: 20000
 
 # §10 / §5.5 / §5.6 — machine-readable, so the client maps codes to copy
 # instead of matching on server prose.
