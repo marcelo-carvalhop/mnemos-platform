@@ -33,6 +33,7 @@ private:
 
     bool pushReviews();
     bool pullSnapshot();
+    bool pullReviews();
     bool reportStatus(bool synced);
     bool request(const String& method, const String& path, const String& body, int& status, String& response);
 };

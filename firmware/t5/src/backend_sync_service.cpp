@@ -90,6 +90,117 @@ bool BackendSyncService::pushReviews() {
     return storage_.clearReviewOutbox();
 }
 
+bool BackendSyncService::pullReviews() {
+
+    uint64_t cursor =
+        storage_.reviewCursor();
+
+    // Limite defensivo: 32 páginas x 100 eventos por ciclo.
+    for (
+        uint8_t page = 0;
+        page < 32;
+        ++page
+    ) {
+        char cursorText[24];
+
+        snprintf(
+            cursorText,
+            sizeof(cursorText),
+            "%llu",
+            static_cast<unsigned long long>(
+                cursor));
+
+        const String path =
+            String(
+                "/v1/terminal/reviews?since=")
+            +
+            cursorText
+            +
+            "&limit=100";
+
+        int status = 0;
+        String body;
+
+        if (
+            !request(
+                "GET",
+                path,
+                "",
+                status,
+                body)
+        ) {
+            return false;
+        }
+
+        if (status == 410) {
+            Serial.println(
+                "[backend] review cursor expirado; "
+                "resync completo necessario");
+            return false;
+        }
+
+        if (
+            status < 200 ||
+            status >= 300
+        ) {
+            Serial.printf(
+                "[backend] review pull HTTP %d\n",
+                status);
+            return false;
+        }
+
+        SyncCodec::
+            ReviewDeltaApplyResult result;
+
+        String error;
+
+        if (
+            !SyncCodec::applyReviewDeltaV2(
+                body,
+                storage_,
+                result,
+                error)
+        ) {
+            Serial.printf(
+                "[backend] delta de reviews rejeitado: %s\n",
+                error.c_str());
+            return false;
+        }
+
+        if (result.appended > 0) {
+            // O nome histórico permanece por compatibilidade;
+            // o sinal agora significa conteúdo OU estado alterado.
+            libraryUpdated_ = true;
+
+            Serial.printf(
+                "[backend] reviews remotas=%u cursor=%llu\n",
+                static_cast<unsigned>(
+                    result.appended),
+                static_cast<unsigned long long>(
+                    result.cursor));
+        }
+
+        if (!result.hasMore) {
+            return true;
+        }
+
+        if (result.cursor <= cursor) {
+            Serial.println(
+                "[backend] cursor de reviews nao avancou");
+            return false;
+        }
+
+        cursor =
+            result.cursor;
+    }
+
+    Serial.println(
+        "[backend] limite de paginas de reviews atingido");
+
+    return false;
+}
+
+
 bool BackendSyncService::pullSnapshot() {
     int status = 0;
     String body;
@@ -148,10 +259,30 @@ bool BackendSyncService::syncNow() {
         return false;
     }
     lastSyncMs_ = millis();
-    const bool reviewsOk = pushReviews();
-    const bool snapshotOk = pullSnapshot();
-    const bool synced = reviewsOk && snapshotOk;
-    const bool statusOk = reportStatus(synced);
-    Serial.printf("[backend] sync reviews=%d snapshot=%d status=%d\n", reviewsOk, snapshotOk, statusOk);
+    const bool reviewsOk =
+        pushReviews();
+
+    const bool snapshotOk =
+        pullSnapshot();
+
+    const bool pullOk =
+        snapshotOk
+            ? pullReviews()
+            : false;
+
+    const bool synced =
+        reviewsOk &&
+        snapshotOk &&
+        pullOk;
+
+    const bool statusOk =
+        reportStatus(synced);
+
+    Serial.printf(
+        "[backend] sync push=%d snapshot=%d pull=%d status=%d\n",
+        reviewsOk,
+        snapshotOk,
+        pullOk,
+        statusOk);
     return synced;
 }

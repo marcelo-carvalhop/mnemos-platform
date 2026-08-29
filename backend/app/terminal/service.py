@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.contract import ReviewSource
 from app.models import Card, CardFlags, Deck, TerminalCredential
 from app.sync import service as sync_service
 
@@ -140,7 +141,7 @@ def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) 
 
     if not deck_by_id:
         return {
-            "schema": "mnemos.sync/v1",
+            "schema": "mnemos.sync/v2",
             "exportedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "decks": [],
             "cards": [],
@@ -171,7 +172,7 @@ def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) 
         d = deck_by_id[deck_id]
         decks.append(
             {
-                "schema": "mnemos.deck/v1",
+                "schema": "mnemos.deck/v2",
                 "id": d.id,
                 "name": d.name,
                 "description": d.description,
@@ -187,10 +188,10 @@ def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) 
     for c in card_rows:
         cards.append(
             {
-                "schema": "mnemos.card/v1",
+                "schema": "mnemos.card/v2",
                 "id": c.id,
                 "deckId": c.deck_id,
-                "type": "basic",
+                "type": "open_recall",
                 "content": {
                     "prompt": {"format": "plain", "text": c.front},
                     "answer": {"format": "plain", "text": c.back},
@@ -209,7 +210,7 @@ def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) 
         )
 
     return {
-        "schema": "mnemos.sync/v1",
+        "schema": "mnemos.sync/v2",
         "exportedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "decks": decks,
         "cards": cards,
@@ -218,77 +219,337 @@ def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) 
 
 
 def _validate_terminal_review(review: dict) -> None:
-    required = {"schema", "id", "cardId", "reviewedAt", "rating", "source"}
-    missing = sorted(required - review.keys())
+    required = {
+        "schema",
+        "id",
+        "cardId",
+        "reviewedAtMs",
+        "schedulerRating",
+        "source",
+    }
+
+    missing = sorted(
+        required - review.keys()
+    )
+
     if missing:
-        raise ValueError(f"missing review fields: {missing}")
-    if review.get("schema") != "mnemos.review/v1":
-        raise ValueError("unsupported review schema")
-    if review.get("source") != "terminal":
-        raise ValueError("terminal endpoint only accepts source=terminal")
-    if not isinstance(review.get("id"), str) or not (1 <= len(review["id"]) <= 36):
+        raise ValueError(
+            f"missing review fields: {missing}"
+        )
+
+    if review.get("schema") != "mnemos.review/v2":
+        raise ValueError(
+            "unsupported review schema"
+        )
+
+    valid_sources = {
+        source.value
+        for source in ReviewSource
+    }
+
+    if review.get("source") not in valid_sources:
+        raise ValueError(
+            "invalid review source"
+        )
+
+    if (
+        not isinstance(review.get("id"), str)
+        or not (1 <= len(review["id"]) <= 36)
+    ):
         raise ValueError("invalid review id")
-    if not isinstance(review.get("cardId"), str) or not (1 <= len(review["cardId"]) <= 36):
+
+    if (
+        not isinstance(review.get("cardId"), str)
+        or not (1 <= len(review["cardId"]) <= 36)
+    ):
         raise ValueError("invalid card id")
-    if not isinstance(review.get("reviewedAt"), int) or review["reviewedAt"] < 0:
-        raise ValueError("invalid reviewedAt")
-    if not isinstance(review.get("rating"), int) or not (1 <= review["rating"] <= 4):
-        raise ValueError("invalid rating")
-    for name in ("responseTimeMs", "intervalBeforeSeconds", "intervalAfterSeconds"):
-        value = review.get(name, 0)
-        if not isinstance(value, int) or value < 0:
-            raise ValueError(f"invalid {name}")
-    confidence = review.get("confidence", 0)
-    if not isinstance(confidence, int) or not (0 <= confidence <= 3):
-        raise ValueError("invalid confidence")
+
+    if (
+        not isinstance(review.get("reviewedAtMs"), int)
+        or review["reviewedAtMs"] < 0
+    ):
+        raise ValueError("invalid reviewedAtMs")
+
+    rating = review.get("schedulerRating")
+
+    if (
+        not isinstance(rating, int)
+        or not (1 <= rating <= 4)
+    ):
+        raise ValueError(
+            "invalid schedulerRating"
+        )
+
+    elapsed = review.get(
+        "responseTimeMs",
+        0,
+    )
+
+    if (
+        not isinstance(elapsed, int)
+        or elapsed < 0
+    ):
+        raise ValueError(
+            "invalid responseTimeMs"
+        )
 
 
-def ingest_reviews(session: Session, credential: TerminalCredential, reviews: list[dict]) -> dict:
+def ingest_reviews(
+    session: Session,
+    credential: TerminalCredential,
+    reviews: list[dict],
+) -> dict:
+
     for review in reviews:
         _validate_terminal_review(review)
 
-    card_ids = {str(review["cardId"]) for review in reviews}
+    card_ids = {
+        str(review["cardId"])
+        for review in reviews
+    }
+
     if card_ids:
         allowed = set(
             session.execute(
                 select(Card.id).where(
-                    Card.user_id == credential.user_id,
-                    Card.deck_id.in_(set(credential.deck_ids or []) | set(credential.reported_deck_ids or [])),
+                    Card.user_id
+                    == credential.user_id,
+                    Card.deck_id.in_(
+                        set(
+                            credential.deck_ids
+                            or []
+                        )
+                        |
+                        set(
+                            credential.reported_deck_ids
+                            or []
+                        )
+                    ),
                     Card.deleted_at.is_(None),
                     Card.id.in_(card_ids),
                 )
             ).scalars()
         )
-        outside_scope = sorted(card_ids - allowed)
+
+        outside_scope = sorted(
+            card_ids - allowed
+        )
+
         if outside_scope:
             raise TerminalScopeError(
-                f"reviews reference cards outside terminal scope: {outside_scope}"
+                "reviews reference cards outside "
+                f"terminal scope: {outside_scope}"
             )
 
     rows: list[dict] = []
+
     for review in reviews:
+        reviewed_at_ms = int(
+            review["reviewedAtMs"]
+        )
+
+        due_after_ms = int(
+            review.get(
+                "dueAfterMs",
+                reviewed_at_ms,
+            )
+            or reviewed_at_ms
+        )
+
+        interval_days_after = max(
+            0,
+            (
+                due_after_ms
+                - reviewed_at_ms
+            )
+            // 86_400_000,
+        )
+
         rows.append(
             {
                 "id": str(review["id"]),
-                "card_id": str(review["cardId"]),
-                "reviewed_at": int(review["reviewedAt"]) * 1000,
-                "grade": int(review["rating"]),
-                "source": "terminal",
-                "elapsed_ms": int(review.get("responseTimeMs", 0)),
-                "device_id": credential.device_id,
-                "interval_days_after": int(review.get("intervalAfterSeconds", 0)) // 86400,
-                "stability_after": None,
-                "difficulty_after": None,
-                "scheduler_version": 1,
-                "app_version": credential.firmware,
+                "card_id": str(
+                    review["cardId"]
+                ),
+                "reviewed_at":
+                    reviewed_at_ms,
+                "grade": int(
+                    review[
+                        "schedulerRating"
+                    ]
+                ),
+                "source": str(
+                    review["source"]
+                ),
+                "elapsed_ms": int(
+                    review.get(
+                        "responseTimeMs",
+                        0,
+                    )
+                ),
+                "device_id":
+                    credential.device_id,
+                "interval_days_after":
+                    interval_days_after,
+                "stability_after":
+                    review.get(
+                        "stabilityAfterDays"
+                    ),
+                "difficulty_after":
+                    review.get(
+                        "difficultyAfter"
+                    ),
+                # FSRS-6.
+                "scheduler_version": 6,
+                "app_version":
+                    credential.firmware,
             }
         )
-    result = sync_service.push(session, credential.user_id, "reviews", rows)
+
+    result = sync_service.push(
+        session,
+        credential.user_id,
+        "reviews",
+        rows,
+    )
+
     session.commit()
+
     return {
         "accepted": result.applied,
-        "duplicates": result.skipped_stale,
-        "highWater": result.high_water,
+        "duplicates":
+            result.skipped_stale,
+        "highWater":
+            result.high_water,
+        "assigned":
+            result.assigned,
+    }
+
+
+def pull_reviews(
+    session: Session,
+    credential: TerminalCredential,
+    *,
+    since_seq: int,
+    limit: int = 500,
+) -> dict:
+    """
+    Pulls account review history using the same server_seq
+    cursor as Web/App, but exposes only cards inside this
+    terminal's content scope.
+
+    Rows emitted by this same terminal are omitted from the
+    payload because they already exist in local history.
+    The cursor still advances across them.
+    """
+
+    rows, cursor = sync_service.pull(
+        session,
+        credential.user_id,
+        "reviews",
+        since_seq=since_seq,
+        limit=limit,
+    )
+
+    scope_decks = (
+        set(credential.deck_ids or [])
+        |
+        set(
+            credential.reported_deck_ids
+            or []
+        )
+    )
+
+    card_ids = {
+        str(row["card_id"])
+        for row in rows
+    }
+
+    if card_ids and scope_decks:
+        allowed = set(
+            session.execute(
+                select(Card.id).where(
+                    Card.user_id
+                    == credential.user_id,
+                    Card.deck_id.in_(
+                        scope_decks
+                    ),
+                    Card.deleted_at.is_(
+                        None
+                    ),
+                    Card.id.in_(card_ids),
+                )
+            ).scalars()
+        )
+    else:
+        allowed = set()
+
+    reviews: list[dict] = []
+
+    for row in rows:
+        card_id = str(
+            row["card_id"]
+        )
+
+        if card_id not in allowed:
+            continue
+
+        # O evento local já existe no terminal.
+        if (
+            row.get("device_id")
+            == credential.device_id
+        ):
+            continue
+
+        reviews.append(
+            {
+                "schema":
+                    "mnemos.review/v2",
+                "id": str(row["id"]),
+                "cardId": card_id,
+                "reviewedAtMs": int(
+                    row["reviewed_at"]
+                ),
+                "schedulerRating": int(
+                    row["grade"]
+                ),
+                "source": str(
+                    row["source"]
+                ),
+                "responseTimeMs": int(
+                    row.get(
+                        "elapsed_ms",
+                        0,
+                    )
+                    or 0
+                ),
+                "stabilityAfterDays":
+                    row.get(
+                        "stability_after"
+                    ),
+                "difficultyAfter":
+                    row.get(
+                        "difficulty_after"
+                    ),
+                "serverSeq": int(
+                    row["server_seq"]
+                ),
+                "deviceId": str(
+                    row["device_id"]
+                ),
+                "affectsSchedule": True,
+            }
+        )
+
+    return {
+        "schema":
+            "mnemos.review-delta/v2",
+        "reviews": reviews,
+        "cursor": cursor,
+        # hasMore refere-se ao fluxo bruto server_seq,
+        # não ao subconjunto visível ao terminal.
+        "hasMore":
+            len(rows) == limit,
     }
 
 

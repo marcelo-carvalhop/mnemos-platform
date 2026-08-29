@@ -35,10 +35,20 @@ public:
     bool clearReviewOutbox();
     uint16_t pendingReviewCount() const;
 
+    // Reviews recebidas do backend entram apenas no histórico.
+    // Nunca devem voltar para o outbox.
+    bool appendRemoteReviewJson(
+        const String& line,
+        bool& inserted);
+
+    uint64_t reviewCursor() const;
+    bool saveReviewCursor(uint64_t cursor);
+
     bool resetAll();
 
 private:
     bool appendReviewToPath(const char* path, const ReviewEvent& event);
     bool migrateLegacyReviewLog();
     String readTextFile(const char* path) const;
+    bool reviewHistoryContainsId(const String& id) const;
 };

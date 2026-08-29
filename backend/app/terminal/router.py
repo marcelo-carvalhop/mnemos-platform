@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.deps import CurrentUser, DbSession
 from app.terminal import service
 from app.terminal.service import TerminalAuthError, TerminalCapacityError, TerminalScopeError
+from app.sync.service import ResyncRequired
 
 router = APIRouter(tags=["terminal"])
 
@@ -226,8 +227,16 @@ def terminal_snapshot(
     session: DbSession,
     authorization: Annotated[str | None, Header()] = None,
     limit: Annotated[int, Query(ge=1, le=256)] = 48,
+    schema: Annotated[str, Query()] = "mnemos.sync/v2",
 ) -> dict:
+    if schema != "mnemos.sync/v2":
+        raise HTTPException(
+            status_code=422,
+            detail="unsupported terminal snapshot schema",
+        )
+
     credential = _terminal_credential(session, authorization)
+
     try:
         return service.snapshot(session, credential, limit=limit)
     except TerminalCapacityError as exc:
@@ -245,7 +254,7 @@ def terminal_reviews(
     session: DbSession,
     authorization: Annotated[str | None, Header()] = None,
 ) -> dict:
-    if body.schema != "mnemos.review-batch/v1":
+    if body.schema != "mnemos.review-batch/v2":
         raise HTTPException(status_code=422, detail="unsupported review batch schema")
     credential = _terminal_credential(session, authorization)
     try:
@@ -254,6 +263,37 @@ def terminal_reviews(
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (ValueError, KeyError, TypeError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get(
+    "/v1/terminal/reviews",
+    operation_id="pullTerminalReviews",
+    response_model=dict,
+    summary="Returns review deltas visible to a dedicated terminal",
+)
+def pull_terminal_reviews(
+    session: DbSession,
+    authorization: Annotated[str | None, Header()] = None,
+    since: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> dict:
+    credential = _terminal_credential(
+        session,
+        authorization,
+    )
+
+    try:
+        return service.pull_reviews(
+            session,
+            credential,
+            since_seq=since,
+            limit=limit,
+        )
+    except ResyncRequired as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=str(exc),
+        ) from exc
 
 
 @router.post(

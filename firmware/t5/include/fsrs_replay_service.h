@@ -13,9 +13,4 @@ public:
         CardState* states,
         size_t count);
 
-private:
-    static int findState(
-        CardState* states,
-        size_t count,
-        const String& cardId);
 };

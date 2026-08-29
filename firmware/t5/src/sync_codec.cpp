@@ -159,6 +159,128 @@ bool applySnapshotV2(const String& body,
     return true;
 }
 
+bool applyReviewDeltaV2(
+    const String& body,
+    Storage& storage,
+    ReviewDeltaApplyResult& result,
+    String& error) {
+
+    result =
+        ReviewDeltaApplyResult{};
+
+    error = "";
+
+    if (
+        body.length() == 0 ||
+        body.length() > 120000U
+    ) {
+        error =
+            "review_delta_payload_too_large";
+        return false;
+    }
+
+    JsonDocument doc;
+
+    if (deserializeJson(doc, body)) {
+        error =
+            "invalid_review_delta_json";
+        return false;
+    }
+
+    if (
+        String(doc["schema"] | "") !=
+        "mnemos.review-delta/v2"
+    ) {
+        error =
+            "unsupported_review_delta_schema";
+        return false;
+    }
+
+    if (!doc["cursor"].is<uint64_t>()) {
+        error =
+            "invalid_review_cursor";
+        return false;
+    }
+
+    result.cursor =
+        doc["cursor"].as<uint64_t>();
+
+    result.hasMore =
+        doc["hasMore"] | false;
+
+    JsonArrayConst reviews =
+        doc["reviews"].as<JsonArrayConst>();
+
+    for (
+        JsonObjectConst review :
+        reviews
+    ) {
+        if (
+            String(review["schema"] | "") !=
+            "mnemos.review/v2"
+        ) {
+            error =
+                "invalid_remote_review_schema";
+            return false;
+        }
+
+        const String id =
+            review["id"] | "";
+
+        const String cardId =
+            review["cardId"] | "";
+
+        const uint8_t rating =
+            review["schedulerRating"] | 0U;
+
+        if (
+            id.length() == 0 ||
+            cardId.length() == 0 ||
+            rating < 1 ||
+            rating > 4 ||
+            !review["reviewedAtMs"]
+                .is<uint64_t>()
+        ) {
+            error =
+                "invalid_remote_review";
+            return false;
+        }
+
+        String line;
+        serializeJson(review, line);
+
+        bool inserted = false;
+
+        if (
+            !storage.appendRemoteReviewJson(
+                line,
+                inserted)
+        ) {
+            error =
+                "remote_review_storage_failed";
+            return false;
+        }
+
+        if (inserted) {
+            ++result.appended;
+        }
+    }
+
+    // Cursor só avança depois que todos os eventos da página
+    // estão duravelmente gravados.
+    if (
+        !storage.saveReviewCursor(
+            result.cursor)
+    ) {
+        error =
+            "review_cursor_storage_failed";
+        return false;
+    }
+
+    return true;
+}
+
+
 String buildReviewBatchV2(const Storage& storage) {
     JsonDocument batch;
     batch["schema"] = "mnemos.review-batch/v2";

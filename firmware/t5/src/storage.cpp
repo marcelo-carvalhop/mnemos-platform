@@ -14,6 +14,8 @@ constexpr char REVIEW_OUTBOX_PATH[] = "/review_outbox.ndjson";
 constexpr char LEGACY_REVIEW_LOG_PATH[] = "/reviews.ndjson";
 constexpr char SESSION_PATH[] = "/session.json";
 constexpr char TEMP_SESSION_PATH[] = "/session.tmp";
+constexpr char SYNC_META_PATH[] = "/sync_meta.json";
+constexpr char TEMP_SYNC_META_PATH[] = "/sync_meta.tmp";
 }
 
 bool Storage::begin() {
@@ -374,6 +376,193 @@ String Storage::readTextFile(const char* path) const {
 String Storage::reviewOutboxNdjson() const { return readTextFile(REVIEW_OUTBOX_PATH); }
 String Storage::reviewHistoryNdjson() const { return readTextFile(REVIEW_HISTORY_PATH); }
 
+bool Storage::reviewHistoryContainsId(
+    const String& id) const {
+
+    if (id.length() == 0) {
+        return false;
+    }
+
+    const String history =
+        reviewHistoryNdjson();
+
+    int start = 0;
+
+    while (
+        start <
+        static_cast<int>(history.length())
+    ) {
+        int end =
+            history.indexOf('\n', start);
+
+        if (end < 0) {
+            end =
+                static_cast<int>(
+                    history.length());
+        }
+
+        const String line =
+            history.substring(start, end);
+
+        start = end + 1;
+
+        if (line.length() == 0) {
+            continue;
+        }
+
+        JsonDocument row;
+
+        if (deserializeJson(row, line)) {
+            continue;
+        }
+
+        if (
+            String(row["id"] | "") == id
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+bool Storage::appendRemoteReviewJson(
+    const String& line,
+    bool& inserted) {
+
+    inserted = false;
+
+    if (line.length() == 0) {
+        return false;
+    }
+
+    JsonDocument row;
+
+    if (deserializeJson(row, line)) {
+        return false;
+    }
+
+    if (
+        String(row["schema"] | "") !=
+        "mnemos.review/v2"
+    ) {
+        return false;
+    }
+
+    const String id =
+        row["id"] | "";
+
+    if (id.length() == 0) {
+        return false;
+    }
+
+    // Necessário para tolerar queda de energia depois de gravar
+    // o evento e antes de persistir o cursor.
+    if (reviewHistoryContainsId(id)) {
+        return true;
+    }
+
+    File file =
+        LittleFS.open(
+            REVIEW_HISTORY_PATH,
+            "a");
+
+    if (!file) {
+        return false;
+    }
+
+    const size_t written =
+        file.print(line);
+
+    file.println();
+    file.flush();
+    file.close();
+
+    inserted =
+        written ==
+        line.length();
+
+    return inserted;
+}
+
+
+uint64_t Storage::reviewCursor() const {
+
+    if (!LittleFS.exists(SYNC_META_PATH)) {
+        return 0ULL;
+    }
+
+    File file =
+        LittleFS.open(
+            SYNC_META_PATH,
+            "r");
+
+    if (!file) {
+        return 0ULL;
+    }
+
+    JsonDocument doc;
+
+    const DeserializationError error =
+        deserializeJson(doc, file);
+
+    file.close();
+
+    if (error) {
+        return 0ULL;
+    }
+
+    return
+        doc["reviewsCursor"]
+            .is<uint64_t>()
+        ? doc["reviewsCursor"]
+            .as<uint64_t>()
+        : 0ULL;
+}
+
+
+bool Storage::saveReviewCursor(
+    uint64_t cursor) {
+
+    JsonDocument doc;
+
+    doc["schema"] =
+        "mnemos.local-sync-meta/v1";
+
+    doc["reviewsCursor"] =
+        cursor;
+
+    File file =
+        LittleFS.open(
+            TEMP_SYNC_META_PATH,
+            "w");
+
+    if (!file) {
+        return false;
+    }
+
+    const size_t written =
+        serializeJson(doc, file);
+
+    file.flush();
+    file.close();
+
+    if (written == 0) {
+        LittleFS.remove(
+            TEMP_SYNC_META_PATH);
+        return false;
+    }
+
+    LittleFS.remove(
+        SYNC_META_PATH);
+
+    return LittleFS.rename(
+        TEMP_SYNC_META_PATH,
+        SYNC_META_PATH);
+}
+
+
 bool Storage::clearReviewOutbox() {
     if (!LittleFS.exists(REVIEW_OUTBOX_PATH)) return true;
     return LittleFS.remove(REVIEW_OUTBOX_PATH);
@@ -416,6 +605,7 @@ bool Storage::resetAll() {
         LIBRARY_PATH, TEMP_LIBRARY_PATH, STATE_PATH, TEMP_STATE_PATH,
         REVIEW_HISTORY_PATH, REVIEW_OUTBOX_PATH, LEGACY_REVIEW_LOG_PATH,
         SESSION_PATH, TEMP_SESSION_PATH,
+        SYNC_META_PATH, TEMP_SYNC_META_PATH,
     };
     bool ok = true;
     for (const char* path : paths) {

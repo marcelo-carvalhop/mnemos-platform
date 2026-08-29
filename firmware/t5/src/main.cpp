@@ -238,7 +238,14 @@ void processAction(UiAction action) {
 
         case AppScreen::Sync:
             if (action == UiAction::SyncBackend) {
-                if (backendSync.syncNow() && backendSync.consumeLibraryUpdated()) rebuildEngine();
+                backendSync.syncNow();
+
+                if (
+                    backendSync.consumeLibraryUpdated()
+                ) {
+                    rebuildEngine();
+                }
+
                 renderSync();
             } else if (action == UiAction::SyncPhone) {
                 startLocalLink(LocalLinkMode::DirectSync);
