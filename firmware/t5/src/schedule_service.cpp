@@ -14,13 +14,26 @@ ScheduleService::ScheduleService(TimeService& clock,
     : clock_(clock), states_(states), cardCount_(cardCount) {}
 
 uint32_t ScheduleService::localDayStartUtc(uint32_t epoch) const {
-    const int64_t local = static_cast<int64_t>(epoch) +
-                          static_cast<int64_t>(Config::GMT_OFFSET_SECONDS) +
-                          static_cast<int64_t>(Config::DAYLIGHT_OFFSET_SECONDS);
-    const int64_t dayStartLocal = (local / 86400LL) * 86400LL;
-    const int64_t utc = dayStartLocal -
-                        static_cast<int64_t>(Config::GMT_OFFSET_SECONDS) -
-                        static_cast<int64_t>(Config::DAYLIGHT_OFFSET_SECONDS);
+    // O dia acadêmico do Mnemos começa às 04:00 locais, conforme o
+    // contrato compartilhado. Assim, por exemplo, 02:30 pertence ao
+    // dia acadêmico anterior.
+    const int64_t local =
+        static_cast<int64_t>(epoch) +
+        static_cast<int64_t>(Config::GMT_OFFSET_SECONDS) +
+        static_cast<int64_t>(Config::DAYLIGHT_OFFSET_SECONDS);
+
+    const int64_t cutoffSeconds =
+        static_cast<int64_t>(Config::DAY_CUTOFF_HOUR) * 3600LL;
+
+    const int64_t shifted = local - cutoffSeconds;
+    const int64_t dayStartLocal =
+        (shifted / 86400LL) * 86400LL + cutoffSeconds;
+
+    const int64_t utc =
+        dayStartLocal -
+        static_cast<int64_t>(Config::GMT_OFFSET_SECONDS) -
+        static_cast<int64_t>(Config::DAYLIGHT_OFFSET_SECONDS);
+
     return utc > 0 ? static_cast<uint32_t>(utc) : 0U;
 }
 

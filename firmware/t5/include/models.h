@@ -64,6 +64,22 @@ enum class Rating : uint8_t {
     Easy = 4,
 };
 
+static_assert(static_cast<uint8_t>(Rating::Again) ==
+              MnemosContract::GRADE_AGAIN,
+              "Rating::Again divergiu do contrato Mnemos");
+
+static_assert(static_cast<uint8_t>(Rating::Hard) ==
+              MnemosContract::GRADE_HARD,
+              "Rating::Hard divergiu do contrato Mnemos");
+
+static_assert(static_cast<uint8_t>(Rating::Good) ==
+              MnemosContract::GRADE_GOOD,
+              "Rating::Good divergiu do contrato Mnemos");
+
+static_assert(static_cast<uint8_t>(Rating::Easy) ==
+              MnemosContract::GRADE_EASY,
+              "Rating::Easy divergiu do contrato Mnemos");
+
 enum class SessionMode : uint8_t {
     Review = 1,
     Practice = 2,
