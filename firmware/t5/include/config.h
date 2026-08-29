@@ -19,7 +19,7 @@ constexpr uint8_t MAX_CONSECUTIVE_SAME_DECK = 2;
 constexpr uint8_t BASE_NEW_CARDS_PER_SESSION = 4;
 constexpr uint8_t FORECAST_LOAD_THRESHOLD_7D = 20;
 
-constexpr char APP_VERSION[] = "0.6.0-preview.1";
+constexpr char APP_VERSION[] = "0.6.0-preview.2";
 constexpr uint8_t DEVICE_PROTOCOL_VERSION = 4;
 constexpr uint16_t LOCAL_LINK_TIMEOUT_SECONDS = 300;
 constexpr char DEVICE_MODEL[] = "LILYGO-T5-4.7-S3-CARDKB";

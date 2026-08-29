@@ -1,5 +1,20 @@
 # Changelog — firmware/t5
 
+## 0.6.0-preview.2
+
+- substituição do scheduler próprio pelo FSRS determinístico compartilhado;
+- geração do contrato compartilhado também para C++;
+- replay do estado pedagógico a partir do histórico de reviews;
+- suporte a `progress_resets` no replay e na sincronização;
+- sincronização de `desired_retention`;
+- pull incremental de reviews e eventos por `server_seq`;
+- protocolo local atualizado para versão 4;
+- alinhamento do aplicativo móvel ao protocolo local v4;
+- credencial dedicada de terminal mantida separada do token da conta;
+- nova HMI e-paper com menor carga visual e foco em recuperação ativa;
+- remoção de indicadores positivos de relógio da interface normal;
+- atualização da documentação e do checklist físico.
+
 ## 0.6.0-preview.1
 
 Primeiro port funcional do firmware Mnemos para LILYGO T5-4.7-S3 sem touch.

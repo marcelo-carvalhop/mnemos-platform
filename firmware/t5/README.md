@@ -1,116 +1,190 @@
-# Mnemos T5 — v0.6.0-preview.1
+# Mnemos T5 — v0.6.0-preview.2
 
-Firmware de referência do Mnemos para **LILYGO T5-4.7-S3 sem touch**, ESP32-S3-WROOM-1-N16R8, display e-paper 960×540 e **Unit CardKB v1.1**.
+Firmware de referência do terminal físico Mnemos para o LILYGO T5-4.7-S3, com display e-paper 960×540 sem touchscreen e Unit CardKB v1.1 como dispositivo principal de entrada.
 
-O CYD permanece como protótipo de validação da v0.5. A partir desta preview, o T5 é o alvo principal do produto físico.
+Esta versão consolida o T5 como cliente completo da plataforma Mnemos. Web, aplicativo móvel e terminal físico seguem a mesma metodologia de estudo e o mesmo modelo determinístico de agendamento. O diferencial do T5 não é possuir uma metodologia separada, mas oferecer uma superfície dedicada de estudo, com baixa distração, e-paper e interação física simples.
 
-## Hardware desta preview
+## Hardware
 
-- LILYGO T5-4.7-S3 com ESP32-S3 N16R8, 16 MB flash e 8 MB OPI PSRAM.
-- Display e-paper 960×540, sem touchscreen.
-- Unit CardKB v1.1 em I2C `0x5F`.
-- CardKB: `SDA = GPIO16`, `SCL = GPIO15`.
-- RTC PCF8563: `SDA = GPIO18`, `SCL = GPIO17`.
-- Touch futuro: mesmo barramento 18/17, `TOUCH_INT = GPIO47`; desabilitado nesta build.
-- SD desabilitado: GPIO16/15 deixam de ser usados pelo barramento SD e passam ao teclado.
+Configuração atualmente validada:
 
-## Ligação do CardKB
+- LILYGO T5-4.7-S3 com ESP32-S3;
+- display e-paper 960×540;
+- Unit CardKB v1.1 em I2C, endereço `0x5F`;
+- CardKB: `SDA = GPIO16`, `SCL = GPIO15`;
+- RTC PCF8563: `SDA = GPIO18`, `SCL = GPIO17`;
+- futuro touch reservado ao barramento do sistema, ainda desabilitado;
+- SD desabilitado porque GPIO16/15 são utilizados pelo teclado;
+- monitoramento de bateria integrado ao firmware.
 
-Sinais definidos pelo firmware:
+O hardware utilizado apresentou inversão física de SDA/SCL no barramento associado ao RTC em relação às primeiras hipóteses de ligação. A configuração acima corresponde à ligação validada em bancada e deve ser considerada a referência do projeto.
 
-| CardKB | T5 |
-|---|---|
-| SDA | GPIO16 |
-| SCL | GPIO15 |
-| GND | GND |
-| VCC | ver nota de alimentação abaixo |
+## Filosofia de interação
 
-O CardKB v1.1 é especificado pelo fabricante para 5 V. O firmware só pressupõe os sinais GPIO16/15. O conector auxiliar do T5 possui alimentação controlada junto ao rail do e-paper; por isso esta preview mantém esse rail ligado durante o uso. Para bancada, valide a tensão real do pino V antes de alimentar o CardKB por ele. Para uma integração elétrica definitiva, a alimentação do teclado deve ser especificada separadamente e não inferida apenas do rótulo `V` do conector.
+O terminal não simula touchscreen.
 
-## Filosofia de entrada
+A entrada é convertida para `UiAction`, mantendo separação entre dispositivo físico e lógica de aplicação. O CardKB é atualmente a implementação principal; uma futura versão com touchscreen poderá produzir as mesmas ações sem alterar o `StudyEngine`.
 
-O terminal não simula touch. Toda interação é feita pelo CardKB. O código usa `UiAction` como contrato lógico entre HMI e entrada; uma futura versão touch poderá gerar as mesmas ações sem modificar o `StudyEngine`.
+A HMI foi projetada para privilegiar:
 
-Atalhos principais:
+- recuperação ativa;
+- baixa carga visual;
+- ausência de elementos técnicos desnecessários;
+- separação entre pergunta e resposta;
+- foco na tarefa atual;
+- indicação de problemas apenas quando requerem atenção.
 
-| Tela | Teclas |
-|---|---|
-| Home | `Enter` estudar/praticar/continuar, `M` menu |
-| Menu | `1` Sincronizar, `2` Agenda, `3` Conexão, `Backspace` voltar |
-| Resposta aberta/cloze/aplicação | digitar texto, `Backspace` apagar, `Enter` confirmar |
-| Múltipla escolha | `1`–`4` |
-| Verdadeiro/falso | `1`–`2` |
-| Confiança | `1` baixa, `2` média, `3` alta |
-| Autoavaliação | `1` errei, `2` acertei |
-| Esforço | `1` difícil, `2` normal, `3` fácil |
-| Feedback objetivo | `Enter` continuar |
-| Resumo | `1` estudar novamente, `Enter` concluir |
+O estado normal do relógio não é exibido. A interface mostra aviso somente quando o horário não é considerado confiável.
 
-## E-paper e digitação
+## Metodologia e scheduler
 
-O texto digitado não provoca uma atualização completa a cada tecla. O CardKB é lido continuamente e a região de resposta é atualizada somente após uma pequena pausa na digitação (`EINK_TEXT_REFRESH_IDLE_MS`). Isso evita que a latência do e-paper bloqueie a captura do teclado.
+O T5 utiliza o mesmo contrato pedagógico compartilhado pelos demais clientes.
+
+O agendamento é baseado em FSRS determinístico com:
+
+- vetor compartilhado de 21 pesos;
+- passos de aprendizagem definidos pelo contrato;
+- passos de reaprendizagem definidos pelo contrato;
+- intervalo máximo compartilhado;
+- fuzz desabilitado;
+- retenção desejada padrão definida em `shared/contract.yaml`.
+
+O firmware não mantém um algoritmo D/S/R próprio.
+
+O histórico de eventos é a fonte canônica do estado pedagógico. O estado FSRS persistido é tratado como dado derivado e pode ser reconstruído por replay.
+
+Para cada cartão, as revisões são ordenadas deterministicamente por:
+
+`(reviewedAtMs, id)`
+
+O último `progress_reset` funciona como corte temporal: revisões anteriores ou no mesmo instante do reset permanecem no histórico, mas não participam do estado FSRS reconstruído após o reset.
+
+A configuração `desired_retention` pode ser sincronizada pela conta. Quando ausente, o terminal utiliza o valor padrão do contrato compartilhado.
+
+## Histórico e persistência
+
+Arquivos principais no LittleFS:
+
+- `review_history.ndjson`: histórico local e remoto de revisões;
+- `review_outbox.ndjson`: revisões originadas no T5 que ainda precisam ser enviadas;
+- `progress_resets.ndjson`: eventos de reinicialização de progresso;
+- `state.json`: cache derivado do estado dos cartões;
+- `sync_meta.json`: cursores e parâmetros sincronizados;
+- arquivos de sessão para retomada de estudo interrompido.
+
+Reviews recebidas de outros clientes entram no histórico, mas nunca no outbox.
+
+Isso evita ciclos de sincronização do tipo:
+
+Web → backend → T5 → backend.
+
+## Sincronização multicliente
+
+O T5 participa do mesmo histórico de estudo utilizado pelo Web e pelo aplicativo móvel.
+
+O fluxo de backend utiliza:
+
+- snapshot de biblioteca;
+- push de reviews originadas no terminal;
+- pull incremental de reviews;
+- pull incremental de `progress_resets`;
+- pull de configurações pedagógicas;
+- cursores baseados em `server_seq`.
+
+O relógio do dispositivo não é utilizado como watermark de sincronização.
+
+Os cursores são persistidos separadamente para cada classe de dado.
+
+## Protocolo local
+
+O protocolo local atual do terminal é versão 4.
+
+O T5 pode criar um ponto de acesso temporário para:
+
+- provisionamento inicial;
+- sincronização direta com o aplicativo móvel.
+
+O QR utiliza o formato:
+
+`mnemos://local?v=4&mode=...`
+
+Principais rotas locais:
+
+- `/v4/info`
+- `/v4/time`
+- `/v4/provision`
+- `/v4/complete`
+- `/v4/network/status`
+- `/v4/sync/library`
+- `/v4/sync/reviews`
+- `/v4/sync/reviews/ack`
+
+O aplicativo móvel mantém compatibilidade com versões anteriores do protocolo.
+
+## Credenciais
+
+O terminal não recebe o token normal da conta do usuário.
+
+Durante o provisionamento, o backend cria uma credencial própria do dispositivo, restrita e revogável independentemente.
+
+Essa credencial é armazenada pelo terminal e utilizada nas sincronizações posteriores.
 
 ## Relógio
 
-O `TimeService` desta versão usa três níveis:
+O `TimeService` utiliza, em ordem de preferência:
 
-1. NTP quando existe Wi-Fi;
-2. PCF8563 quando o terminal está offline;
-3. fallback por Preferences/horário de compilação somente se o RTC estiver inválido.
+1. NTP quando disponível;
+2. RTC PCF8563 em operação offline;
+3. fallback persistido quando nenhuma fonte confiável estiver disponível.
 
-Quando o relógio é sincronizado por NTP ou pelo celular, o PCF8563 também é atualizado. O objetivo é preservar `dueAt` e a agenda após desligamentos reais do terminal.
+Quando ocorre sincronização válida por NTP ou por dispositivo externo, o RTC é atualizado.
 
-## Flash
+A HMI não apresenta indicadores positivos para o estado do relógio. Apenas um horário não confiável produz aviso visual.
 
-A placa possui 16 MB. O layout Mnemos reserva:
+Durante os testes da preview.2 foi observado que o RTC de bancada precisava de uma correção inicial de horário. A validação temporal definitiva deve ser executada antes dos testes finais de agenda.
 
-- `app0`: 3 MB;
-- `app1`: 3 MB;
-- LittleFS: aproximadamente 9,94 MB;
-- NVS + OTA metadata.
+## HMI
 
-Isso mantém OTA A/B e oferece espaço muito maior para biblioteca, histórico e futuros recursos de conteúdo.
+A interface v0.6 utiliza `MNEMOS` como assinatura constante e uma hierarquia visual simples adequada ao e-paper.
+
+Telas principais:
+
+- Estudo;
+- Menu;
+- Agenda;
+- Sincronização;
+- Conexão;
+- Configuração/sincronização com celular;
+- Pergunta;
+- Conferência de resposta;
+- Feedback objetivo;
+- Esforço de recuperação;
+- Resumo da sessão.
+
+A resposta de referência nunca é apresentada juntamente com a pergunta antes da tentativa do usuário.
+
+## Entrada pelo CardKB
+
+Atalhos principais:
+
+| Tela | Ação |
+|---|---|
+| Home | `Enter` estudar/praticar/continuar |
+| Home | `M` abrir menu |
+| Menu | `1` sincronização |
+| Menu | `2` agenda |
+| Menu | `3` conexão |
+| Voltar | `Backspace` |
+| Múltipla escolha | `1`–`4` |
+| Verdadeiro/falso | `1`–`2` |
+| Autoavaliação | `1` não recuperei, `2` recuperei |
+| Esforço | `1` difícil, `2` normal, `3` fácil |
+| Feedback | `Enter` continuar |
+
+O CardKB é lido continuamente. Atualizações de texto são agrupadas para evitar refresh completo do e-paper a cada tecla.
 
 ## Build
 
 ```bash
 cd firmware/t5
 pio run
-```
-
-Upload:
-
-```bash
-pio run -t upload
-```
-
-Monitor:
-
-```bash
-pio device monitor
-```
-
-Se a porta USB não aparecer, coloque o T5 em modo de gravação usando BOOT(IO0) + RST conforme procedimento do fabricante.
-
-## Primeiro teste físico
-
-A sequência mínima esperada é:
-
-1. boot do e-paper;
-2. log `[cardkb] ... online`;
-3. Home Mnemos;
-4. `Enter` inicia estudo;
-5. em cartão aberto, texto digitado aparece após pequena pausa;
-6. `Enter` leva à confiança;
-7. resposta de referência é mostrada depois da confiança;
-8. `1/2` registra erro/acerto;
-9. Home/Agenda mostram somente a próxima revisão agregada.
-
-## Limitações conhecidas
-
-- touch deliberadamente desabilitado;
-- SD deliberadamente desabilitado porque GPIO16/15 são usados pelo CardKB;
-- política definitiva de deep sleep/energia ainda será calibrada no hardware real;
-- nível/tensão de alimentação definitivo do CardKB precisa ser validado na montagem física;
-- imagens/image occlusion ainda não fazem parte da capability do terminal;
-- O agendamento utiliza o mesmo contrato FSRS determinístico compartilhado por T5, aplicativo móvel e cliente web; os intervalos artificiais de demonstração foram removidos.
