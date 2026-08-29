@@ -512,3 +512,361 @@ def test_terminal_cannot_pull_review_outside_assigned_scope(
 
     # Ainda assim, o watermark global avança.
     assert delta["cursor"] > 0
+
+
+def test_terminal_pulls_progress_reset_from_other_device(
+    db: Session,
+    user: str,
+):
+    credential, _, card_id = (
+        create_terminal_with_card(
+            db,
+            user,
+        )
+    )
+
+    reset_id = uid()
+    reset_at = NOW + timedelta(minutes=10)
+
+    sync_service.push(
+        db,
+        user,
+        "progress_resets",
+        [
+            {
+                "id": reset_id,
+                "card_id": card_id,
+                "reset_at": reset_at,
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    delta = terminal_service.pull_progress_resets(
+        db,
+        credential,
+        since_seq=0,
+        limit=500,
+    )
+
+    assert delta["schema"] == (
+        "mnemos.progress-reset-delta/v2"
+    )
+
+    assert len(delta["resets"]) == 1
+
+    reset = delta["resets"][0]
+
+    assert reset["id"] == reset_id
+    assert reset["cardId"] == card_id
+    assert reset["deviceId"] == PHONE
+
+    assert reset["resetAtMs"] == int(
+        reset_at.timestamp() * 1000
+    )
+
+    assert reset["serverSeq"] > 0
+    assert delta["cursor"] > 0
+
+
+def test_terminal_progress_reset_respects_deck_scope(
+    db: Session,
+    user: str,
+):
+    credential, _, _ = (
+        create_terminal_with_card(
+            db,
+            user,
+        )
+    )
+
+    other_deck = uid()
+    other_card = uid()
+    reset_id = uid()
+
+    sync_service.push(
+        db,
+        user,
+        "decks",
+        [
+            deck_row(
+                other_deck,
+                name="Reset fora do T5",
+            )
+        ],
+    )
+
+    sync_service.push(
+        db,
+        user,
+        "cards",
+        [
+            card_row(
+                other_card,
+                other_deck,
+            )
+        ],
+    )
+
+    sync_service.push(
+        db,
+        user,
+        "progress_resets",
+        [
+            {
+                "id": reset_id,
+                "card_id": other_card,
+                "reset_at": NOW,
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    delta = terminal_service.pull_progress_resets(
+        db,
+        credential,
+        since_seq=0,
+        limit=500,
+    )
+
+    assert all(
+        row["id"] != reset_id
+        for row in delta["resets"]
+    )
+
+    # O cursor global continua avançando.
+    assert delta["cursor"] > 0
+
+
+def test_terminal_progress_reset_cursor_is_incremental(
+    db: Session,
+    user: str,
+):
+    credential, _, card_id = (
+        create_terminal_with_card(
+            db,
+            user,
+        )
+    )
+
+    first_id = uid()
+
+    sync_service.push(
+        db,
+        user,
+        "progress_resets",
+        [
+            {
+                "id": first_id,
+                "card_id": card_id,
+                "reset_at": NOW,
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    first = terminal_service.pull_progress_resets(
+        db,
+        credential,
+        since_seq=0,
+        limit=500,
+    )
+
+    assert [
+        row["id"]
+        for row in first["resets"]
+    ] == [first_id]
+
+    cursor = first["cursor"]
+
+    second_id = uid()
+
+    sync_service.push(
+        db,
+        user,
+        "progress_resets",
+        [
+            {
+                "id": second_id,
+                "card_id": card_id,
+                "reset_at":
+                    NOW + timedelta(minutes=1),
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    second = terminal_service.pull_progress_resets(
+        db,
+        credential,
+        since_seq=cursor,
+        limit=500,
+    )
+
+    assert [
+        row["id"]
+        for row in second["resets"]
+    ] == [second_id]
+
+    assert second["cursor"] > cursor
+
+
+
+def test_terminal_pulls_desired_retention(
+    db: Session,
+    user: str,
+):
+    credential, _, _ = (
+        create_terminal_with_card(
+            db,
+            user,
+        )
+    )
+
+    sync_service.push(
+        db,
+        user,
+        "user_settings",
+        [
+            {
+                "key": "desired_retention",
+                "value": "0.93",
+                "updated_at": NOW,
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    delta = terminal_service.pull_user_settings(
+        db,
+        credential,
+        since_seq=0,
+        limit=500,
+    )
+
+    assert delta["schema"] == (
+        "mnemos.user-setting-delta/v2"
+    )
+
+    assert len(delta["settings"]) == 1
+
+    setting = delta["settings"][0]
+
+    assert setting["key"] == (
+        "desired_retention"
+    )
+
+    assert setting["value"] == "0.93"
+
+    assert setting["serverSeq"] > 0
+    assert delta["cursor"] > 0
+
+
+def test_terminal_ignores_non_pedagogical_setting(
+    db: Session,
+    user: str,
+):
+    credential, _, _ = (
+        create_terminal_with_card(
+            db,
+            user,
+        )
+    )
+
+    sync_service.push(
+        db,
+        user,
+        "user_settings",
+        [
+            {
+                "key": "timezone",
+                "value": "America/Sao_Paulo",
+                "updated_at": NOW,
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    delta = terminal_service.pull_user_settings(
+        db,
+        credential,
+        since_seq=0,
+        limit=500,
+    )
+
+    assert delta["settings"] == []
+
+    # O cursor precisa avançar mesmo por uma preferência
+    # que o terminal deliberadamente não consome.
+    assert delta["cursor"] > 0
+
+
+def test_terminal_desired_retention_is_incremental_lww(
+    db: Session,
+    user: str,
+):
+    credential, _, _ = (
+        create_terminal_with_card(
+            db,
+            user,
+        )
+    )
+
+    sync_service.push(
+        db,
+        user,
+        "user_settings",
+        [
+            {
+                "key": "desired_retention",
+                "value": "0.90",
+                "updated_at": NOW,
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    first = terminal_service.pull_user_settings(
+        db,
+        credential,
+        since_seq=0,
+        limit=500,
+    )
+
+    assert (
+        first["settings"][0]["value"]
+        == "0.90"
+    )
+
+    cursor = first["cursor"]
+
+    sync_service.push(
+        db,
+        user,
+        "user_settings",
+        [
+            {
+                "key": "desired_retention",
+                "value": "0.94",
+                "updated_at":
+                    NOW + timedelta(minutes=1),
+                "device_id": PHONE,
+            }
+        ],
+    )
+
+    second = terminal_service.pull_user_settings(
+        db,
+        credential,
+        since_seq=cursor,
+        limit=500,
+    )
+
+    assert len(second["settings"]) == 1
+
+    assert (
+        second["settings"][0]["value"]
+        == "0.94"
+    )
+
+    assert second["cursor"] > cursor

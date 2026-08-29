@@ -51,7 +51,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   }
 
   String _friendly(Object error) {
-    if (error is PlatformException) return error.message ?? 'Falha da plataforma (${error.code}).';
+    if (error is PlatformException) {
+      return error.message ?? 'Falha da plataforma (${error.code}).';
+    }
     var text = error.toString();
     for (final prefix in const ['Bad state: ', 'FormatException: ']) {
       if (text.startsWith(prefix)) text = text.substring(prefix.length);
@@ -60,15 +62,16 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
   }
 
   Future<void> _scanQr() async {
-    final raw = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const _QrScannerScreen()),
-    );
+    final raw = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const _QrScannerScreen()));
     if (raw == null || !mounted) return;
     try {
       final pairing = TerminalPairing.parse(raw);
       setState(() {
         _pairing = pairing;
-        _message = 'Terminal identificado. Escolha a rede que ele deverá conhecer.';
+        _message =
+            'Terminal identificado. Escolha a rede que ele deverá conhecer.';
         _error = false;
       });
       await _scanWifi();
@@ -87,7 +90,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       final networks = await DeviceWifi.scanNetworks();
       final current = await DeviceWifi.currentSsid();
       if (!mounted) return;
-      final preferred = current == null ? null : networks.where((n) => n.ssid == current).firstOrNull;
+      final preferred = current == null
+          ? null
+          : networks.where((n) => n.ssid == current).firstOrNull;
       setState(() {
         _wifiNetworks = networks;
         _selectedNetwork = preferred;
@@ -98,7 +103,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       if (!mounted) return;
       setState(() {
         _scanningWifi = false;
-        _message = '${_friendly(e)} O SSID ainda pode ser informado manualmente.';
+        _message =
+            '${_friendly(e)} O SSID ainda pode ser informado manualmente.';
         _error = false;
       });
     }
@@ -108,16 +114,27 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     final ssid = _ssid.text.trim();
     if (ssid.isEmpty) throw StateError('Informe o SSID da rede.');
     final selected = _selectedNetwork;
-    if (selected != null && selected.ssid == ssid && !selected.compatibleWithCurrentTerminal) {
+    if (selected != null &&
+        selected.ssid == ssid &&
+        !selected.compatibleWithCurrentTerminal) {
       if (!selected.has24GHz) {
-        throw StateError('A rede $ssid foi encontrada apenas em 5/6 GHz. Este terminal precisa de uma variante 2,4 GHz.');
+        throw StateError(
+          'A rede $ssid foi encontrada apenas em 5/6 GHz. Este terminal precisa de uma variante 2,4 GHz.',
+        );
       }
-      throw StateError('O tipo de segurança anunciado por $ssid ainda não é suportado por este terminal.');
+      throw StateError(
+        'O tipo de segurança anunciado por $ssid ainda não é suportado por este terminal.',
+      );
     }
 
-    final id = 'wifi-${base64Url.encode(utf8.encode(ssid)).replaceAll('=', '')}';
+    final id =
+        'wifi-${base64Url.encode(utf8.encode(ssid)).replaceAll('=', '')}';
     final securityType = selected?.securityType ?? _manualSecurityType;
-    final security = <String, Object?>{'type': securityType == 'enterprise' ? 'enterprise-password' : securityType};
+    final security = <String, Object?>{
+      'type': securityType == 'enterprise'
+          ? 'enterprise-password'
+          : securityType,
+    };
     if (securityType == 'personal') {
       if (_password.text.length < 8 || _password.text.length > 63) {
         throw StateError('A senha Wi-Fi deve ter entre 8 e 63 caracteres.');
@@ -140,17 +157,16 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       'id': id,
       'ssid': ssid,
       'security': security,
-      'settings': {
-        'enabled': true,
-        'autoConnect': true,
-        'priority': 100,
-      },
+      'settings': {'enabled': true, 'autoConnect': true, 'priority': 100},
     };
   }
 
   bool _backendCanBeProvisioned(Uri uri) {
     final host = uri.host.toLowerCase();
-    return host.isNotEmpty && host != '10.0.2.2' && host != 'localhost' && host != '127.0.0.1';
+    return host.isNotEmpty &&
+        host != '10.0.2.2' &&
+        host != 'localhost' &&
+        host != '127.0.0.1';
   }
 
   Future<void> _provision() async {
@@ -178,7 +194,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     final backendUrl = ref.read(apiBaseUrlProvider);
     if (_backendCanBeProvisioned(backendUrl)) {
       try {
-        final registration = await ref.read(terminalApiProvider).register(
+        final registration = await ref
+            .read(terminalApiProvider)
+            .register(
               deviceId: pairing.deviceId,
               model: pairing.model,
               firmware: pairing.firmware,
@@ -195,8 +213,15 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     var stage = 'conexão temporária';
     try {
       setState(() => _message = 'Conectando ao Mnemos…');
-      final connected = await DeviceWifi.connect(ssid: pairing.ssid, password: pairing.password);
-      if (!connected) throw StateError('O Android não conseguiu entrar na rede temporária do Mnemos.');
+      final connected = await DeviceWifi.connect(
+        ssid: pairing.ssid,
+        password: pairing.password,
+      );
+      if (!connected) {
+        throw StateError(
+          'O Android não conseguiu entrar na rede temporária do Mnemos.',
+        );
+      }
       await Future<void>.delayed(const Duration(milliseconds: 600));
 
       client = TerminalClient(pairing);
@@ -204,9 +229,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       await client.setClock(DateTime.now());
       final info = await client.info();
       final security = profile['security'];
-      final securityType = security is Map ? security['type']?.toString() : null;
+      final securityType = security is Map
+          ? security['type']?.toString()
+          : null;
       if (securityType == 'enterprise-password' && !info.enterprisePassword) {
-        throw StateError('Este firmware não oferece autenticação Enterprise por usuário e senha.');
+        throw StateError(
+          'Este firmware não oferece autenticação Enterprise por usuário e senha.',
+        );
       }
 
       stage = 'gravação da rede';
@@ -241,7 +270,8 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       setState(() {
         _busy = false;
         _pairing = null;
-        _message = 'Conexão configurada. O conteúdo do Mnemos é definido separadamente em Sincronização.';
+        _message =
+            'Conexão configurada. O conteúdo do Mnemos é definido separadamente em Sincronização.';
         _error = false;
       });
     } catch (e) {
@@ -266,27 +296,48 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
         padding: const EdgeInsets.fromLTRB(20, 14, 20, 36),
         children: [
           if (pairing == null) ...[
-            const Text('Conectar um Mnemos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            const Text(
+              'Conectar um Mnemos',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
             const Text(
               'Esta tela configura somente a conexão do dispositivo. Cards e decks são escolhidos depois, em Sincronização.',
               style: TextStyle(height: 1.5, color: AppColors.sage),
             ),
             const SizedBox(height: 24),
-            FilledButton(onPressed: _busy ? null : _scanQr, child: const Text('Ler QR Code do Mnemos')),
+            FilledButton(
+              onPressed: _busy ? null : _scanQr,
+              child: const Text('Ler QR Code do Mnemos'),
+            ),
           ] else ...[
-            Text(pairing.deviceId, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              pairing.deviceId,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 4),
-            Text('${pairing.model} · firmware ${pairing.firmware}', style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              '${pairing.model} · firmware ${pairing.firmware}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             const SizedBox(height: 24),
             Row(
               children: [
-                const Expanded(child: Text('Rede Wi-Fi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600))),
+                const Expanded(
+                  child: Text(
+                    'Rede Wi-Fi',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
                 IconButton(
                   tooltip: 'Atualizar redes',
                   onPressed: _busy || _scanningWifi ? null : _scanWifi,
                   icon: _scanningWifi
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : const Icon(Icons.refresh),
                 ),
               ],
@@ -301,15 +352,21 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                   title: Text(network.ssid),
                   subtitle: Text(
                     '${network.securityLabel} · ${network.band}${network.compatibleWithCurrentTerminal ? '' : ' · incompatível'}',
-                    style: TextStyle(color: network.compatibleWithCurrentTerminal ? AppColors.sage : AppColors.terracotta),
+                    style: TextStyle(
+                      color: network.compatibleWithCurrentTerminal
+                          ? AppColors.sage
+                          : AppColors.terracotta,
+                    ),
                   ),
-                  trailing: _ssid.text == network.ssid ? const Icon(Icons.check, color: AppColors.petrol) : null,
+                  trailing: _ssid.text == network.ssid
+                      ? const Icon(Icons.check, color: AppColors.petrol)
+                      : null,
                   onTap: network.compatibleWithCurrentTerminal
                       ? () => setState(() {
-                            _selectedNetwork = network;
-                            _ssid.text = network.ssid;
-                            _password.clear();
-                          })
+                          _selectedNetwork = network;
+                          _ssid.text = network.ssid;
+                          _password.clear();
+                        })
                       : null,
                 ),
               const Divider(),
@@ -326,19 +383,32 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                 initialValue: _manualSecurityType,
                 decoration: const InputDecoration(labelText: 'Segurança'),
                 items: const [
-                  DropdownMenuItem(value: 'personal', child: Text('Rede protegida')),
-                  DropdownMenuItem(value: 'enterprise', child: Text('Rede institucional / Enterprise')),
+                  DropdownMenuItem(
+                    value: 'personal',
+                    child: Text('Rede protegida'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'enterprise',
+                    child: Text('Rede institucional / Enterprise'),
+                  ),
                   DropdownMenuItem(value: 'open', child: Text('Rede aberta')),
                 ],
-                onChanged: _busy ? null : (value) => setState(() => _manualSecurityType = value ?? 'personal'),
+                onChanged: _busy
+                    ? null
+                    : (value) => setState(
+                        () => _manualSecurityType = value ?? 'personal',
+                      ),
               ),
               const SizedBox(height: 10),
             ],
-            if (selected?.enterprise == true || (selected == null && _manualSecurityType == 'enterprise')) ...[
+            if (selected?.enterprise == true ||
+                (selected == null && _manualSecurityType == 'enterprise')) ...[
               TextField(
                 controller: _identity,
                 enabled: !_busy,
-                decoration: const InputDecoration(labelText: 'Identidade anônima (opcional)'),
+                decoration: const InputDecoration(
+                  labelText: 'Identidade anônima (opcional)',
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -354,10 +424,20 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                 enabled: !_busy,
                 obscureText: _hidePassword,
                 decoration: InputDecoration(
-                  labelText: (selected?.enterprise == true || (selected == null && _manualSecurityType == 'enterprise')) ? 'Senha institucional' : 'Senha Wi-Fi',
+                  labelText:
+                      (selected?.enterprise == true ||
+                          (selected == null &&
+                              _manualSecurityType == 'enterprise'))
+                      ? 'Senha institucional'
+                      : 'Senha Wi-Fi',
                   suffixIcon: IconButton(
-                    onPressed: () => setState(() => _hidePassword = !_hidePassword),
-                    icon: Icon(_hidePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+                    onPressed: () =>
+                        setState(() => _hidePassword = !_hidePassword),
+                    icon: Icon(
+                      _hidePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
                   ),
                 ),
               ),
@@ -369,7 +449,13 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           ],
           if (_message != null) ...[
             const SizedBox(height: 18),
-            Text(_message!, style: TextStyle(color: _error ? AppColors.terracotta : AppColors.sage, height: 1.45)),
+            Text(
+              _message!,
+              style: TextStyle(
+                color: _error ? AppColors.terracotta : AppColors.sage,
+                height: 1.45,
+              ),
+            ),
           ],
         ],
       ),
@@ -387,20 +473,20 @@ class _QrScannerScreenState extends State<_QrScannerScreen> {
   bool _returned = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('Ler QR Code')),
-        body: MobileScanner(
-          onDetect: (capture) {
-            if (_returned) return;
-            for (final code in capture.barcodes) {
-              final raw = code.rawValue;
-              if (raw == null || !raw.startsWith('mnemos://pair?')) continue;
-              _returned = true;
-              Navigator.of(context).pop(raw);
-              return;
-            }
-          },
-        ),
-      );
+    appBar: AppBar(title: const Text('Ler QR Code')),
+    body: MobileScanner(
+      onDetect: (capture) {
+        if (_returned) return;
+        for (final code in capture.barcodes) {
+          final raw = code.rawValue;
+          if (raw == null || !raw.startsWith('mnemos://pair?')) continue;
+          _returned = true;
+          Navigator.of(context).pop(raw);
+          return;
+        }
+      },
+    ),
+  );
 }
 
 extension _FirstOrNull<T> on Iterable<T> {

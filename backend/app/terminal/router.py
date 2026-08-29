@@ -296,6 +296,68 @@ def pull_terminal_reviews(
         ) from exc
 
 
+@router.get(
+    "/v1/terminal/progress-resets",
+    operation_id="pullTerminalProgressResets",
+    response_model=dict,
+    summary="Returns schedule-reset deltas visible to a dedicated terminal",
+)
+def pull_terminal_progress_resets(
+    session: DbSession,
+    authorization: Annotated[str | None, Header()] = None,
+    since: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> dict:
+    credential = _terminal_credential(
+        session,
+        authorization,
+    )
+
+    try:
+        return service.pull_progress_resets(
+            session,
+            credential,
+            since_seq=since,
+            limit=limit,
+        )
+    except ResyncRequired as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=str(exc),
+        ) from exc
+
+
+@router.get(
+    "/v1/terminal/settings",
+    operation_id="pullTerminalUserSettings",
+    response_model=dict,
+    summary="Returns pedagogical settings visible to a dedicated terminal",
+)
+def pull_terminal_user_settings(
+    session: DbSession,
+    authorization: Annotated[str | None, Header()] = None,
+    since: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
+) -> dict:
+    credential = _terminal_credential(
+        session,
+        authorization,
+    )
+
+    try:
+        return service.pull_user_settings(
+            session,
+            credential,
+            since_seq=since,
+            limit=limit,
+        )
+    except ResyncRequired as exc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=str(exc),
+        ) from exc
+
+
 @router.post(
     "/v1/terminal/status",
     operation_id="reportTerminalStatus",

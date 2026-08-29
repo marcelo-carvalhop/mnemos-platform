@@ -1,4 +1,5 @@
 #include "storage.h"
+#include "mnemos_contract_generated.h"
 
 #include <ArduinoJson.h>
 #include <LittleFS.h>
@@ -11,6 +12,7 @@ constexpr char STATE_PATH[] = "/state.json";
 constexpr char TEMP_STATE_PATH[] = "/state.tmp";
 constexpr char REVIEW_HISTORY_PATH[] = "/review_history.ndjson";
 constexpr char REVIEW_OUTBOX_PATH[] = "/review_outbox.ndjson";
+constexpr char PROGRESS_RESET_HISTORY_PATH[] = "/progress_resets.ndjson";
 constexpr char LEGACY_REVIEW_LOG_PATH[] = "/reviews.ndjson";
 constexpr char SESSION_PATH[] = "/session.json";
 constexpr char TEMP_SESSION_PATH[] = "/session.tmp";
@@ -487,80 +489,10 @@ bool Storage::appendRemoteReviewJson(
 }
 
 
-uint64_t Storage::reviewCursor() const {
-
-    if (!LittleFS.exists(SYNC_META_PATH)) {
-        return 0ULL;
-    }
-
-    File file =
-        LittleFS.open(
-            SYNC_META_PATH,
-            "r");
-
-    if (!file) {
-        return 0ULL;
-    }
-
-    JsonDocument doc;
-
-    const DeserializationError error =
-        deserializeJson(doc, file);
-
-    file.close();
-
-    if (error) {
-        return 0ULL;
-    }
-
-    return
-        doc["reviewsCursor"]
-            .is<uint64_t>()
-        ? doc["reviewsCursor"]
-            .as<uint64_t>()
-        : 0ULL;
-}
 
 
-bool Storage::saveReviewCursor(
-    uint64_t cursor) {
 
-    JsonDocument doc;
 
-    doc["schema"] =
-        "mnemos.local-sync-meta/v1";
-
-    doc["reviewsCursor"] =
-        cursor;
-
-    File file =
-        LittleFS.open(
-            TEMP_SYNC_META_PATH,
-            "w");
-
-    if (!file) {
-        return false;
-    }
-
-    const size_t written =
-        serializeJson(doc, file);
-
-    file.flush();
-    file.close();
-
-    if (written == 0) {
-        LittleFS.remove(
-            TEMP_SYNC_META_PATH);
-        return false;
-    }
-
-    LittleFS.remove(
-        SYNC_META_PATH);
-
-    return LittleFS.rename(
-        TEMP_SYNC_META_PATH,
-        SYNC_META_PATH);
-}
 
 
 bool Storage::clearReviewOutbox() {
@@ -600,10 +532,466 @@ bool Storage::migrateLegacyReviewLog() {
     return LittleFS.remove(LEGACY_REVIEW_LOG_PATH);
 }
 
+uint64_t Storage::syncCursor(
+    const char* key) const {
+
+    if (!LittleFS.exists(SYNC_META_PATH)) {
+        return 0ULL;
+    }
+
+    File file =
+        LittleFS.open(
+            SYNC_META_PATH,
+            "r");
+
+    if (!file) {
+        return 0ULL;
+    }
+
+    JsonDocument doc;
+
+    const DeserializationError error =
+        deserializeJson(doc, file);
+
+    file.close();
+
+    if (error) {
+        return 0ULL;
+    }
+
+    JsonObjectConst cursors =
+        doc["cursors"].as<JsonObjectConst>();
+
+    if (
+        !cursors.isNull() &&
+        cursors[key].is<uint64_t>()
+    ) {
+        return
+            cursors[key].as<uint64_t>();
+    }
+
+    // Migração transparente do formato v1.
+    if (
+        String(key) == "reviews" &&
+        doc["reviewsCursor"].is<uint64_t>()
+    ) {
+        return
+            doc["reviewsCursor"].as<uint64_t>();
+    }
+
+    return 0ULL;
+}
+
+
+bool Storage::saveSyncCursor(
+    const char* key,
+    uint64_t cursor) {
+
+    JsonDocument doc;
+
+    if (LittleFS.exists(SYNC_META_PATH)) {
+        File existing =
+            LittleFS.open(
+                SYNC_META_PATH,
+                "r");
+
+        if (existing) {
+            if (deserializeJson(doc, existing)) {
+                doc.clear();
+            }
+
+            existing.close();
+        }
+    }
+
+    uint64_t legacyReviews = 0ULL;
+
+    if (
+        doc["reviewsCursor"].is<uint64_t>()
+    ) {
+        legacyReviews =
+            doc["reviewsCursor"].as<uint64_t>();
+    }
+
+    doc["schema"] =
+        "mnemos.local-sync-meta/v2";
+
+    JsonObject cursors;
+
+    if (
+        doc["cursors"].is<JsonObject>()
+    ) {
+        cursors =
+            doc["cursors"].as<JsonObject>();
+    } else {
+        cursors =
+            doc["cursors"].to<JsonObject>();
+    }
+
+    if (
+        !cursors["reviews"].is<uint64_t>() &&
+        legacyReviews > 0
+    ) {
+        cursors["reviews"] =
+            legacyReviews;
+    }
+
+    cursors[key] =
+        cursor;
+
+    doc.remove("reviewsCursor");
+
+    File file =
+        LittleFS.open(
+            TEMP_SYNC_META_PATH,
+            "w");
+
+    if (!file) {
+        return false;
+    }
+
+    const size_t written =
+        serializeJson(doc, file);
+
+    file.flush();
+    file.close();
+
+    if (written == 0) {
+        LittleFS.remove(
+            TEMP_SYNC_META_PATH);
+        return false;
+    }
+
+    LittleFS.remove(
+        SYNC_META_PATH);
+
+    return LittleFS.rename(
+        TEMP_SYNC_META_PATH,
+        SYNC_META_PATH);
+}
+
+
+uint64_t Storage::reviewCursor() const {
+    return syncCursor("reviews");
+}
+
+
+bool Storage::saveReviewCursor(
+    uint64_t cursor) {
+
+    return saveSyncCursor(
+        "reviews",
+        cursor);
+}
+
+
+uint64_t Storage::progressResetCursor() const {
+    return syncCursor(
+        "progressResets");
+}
+
+
+bool Storage::saveProgressResetCursor(
+    uint64_t cursor) {
+
+    return saveSyncCursor(
+        "progressResets",
+        cursor);
+}
+
+
+bool Storage::appendRemoteProgressResetJson(
+    const String& line,
+    bool& inserted) {
+
+    inserted = false;
+
+    JsonDocument row;
+
+    if (deserializeJson(row, line)) {
+        return false;
+    }
+
+    if (
+        String(row["schema"] | "") !=
+        "mnemos.progress-reset/v2"
+    ) {
+        return false;
+    }
+
+    const String id =
+        row["id"] | "";
+
+    if (id.length() == 0) {
+        return false;
+    }
+
+    // Idempotência local: importante caso haja queda de
+    // energia antes de persistir o cursor.
+    const String history =
+        readTextFile(
+            PROGRESS_RESET_HISTORY_PATH);
+
+    int start = 0;
+
+    while (
+        start <
+        static_cast<int>(
+            history.length())
+    ) {
+        int end =
+            history.indexOf('\n', start);
+
+        if (end < 0) {
+            end =
+                static_cast<int>(
+                    history.length());
+        }
+
+        const String existingLine =
+            history.substring(
+                start,
+                end);
+
+        start = end + 1;
+
+        if (existingLine.length() == 0) {
+            continue;
+        }
+
+        JsonDocument existing;
+
+        if (
+            deserializeJson(
+                existing,
+                existingLine)
+        ) {
+            continue;
+        }
+
+        if (
+            String(existing["id"] | "")
+            == id
+        ) {
+            return true;
+        }
+    }
+
+    File file =
+        LittleFS.open(
+            PROGRESS_RESET_HISTORY_PATH,
+            "a");
+
+    if (!file) {
+        return false;
+    }
+
+    const size_t written =
+        file.print(line);
+
+    file.println();
+    file.flush();
+    file.close();
+
+    inserted =
+        written ==
+        line.length();
+
+    return inserted;
+}
+
+
+String Storage::progressResetHistoryNdjson()
+    const {
+
+    return readTextFile(
+        PROGRESS_RESET_HISTORY_PATH);
+}
+
+
+
+uint64_t Storage::settingsCursor() const {
+    return syncCursor(
+        "userSettings");
+}
+
+
+bool Storage::saveSettingsCursor(
+    uint64_t cursor) {
+
+    return saveSyncCursor(
+        "userSettings",
+        cursor);
+}
+
+
+double Storage::desiredRetention() const {
+
+    const double fallback =
+        MnemosContract::DESIRED_RETENTION;
+
+    if (!LittleFS.exists(SYNC_META_PATH)) {
+        return fallback;
+    }
+
+    File file =
+        LittleFS.open(
+            SYNC_META_PATH,
+            "r");
+
+    if (!file) {
+        return fallback;
+    }
+
+    JsonDocument doc;
+
+    const DeserializationError error =
+        deserializeJson(doc, file);
+
+    file.close();
+
+    if (error) {
+        return fallback;
+    }
+
+    JsonVariantConst value =
+        doc["settings"]
+           ["desiredRetention"];
+
+    if (!value.is<double>()) {
+        return fallback;
+    }
+
+    const double retention =
+        value.as<double>();
+
+    if (
+        retention <= 0.0 ||
+        retention >= 1.0
+    ) {
+        return fallback;
+    }
+
+    return retention;
+}
+
+
+bool Storage::saveDesiredRetention(
+    double value) {
+
+    if (
+        value <= 0.0 ||
+        value >= 1.0
+    ) {
+        return false;
+    }
+
+    JsonDocument doc;
+
+    if (LittleFS.exists(SYNC_META_PATH)) {
+        File existing =
+            LittleFS.open(
+                SYNC_META_PATH,
+                "r");
+
+        if (existing) {
+            if (
+                deserializeJson(
+                    doc,
+                    existing)
+            ) {
+                doc.clear();
+            }
+
+            existing.close();
+        }
+    }
+
+    // Migração transparente do metadata v1.
+    uint64_t legacyReviews = 0ULL;
+
+    if (
+        doc["reviewsCursor"]
+            .is<uint64_t>()
+    ) {
+        legacyReviews =
+            doc["reviewsCursor"]
+                .as<uint64_t>();
+    }
+
+    doc["schema"] =
+        "mnemos.local-sync-meta/v2";
+
+    JsonObject cursors =
+        doc["cursors"]
+            .as<JsonObject>();
+
+    if (cursors.isNull()) {
+        cursors =
+            doc["cursors"]
+                .to<JsonObject>();
+    }
+
+    if (
+        !cursors["reviews"]
+            .is<uint64_t>() &&
+        legacyReviews > 0
+    ) {
+        cursors["reviews"] =
+            legacyReviews;
+    }
+
+    JsonObject settings =
+        doc["settings"]
+            .as<JsonObject>();
+
+    if (settings.isNull()) {
+        settings =
+            doc["settings"]
+                .to<JsonObject>();
+    }
+
+    settings["desiredRetention"] =
+        value;
+
+    doc.remove("reviewsCursor");
+
+    File file =
+        LittleFS.open(
+            TEMP_SYNC_META_PATH,
+            "w");
+
+    if (!file) {
+        return false;
+    }
+
+    const size_t written =
+        serializeJson(
+            doc,
+            file);
+
+    file.flush();
+    file.close();
+
+    if (written == 0) {
+        LittleFS.remove(
+            TEMP_SYNC_META_PATH);
+        return false;
+    }
+
+    LittleFS.remove(
+        SYNC_META_PATH);
+
+    return LittleFS.rename(
+        TEMP_SYNC_META_PATH,
+        SYNC_META_PATH);
+}
+
+
 bool Storage::resetAll() {
     const char* paths[] = {
         LIBRARY_PATH, TEMP_LIBRARY_PATH, STATE_PATH, TEMP_STATE_PATH,
-        REVIEW_HISTORY_PATH, REVIEW_OUTBOX_PATH, LEGACY_REVIEW_LOG_PATH,
+        REVIEW_HISTORY_PATH, REVIEW_OUTBOX_PATH, PROGRESS_RESET_HISTORY_PATH, LEGACY_REVIEW_LOG_PATH,
         SESSION_PATH, TEMP_SESSION_PATH,
         SYNC_META_PATH, TEMP_SYNC_META_PATH,
     };

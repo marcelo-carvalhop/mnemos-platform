@@ -537,8 +537,7 @@ bool StudyEngine::commitCurrent(
                 static_cast<uint8_t>(
                     rating),
                 reviewedAtMs,
-                MnemosContract::
-                    DESIRED_RETENTION);
+                storage_.desiredRetention());
 
         writeFsrsState(
             after,

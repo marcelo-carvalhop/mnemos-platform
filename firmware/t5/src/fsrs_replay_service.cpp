@@ -9,64 +9,14 @@
 
 namespace {
 
-struct ReplayEvent {
+struct ReplayReview {
     uint64_t reviewedAtMs = 0;
-    uint8_t rating = 0;
     String id;
+    uint8_t rating = 0;
 };
 
 
-FsrsState fromCardState(
-    const CardState& state) {
-
-    FsrsState fsrs;
-
-    fsrs.stability =
-        state.fsrsStabilityDays;
-
-    fsrs.difficulty =
-        state.fsrsDifficulty;
-
-    fsrs.dueAtMs =
-        state.fsrsDueAtMs;
-
-    fsrs.lastReviewAtMs =
-        state.fsrsLastReviewAtMs;
-
-    fsrs.reps =
-        state.fsrsRepetitions;
-
-    fsrs.lapses =
-        state.fsrsLapses;
-
-    switch (state.fsrsPhase) {
-        case 2:
-            fsrs.phase =
-                FsrsPhase::Review;
-            break;
-
-        case 3:
-            fsrs.phase =
-                FsrsPhase::Relearning;
-            break;
-
-        default:
-            fsrs.phase =
-                FsrsPhase::Learning;
-            break;
-    }
-
-    fsrs.step =
-        state.fsrsStep;
-
-    fsrs.initialized =
-        state.fsrsInitialized;
-
-    return fsrs;
-}
-
-
-void toCardState(
+void writeState(
     const FsrsState& fsrs,
     CardState& state) {
 
@@ -99,7 +49,7 @@ void toCardState(
         fsrs.initialized;
 
 
-    // Espelho legado: não participa mais do cálculo.
+    // Espelho legado: compatibilidade apenas.
     state.difficulty =
         static_cast<float>(
             fsrs.difficulty);
@@ -132,9 +82,9 @@ void toCardState(
 }
 
 
-bool eventLess(
-    const ReplayEvent& a,
-    const ReplayEvent& b) {
+bool reviewLess(
+    const ReplayReview& a,
+    const ReplayReview& b) {
 
     if (
         a.reviewedAtMs !=
@@ -149,6 +99,205 @@ bool eventLess(
         a.id.compareTo(b.id) < 0;
 }
 
+
+uint64_t latestResetForCard(
+    const String& resetHistory,
+    const String& cardId) {
+
+    uint64_t cutoffMs = 0;
+
+    int start = 0;
+
+    while (
+        start <
+        static_cast<int>(
+            resetHistory.length())
+    ) {
+        int end =
+            resetHistory.indexOf(
+                '\n',
+                start);
+
+        if (end < 0) {
+            end =
+                static_cast<int>(
+                    resetHistory.length());
+        }
+
+        const String line =
+            resetHistory.substring(
+                start,
+                end);
+
+        start = end + 1;
+
+        if (line.length() == 0) {
+            continue;
+        }
+
+        JsonDocument row;
+
+        if (deserializeJson(row, line)) {
+            continue;
+        }
+
+        if (
+            String(row["schema"] | "") !=
+            "mnemos.progress-reset/v2"
+        ) {
+            continue;
+        }
+
+        if (
+            String(row["cardId"] | "") !=
+            cardId
+        ) {
+            continue;
+        }
+
+        if (
+            !row["resetAtMs"]
+                .is<uint64_t>()
+        ) {
+            continue;
+        }
+
+        const uint64_t resetAtMs =
+            row["resetAtMs"]
+                .as<uint64_t>();
+
+        if (resetAtMs > cutoffMs) {
+            cutoffMs =
+                resetAtMs;
+        }
+    }
+
+    return cutoffMs;
+}
+
+
+void collectReviews(
+    const String& reviewHistory,
+    const String& cardId,
+    uint64_t cutoffMs,
+    std::vector<ReplayReview>& reviews) {
+
+    int start = 0;
+
+    while (
+        start <
+        static_cast<int>(
+            reviewHistory.length())
+    ) {
+        int end =
+            reviewHistory.indexOf(
+                '\n',
+                start);
+
+        if (end < 0) {
+            end =
+                static_cast<int>(
+                    reviewHistory.length());
+        }
+
+        const String line =
+            reviewHistory.substring(
+                start,
+                end);
+
+        start = end + 1;
+
+        if (line.length() == 0) {
+            continue;
+        }
+
+        JsonDocument row;
+
+        if (deserializeJson(row, line)) {
+            continue;
+        }
+
+        if (
+            String(row["schema"] | "") !=
+            "mnemos.review/v2"
+        ) {
+            continue;
+        }
+
+        if (
+            String(row["cardId"] | "") !=
+            cardId
+        ) {
+            continue;
+        }
+
+        if (
+            !(row["affectsSchedule"] | true)
+        ) {
+            continue;
+        }
+
+        const uint8_t rating =
+            row["schedulerRating"] | 0U;
+
+        if (
+            rating < 1 ||
+            rating > 4
+        ) {
+            continue;
+        }
+
+        uint64_t reviewedAtMs = 0;
+
+        if (
+            row["reviewedAtMs"]
+                .is<uint64_t>()
+        ) {
+            reviewedAtMs =
+                row["reviewedAtMs"]
+                    .as<uint64_t>();
+
+        } else if (
+            row["reviewedAt"]
+                .is<uint32_t>()
+        ) {
+            reviewedAtMs =
+                static_cast<uint64_t>(
+                    row["reviewedAt"]
+                        .as<uint32_t>())
+                *
+                1000ULL;
+        }
+
+        if (reviewedAtMs == 0) {
+            continue;
+        }
+
+        // Mesma regra do Web:
+        // revisões no mesmo instante do reset também
+        // pertencem ao estado anterior ao reset.
+        if (
+            cutoffMs > 0 &&
+            reviewedAtMs <= cutoffMs
+        ) {
+            continue;
+        }
+
+        ReplayReview review;
+
+        review.reviewedAtMs =
+            reviewedAtMs;
+
+        review.id =
+            row["id"] | "";
+
+        review.rating =
+            rating;
+
+        reviews.push_back(review);
+    }
+}
+
 }  // namespace
 
 
@@ -157,10 +306,17 @@ bool FsrsReplayService::rebuild(
     CardState* states,
     size_t count) {
 
-    const String history =
+    const String reviewHistory =
         storage.reviewHistoryNdjson();
 
-    uint32_t applied = 0;
+    const String resetHistory =
+        storage.progressResetHistoryNdjson();
+
+    uint32_t appliedReviews = 0;
+    uint32_t appliedResets = 0;
+
+    const double desiredRetention =
+        storage.desiredRetention();
 
 
     for (
@@ -171,130 +327,27 @@ bool FsrsReplayService::rebuild(
         CardState& state =
             states[cardIndex];
 
-        // Estado FSRS é sempre reconstruído da verdade histórica.
-        state.fsrsDifficulty = 0.0;
-        state.fsrsStabilityDays = 0.0;
-        state.fsrsDueAtMs = 0;
-        state.fsrsLastReviewAtMs = 0;
-        state.fsrsRepetitions = 0;
-        state.fsrsLapses = 0;
-        state.fsrsPhase = 1;
-        state.fsrsStep = 0;
-        state.fsrsInitialized = false;
+        const uint64_t cutoffMs =
+            latestResetForCard(
+                resetHistory,
+                state.id);
 
-
-        std::vector<ReplayEvent> events;
-
-        int start = 0;
-
-        while (
-            start <
-            static_cast<int>(
-                history.length())
-        ) {
-            int end =
-                history.indexOf(
-                    '\n',
-                    start);
-
-            if (end < 0) {
-                end =
-                    static_cast<int>(
-                        history.length());
-            }
-
-            const String line =
-                history.substring(
-                    start,
-                    end);
-
-            start = end + 1;
-
-            if (line.length() == 0) {
-                continue;
-            }
-
-            JsonDocument row;
-
-            if (deserializeJson(row, line)) {
-                continue;
-            }
-
-            if (
-                String(row["schema"] | "") !=
-                "mnemos.review/v2"
-            ) {
-                continue;
-            }
-
-            if (
-                !(row["affectsSchedule"] | false)
-            ) {
-                continue;
-            }
-
-            if (
-                String(row["cardId"] | "") !=
-                state.id
-            ) {
-                continue;
-            }
-
-            const uint8_t rating =
-                row["schedulerRating"] | 0U;
-
-            if (
-                rating < 1 ||
-                rating > 4
-            ) {
-                continue;
-            }
-
-            uint64_t reviewedAtMs = 0;
-
-            if (
-                row["reviewedAtMs"]
-                    .is<uint64_t>()
-            ) {
-                reviewedAtMs =
-                    row["reviewedAtMs"]
-                        .as<uint64_t>();
-
-            } else if (
-                row["reviewedAt"]
-                    .is<uint32_t>()
-            ) {
-                reviewedAtMs =
-                    static_cast<uint64_t>(
-                        row["reviewedAt"]
-                            .as<uint32_t>())
-                    *
-                    1000ULL;
-            }
-
-            if (reviewedAtMs == 0) {
-                continue;
-            }
-
-            ReplayEvent event;
-
-            event.reviewedAtMs =
-                reviewedAtMs;
-
-            event.rating =
-                rating;
-
-            event.id =
-                row["id"] | "";
-
-            events.push_back(event);
+        if (cutoffMs > 0) {
+            ++appliedResets;
         }
 
+        std::vector<ReplayReview> reviews;
+
+        collectReviews(
+            reviewHistory,
+            state.id,
+            cutoffMs,
+            reviews);
 
         std::sort(
-            events.begin(),
-            events.end(),
-            eventLess);
+            reviews.begin(),
+            reviews.end(),
+            reviewLess);
 
 
         FsrsState fsrs =
@@ -302,29 +355,33 @@ bool FsrsReplayService::rebuild(
 
 
         for (
-            const ReplayEvent& event :
-            events
+            const ReplayReview& review :
+            reviews
         ) {
             fsrs =
                 FsrsEngine::apply(
                     fsrs,
-                    event.rating,
-                    event.reviewedAtMs);
+                    review.rating,
+                    review.reviewedAtMs,
+                    desiredRetention);
 
-            ++applied;
+            ++appliedReviews;
         }
 
 
-        toCardState(
+        writeState(
             fsrs,
             state);
     }
 
 
     Serial.printf(
-        "[fsrs] replay ordenado aplicado=%u\n",
+        "[fsrs] replay reviews=%u reset_cards=%u retention=%.4f\n",
         static_cast<unsigned>(
-            applied));
+            appliedReviews),
+        static_cast<unsigned>(
+            appliedResets),
+        desiredRetention);
 
     return true;
 }

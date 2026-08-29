@@ -281,6 +281,236 @@ bool applyReviewDeltaV2(
 }
 
 
+bool applyProgressResetDeltaV2(
+    const String& body,
+    Storage& storage,
+    ProgressResetDeltaApplyResult& result,
+    String& error) {
+
+    result =
+        ProgressResetDeltaApplyResult{};
+
+    error = "";
+
+    JsonDocument doc;
+
+    if (deserializeJson(doc, body)) {
+        error =
+            "invalid_progress_reset_delta_json";
+        return false;
+    }
+
+    if (
+        String(doc["schema"] | "") !=
+        "mnemos.progress-reset-delta/v2"
+    ) {
+        error =
+            "unsupported_progress_reset_delta_schema";
+        return false;
+    }
+
+    if (!doc["cursor"].is<uint64_t>()) {
+        error =
+            "invalid_progress_reset_cursor";
+        return false;
+    }
+
+    result.cursor =
+        doc["cursor"].as<uint64_t>();
+
+    result.hasMore =
+        doc["hasMore"] | false;
+
+    JsonArrayConst resets =
+        doc["resets"].as<JsonArrayConst>();
+
+    for (
+        JsonObjectConst reset :
+        resets
+    ) {
+        if (
+            String(reset["schema"] | "") !=
+            "mnemos.progress-reset/v2"
+        ) {
+            error =
+                "invalid_progress_reset_schema";
+            return false;
+        }
+
+        const String id =
+            reset["id"] | "";
+
+        const String cardId =
+            reset["cardId"] | "";
+
+        if (
+            id.length() == 0 ||
+            cardId.length() == 0 ||
+            !reset["resetAtMs"]
+                .is<uint64_t>()
+        ) {
+            error =
+                "invalid_progress_reset";
+            return false;
+        }
+
+        String line;
+
+        serializeJson(
+            reset,
+            line);
+
+        bool inserted = false;
+
+        if (
+            !storage
+                .appendRemoteProgressResetJson(
+                    line,
+                    inserted)
+        ) {
+            error =
+                "progress_reset_storage_failed";
+            return false;
+        }
+
+        if (inserted) {
+            ++result.appended;
+        }
+    }
+
+    // O cursor só avança depois de todos os eventos
+    // da página estarem persistidos.
+    if (
+        !storage.saveProgressResetCursor(
+            result.cursor)
+    ) {
+        error =
+            "progress_reset_cursor_storage_failed";
+        return false;
+    }
+
+    return true;
+}
+
+
+bool applyUserSettingDeltaV2(
+    const String& body,
+    Storage& storage,
+    UserSettingDeltaApplyResult& result,
+    String& error) {
+
+    result =
+        UserSettingDeltaApplyResult{};
+
+    error = "";
+
+    JsonDocument doc;
+
+    if (deserializeJson(doc, body)) {
+        error =
+            "invalid_user_setting_delta_json";
+        return false;
+    }
+
+    if (
+        String(doc["schema"] | "") !=
+        "mnemos.user-setting-delta/v2"
+    ) {
+        error =
+            "unsupported_user_setting_delta_schema";
+        return false;
+    }
+
+    if (!doc["cursor"].is<uint64_t>()) {
+        error =
+            "invalid_user_setting_cursor";
+        return false;
+    }
+
+    result.cursor =
+        doc["cursor"].as<uint64_t>();
+
+    result.hasMore =
+        doc["hasMore"] | false;
+
+    JsonArrayConst settings =
+        doc["settings"]
+            .as<JsonArrayConst>();
+
+    for (
+        JsonObjectConst setting :
+        settings
+    ) {
+        if (
+            String(setting["schema"] | "") !=
+            "mnemos.user-setting/v2"
+        ) {
+            error =
+                "invalid_user_setting_schema";
+            return false;
+        }
+
+        const String key =
+            setting["key"] | "";
+
+        if (
+            key !=
+            "desired_retention"
+        ) {
+            // Backend já filtra, mas o firmware também
+            // aplica sua própria whitelist.
+            continue;
+        }
+
+        const String value =
+            setting["value"] | "";
+
+        if (value.length() == 0) {
+            error =
+                "missing_desired_retention";
+            return false;
+        }
+
+        const double retention =
+            value.toDouble();
+
+        if (
+            retention <= 0.0 ||
+            retention >= 1.0
+        ) {
+            error =
+                "invalid_desired_retention";
+            return false;
+        }
+
+        if (
+            !storage.saveDesiredRetention(
+                retention)
+        ) {
+            error =
+                "desired_retention_storage_failed";
+            return false;
+        }
+
+        // Mesmo que seja um retry do mesmo valor,
+        // repetir o replay é seguro e evita um caso de
+        // queda de energia entre setting e cursor.
+        ++result.applied;
+    }
+
+    if (
+        !storage.saveSettingsCursor(
+            result.cursor)
+    ) {
+        error =
+            "user_setting_cursor_storage_failed";
+        return false;
+    }
+
+    return true;
+}
+
+
 String buildReviewBatchV2(const Storage& storage) {
     JsonDocument batch;
     batch["schema"] = "mnemos.review-batch/v2";

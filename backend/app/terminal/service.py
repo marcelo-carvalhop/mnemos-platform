@@ -553,6 +553,178 @@ def pull_reviews(
     }
 
 
+
+def pull_progress_resets(
+    session: Session,
+    credential: TerminalCredential,
+    *,
+    since_seq: int,
+    limit: int = 500,
+) -> dict:
+    """
+    Pulls schedule-reset events visible to this terminal.
+
+    The server_seq cursor advances over the canonical account
+    history even when a row is outside this terminal's deck scope.
+    """
+
+    rows, cursor = sync_service.pull(
+        session,
+        credential.user_id,
+        "progress_resets",
+        since_seq=since_seq,
+        limit=limit,
+    )
+
+    scope_decks = (
+        set(credential.deck_ids or [])
+        |
+        set(
+            credential.reported_deck_ids
+            or []
+        )
+    )
+
+    card_ids = {
+        str(row["card_id"])
+        for row in rows
+    }
+
+    if card_ids and scope_decks:
+        allowed = set(
+            session.execute(
+                select(Card.id).where(
+                    Card.user_id
+                    == credential.user_id,
+                    Card.deck_id.in_(
+                        scope_decks
+                    ),
+                    Card.deleted_at.is_(None),
+                    Card.id.in_(card_ids),
+                )
+            ).scalars()
+        )
+    else:
+        allowed = set()
+
+    resets: list[dict] = []
+
+    for row in rows:
+        card_id = str(
+            row["card_id"]
+        )
+
+        if card_id not in allowed:
+            continue
+
+        # Mantemos esta regra desde já para que uma futura
+        # implementação de reset no próprio T5 seja idempotente.
+        if (
+            row.get("device_id")
+            == credential.device_id
+        ):
+            continue
+
+        resets.append(
+            {
+                "schema":
+                    "mnemos.progress-reset/v2",
+                "id": str(row["id"]),
+                "cardId": card_id,
+                "resetAtMs": int(
+                    row["reset_at"]
+                ),
+                "serverSeq": int(
+                    row["server_seq"]
+                ),
+                "deviceId": str(
+                    row["device_id"]
+                ),
+            }
+        )
+
+    return {
+        "schema":
+            "mnemos.progress-reset-delta/v2",
+        "resets": resets,
+        "cursor": cursor,
+        "hasMore":
+            len(rows) == limit,
+    }
+
+
+
+_TERMINAL_PEDAGOGICAL_SETTINGS = {
+    "desired_retention",
+}
+
+
+def pull_user_settings(
+    session: Session,
+    credential: TerminalCredential,
+    *,
+    since_seq: int,
+    limit: int = 500,
+) -> dict:
+    """
+    Pulls only settings that alter deterministic study
+    behaviour on the terminal.
+
+    Cosmetic/app-specific preferences deliberately do not
+    cross this boundary.
+    """
+
+    rows, cursor = sync_service.pull(
+        session,
+        credential.user_id,
+        "user_settings",
+        since_seq=since_seq,
+        limit=limit,
+    )
+
+    settings: list[dict] = []
+
+    for row in rows:
+        key = str(
+            row["key"]
+        )
+
+        if (
+            key not in
+            _TERMINAL_PEDAGOGICAL_SETTINGS
+        ):
+            continue
+
+        settings.append(
+            {
+                "schema":
+                    "mnemos.user-setting/v2",
+                "key": key,
+                "value": str(
+                    row["value"]
+                ),
+                "updatedAtMs": int(
+                    row["updated_at"]
+                ),
+                "serverSeq": int(
+                    row["server_seq"]
+                ),
+                "deviceId": str(
+                    row["device_id"]
+                ),
+            }
+        )
+
+    return {
+        "schema":
+            "mnemos.user-setting-delta/v2",
+        "settings": settings,
+        "cursor": cursor,
+        "hasMore":
+            len(rows) == limit,
+    }
+
+
 def terminal_for_user(session: Session, user_id: str, device_id: str) -> TerminalCredential:
     row = session.get(TerminalCredential, device_id)
     if row is None or row.user_id != user_id:
