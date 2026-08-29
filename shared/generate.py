@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the shared contract into Dart and Python.
+"""Generate the shared contract into Dart, Python, TypeScript and C++.
 
 Spec §4: character limits, enums and error codes are declared once in
 contract.yaml and consumed by both sides. The generated files are committed,
@@ -23,6 +23,7 @@ CONTRACT = ROOT / "shared" / "contract.yaml"
 DART_OUT = ROOT / "app" / "mobile" / "packages" / "domain" / "lib" / "src" / "contract.g.dart"
 PY_OUT = ROOT / "backend" / "app" / "contract.py"
 TS_OUT = ROOT / "app" / "web" / "src" / "app" / "core" / "contract.g.ts"
+CPP_OUT = ROOT / "firmware" / "t5" / "include" / "mnemos_contract_generated.h"
 
 BANNER_LINES = [
     "GENERATED FROM shared/contract.yaml — DO NOT EDIT.",
@@ -346,6 +347,99 @@ export function errorCodeFromWire(wire: string | null | undefined): ErrorCode | 
 """
 
 
+
+def _cpp(c: dict) -> str:
+    limits = c["card_limits"]
+    sched = c["scheduling"]
+    quota = c["quota"]
+    modes = c["modes"]
+    generation = c["generation"]
+
+    milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
+    weights = ", ".join(f"{w}f" for w in sched["fsrs_weights"])
+
+    grade_values = "\n".join(
+        f"constexpr uint8_t GRADE_{g['dart'].upper()} = {g['value']}U;"
+        for g in c["grades"]
+    )
+
+    review_sources = "\n".join(
+        f'constexpr const char REVIEW_SOURCE_{s.upper()}[] = "{s}";'
+        for s in c["review_sources"]
+    )
+
+    card_statuses = "\n".join(
+        f'constexpr const char CARD_STATUS_{s.upper()}[] = "{s}";'
+        for s in c["card_statuses"]
+    )
+
+    errors = "\n".join(
+        f'constexpr const char ERROR_{e.upper()}[] = "{e}";'
+        for e in c["error_codes"]
+    )
+
+    banner = "\n".join(f"// {line}" for line in BANNER_LINES)
+
+    return f"""{banner}
+#pragma once
+
+#include <stddef.h>
+#include <stdint.h>
+
+namespace MnemosContract {{
+
+constexpr uint32_t CONTRACT_VERSION = {c['version']}U;
+
+constexpr size_t FRONT_MAX_GRAPHEMES = {limits['front_max_graphemes']}U;
+constexpr size_t BACK_MAX_GRAPHEMES = {limits['back_max_graphemes']}U;
+
+constexpr uint32_t MATURE_INTERVAL_DAYS = {sched['mature_interval_days']}U;
+constexpr float DESIRED_RETENTION = {sched['desired_retention']}f;
+constexpr uint8_t DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']}U;
+
+constexpr uint32_t GRADUATION_MILESTONE_DAYS[] = {{{milestones}}};
+constexpr size_t GRADUATION_MILESTONE_COUNT =
+    sizeof(GRADUATION_MILESTONE_DAYS) /
+    sizeof(GRADUATION_MILESTONE_DAYS[0]);
+
+constexpr float FSRS_WEIGHTS[] = {{{weights}}};
+constexpr size_t FSRS_WEIGHT_COUNT =
+    sizeof(FSRS_WEIGHTS) / sizeof(FSRS_WEIGHTS[0]);
+
+static_assert(FSRS_WEIGHT_COUNT == 21U,
+              "Mnemos currently requires the 21-weight FSRS contract");
+
+{grade_values}
+
+{review_sources}
+
+{card_statuses}
+
+constexpr uint8_t MULTIPLE_CHOICE_OPTIONS =
+    {modes['multiple_choice_options']}U;
+constexpr uint32_t MULTIPLE_CHOICE_FAST_ANSWER_MS =
+    {modes['multiple_choice_fast_answer_ms']}U;
+constexpr uint16_t LEECH_MIN_LAPSES =
+    {modes['leech_min_lapses']}U;
+constexpr uint16_t SIMULADO_DEFAULT_QUESTIONS =
+    {modes['simulado_default_questions']}U;
+constexpr uint16_t SIMULADO_DEFAULT_MINUTES =
+    {modes['simulado_default_minutes']}U;
+constexpr uint32_t TTS_ANSWER_PAUSE_MS =
+    {modes['tts_answer_pause_ms']}U;
+
+constexpr uint32_t FREE_GENERATIONS_LIFETIME =
+    {quota['free_generations_lifetime']}U;
+constexpr uint32_t MAX_JOBS_IN_FLIGHT =
+    {quota['max_jobs_in_flight']}U;
+constexpr uint32_t TOPIC_MAX_CHARS =
+    {generation['topic_max_chars']}U;
+
+{errors}
+
+}}  // namespace MnemosContract
+"""
+
 def _camel(snake: str) -> str:
     head, *tail = snake.split("_")
     return head + "".join(p.capitalize() for p in tail)
@@ -361,6 +455,7 @@ def main() -> int:
         DART_OUT: _dart(contract),
         PY_OUT: _python(contract),
         TS_OUT: _typescript(contract),
+        CPP_OUT: _cpp(contract),
     }
 
     stale = []
