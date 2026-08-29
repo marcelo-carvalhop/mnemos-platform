@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <esp_system.h>
 #include "config.h"
+#include "fsrs_replay_service.h"
 #include "learning_model.h"
 #include "storage.h"
 #include "time_service.h"
@@ -25,6 +26,17 @@ void StudyEngine::initializeStates() {
         if (states_[i].id.length() == 0) states_[i].id = cards_[i].id;
     }
     storage_.loadStates(states_, count_);
+
+    // O histórico é a fonte canônica do estado FSRS.
+    FsrsReplayService::rebuild(
+        storage_,
+        states_,
+        count_);
+
+    storage_.saveStates(
+        states_,
+        count_);
+
     resumableSession_ = storage_.loadSession(
         cards_, count_, queue_, Config::SESSION_MAX_CARDS,
         sessionCount_, currentPosition_, mode_, stats_);

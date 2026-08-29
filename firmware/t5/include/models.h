@@ -35,6 +35,25 @@ struct CardState {
     uint16_t lapses = 0;
     uint8_t lastRating = 0;
     bool illusionOfMastery = false;
+
+    // Estado FSRS v0.6. Mantido em paralelo ao estado legado durante
+    // a migração. A fonte canônica é o histórico de revisões.
+    double fsrsDifficulty = 0.0;
+    double fsrsStabilityDays = 0.0;
+
+    uint64_t fsrsDueAtMs = 0;
+    uint64_t fsrsLastReviewAtMs = 0;
+
+    uint32_t fsrsRepetitions = 0;
+    uint32_t fsrsLapses = 0;
+
+    // 1 = Learning, 2 = Review, 3 = Relearning.
+    uint8_t fsrsPhase = 1;
+
+    // -1 quando o cartão já está em Review.
+    int8_t fsrsStep = 0;
+
+    bool fsrsInitialized = false;
 };
 
 enum class Confidence : uint8_t {

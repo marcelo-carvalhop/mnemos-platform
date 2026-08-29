@@ -135,6 +135,40 @@ bool Storage::loadStates(CardState* states, size_t count) {
             states[i].lastRating = obj["lastRating"] | 0U;
             states[i].illusionOfMastery = obj["illusionOfMastery"] | false;
 
+            JsonObjectConst fsrs = obj["fsrs"].as<JsonObjectConst>();
+            if (!fsrs.isNull()) {
+                states[i].fsrsDifficulty =
+                    fsrs["difficulty"] | 0.0;
+
+                states[i].fsrsStabilityDays =
+                    fsrs["stabilityDays"] | 0.0;
+
+                states[i].fsrsDueAtMs =
+                    fsrs["dueAtMs"].is<uint64_t>()
+                        ? fsrs["dueAtMs"].as<uint64_t>()
+                        : 0ULL;
+
+                states[i].fsrsLastReviewAtMs =
+                    fsrs["lastReviewAtMs"].is<uint64_t>()
+                        ? fsrs["lastReviewAtMs"].as<uint64_t>()
+                        : 0ULL;
+
+                states[i].fsrsRepetitions =
+                    fsrs["repetitions"] | 0U;
+
+                states[i].fsrsLapses =
+                    fsrs["lapses"] | 0U;
+
+                states[i].fsrsPhase =
+                    fsrs["phase"] | 1U;
+
+                states[i].fsrsStep =
+                    fsrs["step"] | 0;
+
+                states[i].fsrsInitialized =
+                    fsrs["initialized"] | false;
+            }
+
             // Migração de v0.4: aproxima S pelo último intervalo se o campo D/S ainda não existia.
             if (states[i].stabilityDays <= 0.0f && obj["intervalSeconds"].is<uint32_t>()) {
                 const uint32_t seconds = obj["intervalSeconds"].as<uint32_t>();
@@ -148,7 +182,7 @@ bool Storage::loadStates(CardState* states, size_t count) {
 
 bool Storage::saveStates(const CardState* states, size_t count) {
     JsonDocument doc;
-    doc["schema"] = "mnemos.local-card-state/v2";
+    doc["schema"] = "mnemos.local-card-state/v3";
     JsonArray cards = doc["cards"].to<JsonArray>();
 
     for (size_t i = 0; i < count; ++i) {
@@ -162,6 +196,17 @@ bool Storage::saveStates(const CardState* states, size_t count) {
         obj["lapses"] = states[i].lapses;
         obj["lastRating"] = states[i].lastRating;
         obj["illusionOfMastery"] = states[i].illusionOfMastery;
+
+        JsonObject fsrs = obj["fsrs"].to<JsonObject>();
+        fsrs["difficulty"] = states[i].fsrsDifficulty;
+        fsrs["stabilityDays"] = states[i].fsrsStabilityDays;
+        fsrs["dueAtMs"] = states[i].fsrsDueAtMs;
+        fsrs["lastReviewAtMs"] = states[i].fsrsLastReviewAtMs;
+        fsrs["repetitions"] = states[i].fsrsRepetitions;
+        fsrs["lapses"] = states[i].fsrsLapses;
+        fsrs["phase"] = states[i].fsrsPhase;
+        fsrs["step"] = states[i].fsrsStep;
+        fsrs["initialized"] = states[i].fsrsInitialized;
     }
 
     File file = LittleFS.open(TEMP_STATE_PATH, "w");
