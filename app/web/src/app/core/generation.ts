@@ -55,6 +55,35 @@ export class Generation {
     return body.jobs ?? [];
   }
 
+  /**
+   * §7.2 — uma URL pré-assinada. O arquivo vai direto para o armazenamento.
+   *
+   * Só `application/pdf`, `image/jpeg`, `image/png` e `image/webp` são aceitos;
+   * qualquer outro tipo volta 415 daqui, antes de o navegador subir um byte.
+   */
+  async createUpload(contentType: string): Promise<{ upload_key: string; url: string }> {
+    return this.call<{ upload_key: string; url: string }>(
+      this.http.post<{ upload_key: string; url: string }>(
+        `${this.baseUrl}/v1/generation/uploads`,
+        { content_type: contentType },
+      ),
+    );
+  }
+
+  /**
+   * O PUT vai para o armazenamento, não para a nossa API (§7.2).
+   *
+   * O `content-type` tem de ser exatamente o mesmo que assinou a URL, senão a
+   * assinatura não confere. E o interceptor de autenticação não carimba este
+   * pedido — ele só assina o nosso host —, o que é o certo: um `Authorization`
+   * a mais aqui invalidaria a assinatura.
+   */
+  async upload(url: string, file: Blob, contentType: string): Promise<void> {
+    await this.call<unknown>(
+      this.http.put(url, file, { headers: { 'content-type': contentType } }),
+    );
+  }
+
   async create(input: {
     sourceType: 'topic' | 'text' | 'pdf' | 'photo';
     targetDeckId: string;

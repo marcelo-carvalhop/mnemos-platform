@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:store/store.dart';
 
 import '../../providers.dart';
-import '../../theme.dart';
-import '../generation/generate_screen.dart';
+import '../../theme/tokens.dart';
+import '../../theme/typography.dart';
+import '../../ui/ui.dart';
+import '../create/create_screen.dart';
 
 /// Screens `13`–`16` — §5.1.
 ///
@@ -108,7 +110,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     widget.onDone();
     if (generate) {
       await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => GenerateScreen(deckId: deckId, deckName: _subject.text.trim()),
+        builder: (_) => CreateScreen(deckId: deckId),
       ));
     }
   }
@@ -128,10 +130,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       child: Container(
                         height: 3,
                         margin: EdgeInsets.only(right: i == 3 ? 0 : 6),
-                        decoration: BoxDecoration(
-                          color: i <= _page ? AppColors.navy : AppColors.hairline,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
+                        decoration: ShapeDecoration(
+        color: i <= _page ? MnemosColors.primary : MnemosColors.hairline,
+        shape: squircle(2),
+      ),
                       ),
                     ),
                 ],
@@ -185,21 +187,89 @@ class _Welcome extends StatelessWidget {
     return _Page(
       children: [
         const Spacer(),
-        const Icon(Icons.landscape_outlined, size: 54, color: AppColors.navy),
-        const SizedBox(height: 28),
+        const Eyebrow('mnemos'),
+        const SizedBox(height: MnemosSpacing.lg),
         const Text(
-          'Estude menos.\nLembre por anos.',
-          style: TextStyle(
-              fontSize: 28, height: 1.25, fontWeight: FontWeight.w500, color: AppColors.ink),
+          'Estude menos.\nLembre por\nanos.',
+          style: MnemosText.display,
         ),
-        const SizedBox(height: 14),
-        const Text(
+        const SizedBox(height: MnemosSpacing.xl),
+        Text(
           'O app organiza o conteúdo e o Mnemos cuida da revisão. '
           'O estudo acontece no terminal, sem distrações.',
-          style: TextStyle(fontSize: 14.5, height: 1.55, color: AppColors.muted),
+          style: MnemosText.bodyLong.copyWith(fontSize: 16, color: MnemosColors.muted),
         ),
+        const SizedBox(height: MnemosSpacing.xl),
+        const _TerminalTeaser(),
         const Spacer(),
         FilledButton(onPressed: onNext, child: const Text('Começar')),
+        const SizedBox(height: MnemosSpacing.md),
+        TextButton(
+          onPressed: onNext,
+          child: const Text('Já tenho conta'),
+        ),
+      ],
+    );
+  }
+}
+
+/// O desenho do T5 ao lado da frase que explica o que ele é.
+///
+/// O aparelho é a parte do produto que ninguém adivinha por um ícone: mostrar
+/// um card na tela dele diz em dois segundos o que um parágrafo não diria.
+class _TerminalTeaser extends StatelessWidget {
+  const _TerminalTeaser();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 96,
+          height: 132,
+          padding: const EdgeInsets.all(MnemosSpacing.md),
+          decoration: ShapeDecoration(
+        color: MnemosColors.raised,
+        shape: squircle(10, side: BorderSide(color: MnemosColors.line)),
+      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'T5',
+                style: MnemosText.eyebrowSmall.copyWith(
+                  fontSize: 9,
+                  color: MnemosColors.fainter,
+                ),
+              ),
+              Text(
+                'O que o TCP garante?',
+                style: MnemosText.cardTitle.copyWith(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  height: 1.3,
+                ),
+              ),
+              Text(
+                '3/12',
+                style: MnemosText.monoSmall.copyWith(
+                  fontSize: 9,
+                  color: MnemosColors.fainter,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: MnemosSpacing.lg),
+        Expanded(
+          child: Text(
+            'Um aparelho de tinta eletrônica que só faz uma coisa: te perguntar '
+            'a coisa certa na hora certa.',
+            style: MnemosText.bodySmall.copyWith(fontSize: 13.5, height: 1.6),
+          ),
+        ),
       ],
     );
   }
@@ -228,12 +298,11 @@ class _Subject extends StatelessWidget {
       children: [
         const SizedBox(height: 30),
         const Text('O que você quer estudar?',
-            style: TextStyle(
-                fontSize: 24, height: 1.25, fontWeight: FontWeight.w500, color: AppColors.ink)),
+            style: MnemosText.screenTitleWrapped),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           'Pode ser uma matéria ou um assunto específico que você queira memorizar.',
-          style: TextStyle(fontSize: 14, height: 1.5, color: AppColors.muted),
+          style: MnemosText.bodyLong.copyWith(fontSize: 15, color: MnemosColors.muted),
         ),
         const SizedBox(height: 24),
         TextField(
@@ -241,11 +310,11 @@ class _Subject extends StatelessWidget {
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
             hintText: 'Ex.: Redes de Computadores',
-            hintStyle: TextStyle(fontSize: 13.5, color: AppColors.faint),
+            hintStyle: TextStyle(fontSize: 13.5, color: MnemosColors.faint),
           ),
         ),
         const SizedBox(height: 20),
-        const Text('Sugestões', style: TextStyle(fontSize: 12, color: AppColors.faint)),
+        const Eyebrow('sugestões'),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
@@ -255,7 +324,7 @@ class _Subject extends StatelessWidget {
               ActionChip(
                 label: Text(s),
                 onPressed: () => onPick(s),
-                backgroundColor: AppColors.fill,
+                backgroundColor: MnemosColors.raised,
                 side: BorderSide.none,
               ),
           ],
@@ -294,11 +363,10 @@ class _Goal extends StatelessWidget {
       children: [
         const SizedBox(height: 30),
         const Text('Quanto por dia?',
-            style: TextStyle(
-                fontSize: 24, height: 1.25, fontWeight: FontWeight.w500, color: AppColors.ink)),
+            style: MnemosText.screenTitleWrapped),
         const SizedBox(height: 10),
-        const Text('Dá para mudar depois, a qualquer momento.',
-            style: TextStyle(fontSize: 14, color: AppColors.muted)),
+        Text('Dá para mudar depois, a qualquer momento.',
+            style: MnemosText.bodyLong.copyWith(fontSize: 15, color: MnemosColors.muted)),
         const SizedBox(height: 26),
         for (final (goal, title, detail) in _options) ...[
           _Option(
@@ -333,16 +401,16 @@ class _Option extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      customBorder: squircle(MnemosRadii.control),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? AppColors.fill : AppColors.ivory,
+          color: selected ? MnemosColors.raised : MnemosColors.canvas,
           border: Border.all(
-            color: selected ? AppColors.navy : AppColors.hairline,
+            color: selected ? MnemosColors.primary : MnemosColors.hairline,
             width: selected ? 1.6 : 1,
           ),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(MnemosRadii.control),
         ),
         child: Row(
           children: [
@@ -351,14 +419,14 @@ class _Option extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                      style: MnemosText.itemTitle.copyWith(fontSize: 16)),
                   const SizedBox(height: 3),
                   Text(detail,
-                      style: const TextStyle(fontSize: 12.5, color: AppColors.faint)),
+                      style: MnemosText.caption),
                 ],
               ),
             ),
-            if (selected) const Icon(Icons.check_circle, size: 20, color: AppColors.navy),
+            if (selected) const Icon(Icons.check_circle, size: 20, color: MnemosColors.primary),
           ],
         ),
       ),
@@ -389,34 +457,33 @@ class _FreeGeneration extends StatelessWidget {
       children: [
         const SizedBox(height: 30),
         const Text('Sua geração grátis',
-            style: TextStyle(
-                fontSize: 24, height: 1.25, fontWeight: FontWeight.w500, color: AppColors.ink)),
+            style: MnemosText.screenTitleWrapped),
         const SizedBox(height: 12),
         // §7.7.1 — it is one per lifetime, and it does not expire. Spending it
         // without saying so is taking something the user did not know they
         // had.
-        const Text(
+        Text(
           'Você tem uma geração por IA para usar quando quiser. Ela não expira.',
-          style: TextStyle(fontSize: 14.5, height: 1.55, color: AppColors.muted),
+          style: MnemosText.bodyLong.copyWith(fontSize: 15, color: MnemosColors.muted),
         ),
         const SizedBox(height: 26),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.fill,
-            borderRadius: BorderRadius.circular(14),
-          ),
+          decoration: ShapeDecoration(
+        color: MnemosColors.raised,
+        shape: squircle(14),
+      ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 subject.isEmpty ? 'Usar agora' : 'Usar agora em $subject',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                style: MnemosText.itemTitle,
               ),
               const SizedBox(height: 6),
               const Text(
                 'Cria um baralho inicial a partir do que você respondeu.',
-                style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.muted),
+                style: MnemosText.caption,
               ),
             ],
           ),
@@ -424,7 +491,7 @@ class _FreeGeneration extends StatelessWidget {
         const SizedBox(height: 14),
         const Text(
           'Ou guarde para fotografar seu caderno depois — costuma impressionar mais.',
-          style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.faint),
+          style: TextStyle(fontSize: 12.5, height: 1.5, color: MnemosColors.faint),
         ),
         const Spacer(),
         FilledButton(
@@ -441,7 +508,7 @@ class _FreeGeneration extends StatelessWidget {
         const Center(
           child: Text(
             'Criar e organizar cards é livre. O estudo acontece no Mnemos.',
-            style: TextStyle(fontSize: 11.5, color: AppColors.faint),
+            style: TextStyle(fontSize: 11.5, color: MnemosColors.faint),
           ),
         ),
       ],

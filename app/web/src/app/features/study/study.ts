@@ -36,26 +36,59 @@ import { IntervalPipe } from '../../shared/interval-pipe';
   template: `
     @if (card(); as current) {
       <header class="bar">
-        <a class="leave" routerLink="/hoje">Sair</a>
-        <p class="mn-mono progress">{{ done() }} de {{ total() }}</p>
-        <div class="track" aria-hidden="true">
-          <span [style.width.%]="total() ? (done() / total()) * 100 : 0"></span>
+        <div class="left">
+          <a class="leave" routerLink="/hoje" aria-label="Sair da sessão">✕</a>
+          <span class="deck">{{ deckName(current.deck_id) }}</span>
         </div>
+
+        <div class="middle">
+          <!-- Um segmento por card da sessão, não uma barra contínua: a
+               pessoa vê quantos faltam e como foram os que já passaram. -->
+          <div class="ruler" aria-hidden="true">
+            @for (i of segments(); track i) {
+              <span
+                [class.right]="i < correct()"
+                [class.wrong]="i >= correct() && i < done()"
+                [class.now]="i === done()"
+              ></span>
+            }
+          </div>
+          <!-- Sans e caixa mista: eram quatro tratamentos de tipo numa faixa
+               de 40 px — o nome do baralho em sans, a régua, o contador e os
+               acertos em mono caixa alta, e o atalho em mono mais claro. Só o
+               número fica em mono, que é onde o avanço fixo serve para
+               alguma coisa. -->
+          <p class="counts">
+            <span class="mn-mono">{{ done() + 1 }}</span> de
+            <span class="mn-mono">{{ total() }}</span>
+            <span class="split">·</span>
+            {{ correct() }} certos, {{ done() - correct() }} errados
+          </p>
+        </div>
+
+        <!-- O atalho sai da faixa: ele já aparece dentro do próprio botão. -->
       </header>
 
       <article class="card" [attr.aria-live]="'polite'">
+        <p class="eyebrow mn-mono">Pergunta</p>
         <p class="front">{{ current.front }}</p>
 
         @if (revealed()) {
           <hr />
+          <p class="eyebrow mn-mono">Resposta</p>
           <p class="back">{{ current.back }}</p>
-          @if (current.tags.length > 0) {
-            <ul class="tags">
-              @for (tag of current.tags; track tag) {
-                <li class="mn-mono">{{ tag }}</li>
-              }
-            </ul>
-          }
+          <div class="foot">
+            @if (current.tags.length > 0) {
+              <ul class="tags">
+                @for (tag of current.tags; track tag) {
+                  <li class="mn-mono">{{ tag }}</li>
+                }
+              </ul>
+            } @else {
+              <span></span>
+            }
+            <span class="seen">{{ seen(current.id) }}</span>
+          </div>
         }
       </article>
 
@@ -65,6 +98,7 @@ import { IntervalPipe } from '../../shared/interval-pipe';
           <kbd class="mn-mono">espaço</kbd>
         </button>
       } @else {
+        <p class="eyebrow mn-mono centred">Como foi?</p>
         <div class="grades" role="group" aria-label="Como foi">
           @for (grade of grades; track grade) {
             <button
@@ -109,6 +143,31 @@ export class Study implements OnDestroy {
 
   protected readonly revealed = signal(false);
   protected readonly answered = signal(0);
+
+  /** Quantos a pessoa acertou nesta sessão — "errei" é o único erro. */
+  protected readonly correct = signal(0);
+
+  /** Um índice por card da sessão, para desenhar a régua. */
+  protected readonly segments = computed(() =>
+    Array.from({ length: this.total() }, (_, i) => i),
+  );
+
+  protected deckName(deckId: string): string {
+    return this.store.liveDecks().find((d) => d.id === deckId)?.name ?? 'Sessão';
+  }
+
+  /** "Visto há 6 dias · intervalo 6 d" — o contexto da pergunta. */
+  protected seen(cardId: string): string {
+    const state = this.store.states().get(cardId);
+    if (!state?.lastReviewAt) return 'Primeira vez que você vê este card';
+    const days = Math.round((Date.now() - state.lastReviewAt.getTime()) / 86_400_000);
+    const gap =
+      state.dueAt && state.lastReviewAt
+        ? Math.round((state.dueAt.getTime() - state.lastReviewAt.getTime()) / 86_400_000)
+        : null;
+    const when = days <= 0 ? 'hoje' : days === 1 ? 'ontem' : `há ${days} dias`;
+    return gap === null ? `Visto ${when}` : `Visto ${when} · intervalo ${gap} d`;
+  }
 
   /**
    * A fila é congelada — mas só quando existe algo para congelar.
@@ -179,6 +238,7 @@ export class Study implements OnDestroy {
     this.revealed.set(false);
     this.revealedAt = null;
     this.answered.update((n) => n + 1);
+    if (grade > 1) this.correct.update((n) => n + 1);
     this.index.update((i) => i + 1);
 
     // Enviar ao fim, não a cada card: uma requisição por resposta transformaria

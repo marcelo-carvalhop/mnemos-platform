@@ -74,7 +74,8 @@ describe('Study', () => {
 
     expect(f.nativeElement.textContent).toContain('Chegou depois');
     // Um só na fila: o respondido não conta, e o total não pode inflar.
-    expect(f.nativeElement.textContent).toContain('0 de 1');
+    // O contador é a posição na sessão ("1 de 1"), não o número de feitos.
+    expect(f.nativeElement.textContent).toContain('1 de 1');
   });
 
   it('sem nada vencendo e com a sincronia pronta, diz que não há nada', async () => {
@@ -126,10 +127,13 @@ describe('Study', () => {
   it('a fila não encolhe embaixo de quem está estudando', () => {
     // `store.due()` é reativo: sem congelar, o total iria de "2" para "1 de 1"
     // a cada resposta, e a sessão nunca pareceria ter fim.
-    expect(text()).toContain('0 de 2');
+    expect(text()).toContain('1 de 2');
     press(' ');
     press('4');
-    expect(text()).toContain('1 de 2');
+    // O que importa aqui é o denominador: a segunda resposta continua sendo
+    // "de 2", e não vira "de 1" porque a fila encolheu embaixo da pessoa.
+    expect(text()).toContain('2 de 2');
+    expect(text()).not.toContain('de 1');
   });
 
   it('digitar num campo de texto não gradua', () => {

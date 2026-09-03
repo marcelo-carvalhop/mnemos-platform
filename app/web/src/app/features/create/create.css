@@ -1,21 +1,11 @@
-:host {
-  display: block;
-  max-width: 680px;
-}
-
 .quota {
   display: inline-block;
   font-size: 12.5px;
   color: var(--mn-text-muted);
   background: var(--mn-line);
-  border-radius: 20px;
+  border-radius: var(--mn-radius-lg);
   padding: 4px 12px;
   margin: 0 0 24px;
-}
-
-h1 {
-  font-size: 32px;
-  margin-bottom: 8px;
 }
 
 .hint {
@@ -52,7 +42,7 @@ textarea:focus {
 .examples button {
   border: 1px solid var(--mn-line);
   background: none;
-  border-radius: 20px;
+  border-radius: var(--mn-radius-lg);
   padding: 6px 14px;
   font-size: 13.5px;
   color: var(--mn-text-muted);
@@ -60,65 +50,6 @@ textarea:focus {
 .examples button:hover {
   border-color: var(--mn-accent);
   color: var(--mn-accent);
-}
-
-.refine {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  margin-bottom: 26px;
-}
-fieldset {
-  border: 0;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-legend {
-  float: left;
-  font-size: 13.5px;
-  color: var(--mn-text-muted);
-  margin-right: 12px;
-  padding: 0;
-}
-fieldset label {
-  padding: 7px 16px;
-  border: 1px solid var(--mn-line);
-  border-radius: 20px;
-  font-size: 14px;
-  cursor: pointer;
-}
-fieldset label.on {
-  background: var(--mn-accent-soft);
-  border-color: var(--mn-accent);
-  color: var(--mn-accent);
-  font-weight: 600;
-}
-fieldset input {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.count {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 13.5px;
-  color: var(--mn-text-muted);
-}
-.count input {
-  flex: 1;
-  accent-color: var(--mn-accent);
-}
-.count output {
-  font-size: 16px;
-  color: var(--mn-accent);
-  min-width: 2ch;
-  text-align: right;
 }
 
 .primary {
@@ -138,29 +69,20 @@ fieldset input {
 .primary:hover:not(:disabled) {
   background: var(--mn-accent-hover);
 }
+/* Desabilitado mantém a **cor** e perde a promessa. Um preenchido cinza pesava
+ * mais que o "Escrever eu mesmo" habilitado ao lado — o elemento mais forte da
+ * tela era o que não funciona. Na App Store o "OBTER" indisponível perde a
+ * cor, não ganha um preenchimento novo. */
 .primary:disabled {
-  background: var(--mn-line);
-  color: var(--mn-text-muted);
+  background: color-mix(in srgb, var(--mn-accent) 30%, transparent);
+  color: color-mix(in srgb, var(--mn-text-on-accent) 60%, transparent);
   cursor: not-allowed;
 }
 
-.alternatives {
-  margin-top: 12px;
-  display: flex;
-  gap: 12px;
-}
-.alternatives button {
-  flex: 1;
-  padding: 14px;
-  border: 1px solid var(--mn-line);
-  background: none;
-  border-radius: var(--mn-radius-lg);
-  font-size: 14px;
-  color: var(--mn-text);
-}
-.alternatives button:hover {
-  border-color: var(--mn-accent);
-  color: var(--mn-accent);
+/* E o secundário sobe para o mesmo peso: os dois formam um par de ações, não
+ * uma barra e uma nota de rodapé. */
+.actions .secondary {
+  border-color: var(--mn-outline);
 }
 
 .problem {
@@ -178,4 +100,228 @@ fieldset input {
   text-align: center;
   font-size: 12.5px;
   color: var(--mn-text-muted);
+}
+
+/* --- redesign: duas colunas com a prévia à direita ------------------------ */
+
+:host {
+  display: block;
+  max-width: none;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: var(--mn-gap-6);
+  align-items: start;
+}
+.form {
+  max-width: 640px;
+}
+.form h1 {
+  font-size: 34px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+
+.refine {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--mn-gap-4);
+  margin-top: var(--mn-gap-5);
+}
+.counts {
+  display: flex;
+  gap: var(--mn-gap-2);
+  margin-top: 10px;
+}
+.counts button {
+  flex: 1;
+  border: 1px solid var(--mn-line-strong);
+  background: none;
+  color: var(--mn-text-muted);
+  font-size: 14px;
+  padding: 10px 0;
+  border-radius: var(--mn-radius);
+}
+.counts button.on {
+  background: var(--mn-accent);
+  border-color: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  font-weight: 600;
+}
+
+/* As origens: quatro escolhas iguais, a ativa preenchida. O tracejado saiu
+   junto com o `disabled` — borda tracejada lê como "ainda não existe". */
+.sources {
+  display: flex;
+  gap: 10px;
+  margin: 0 0 var(--mn-gap-4);
+}
+.sources button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--mn-gap-2);
+  border: 1px solid var(--mn-line-strong);
+  background: var(--mn-surface-raised);
+  border-radius: var(--mn-radius-lg);
+  padding: var(--mn-gap-3) var(--mn-gap-3) var(--mn-gap-4);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--mn-accent-hover);
+}
+.sources svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sources button:hover:not(.on) {
+  border-color: var(--mn-accent);
+  color: var(--mn-accent);
+}
+.sources button.on {
+  background: var(--mn-accent);
+  border-color: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  font-weight: 600;
+}
+
+/* A zona de arquivo. O tracejado **aqui** é o certo: significa "solte algo
+   nesta área", que é exatamente o que se pede. */
+.drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 168px;
+  padding: 24px;
+  text-align: center;
+  border: 1.5px dashed var(--mn-outline);
+  border-radius: var(--mn-radius-lg);
+  background: var(--mn-surface-raised);
+  cursor: pointer;
+}
+.drop:hover,
+.drop.over {
+  border-color: var(--mn-accent);
+  background: var(--mn-accent-soft);
+}
+.drop input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+.drop .name {
+  font-family: var(--mn-font-content);
+  font-size: 17px;
+  color: var(--mn-text);
+}
+.drop .size {
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 34ch;
+  color: var(--mn-text-faint);
+}
+
+/* Só aparece perto do teto de §7.3 — ver `charsLeft`. */
+.counter {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--mn-text-faint);
+}
+.counter.over {
+  color: var(--mn-destructive);
+  font-weight: 600;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: var(--mn-gap-5);
+}
+.actions .primary {
+  flex: 1;
+  margin: 0;
+}
+.actions .secondary {
+  border: 1px solid var(--mn-outline);
+  background: none;
+  border-radius: var(--mn-radius);
+  padding: 16px 22px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--mn-text);
+}
+
+/* A coluna afunda em vez de flutuar: é referência, não conteúdo editável. */
+.preview {
+  background: var(--mn-surface-sunken);
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-xl);
+  padding: 28px;
+}
+.preview .quota {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--mn-text-faint);
+}
+.preview ul {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.preview li {
+  background: var(--mn-surface-raised);
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  padding: 20px;
+}
+/* "Há mais" é um degradê na base da coluna, não um item inteiro a 55% de
+ * opacidade — sem legenda, um card apagado no meio de dois cheios lê como
+ * falha de renderização. É como a lista do Spotlight indica continuação. */
+.preview ul {
+  -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 72%, transparent 100%);
+}
+.preview .front {
+  margin: 0;
+  font-family: var(--mn-font-content);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.preview .back {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--mn-text-muted);
+}
+.preview .note {
+  margin: 18px 0 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--mn-text-faint);
+}
+
+@media (max-width: 1000px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
 }

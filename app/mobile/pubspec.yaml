@@ -59,3 +59,31 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Bundled rather than fetched at runtime: §2.2 makes the app work offline
+  # from the first launch, and a typeface that arrives on the second launch
+  # would make the first one a different product.
+  fonts:
+    # Titles, section headings and every large numeral (§ design "Mnemos App").
+    - family: Literata
+      fonts:
+        - asset: assets/fonts/Literata-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Literata-SemiBold.ttf
+          weight: 600
+    # Body copy and interface labels.
+    - family: Public Sans
+      fonts:
+        - asset: assets/fonts/PublicSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/PublicSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/PublicSans-SemiBold.ttf
+          weight: 600
+    # Eyebrows and tabular data, where the fixed advance is the point.
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-Medium.ttf
+          weight: 500

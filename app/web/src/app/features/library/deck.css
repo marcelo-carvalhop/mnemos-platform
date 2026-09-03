@@ -167,13 +167,15 @@ h1 {
   border-color: transparent !important;
   font-weight: 600;
 }
+/* Mantém a cor, perde a promessa — a mesma regra de `create.css`. */
 .primary:disabled {
-  background: var(--mn-line) !important;
-  color: var(--mn-text-muted);
+  background: color-mix(in srgb, var(--mn-accent) 30%, transparent) !important;
+  color: color-mix(in srgb, var(--mn-text-on-accent) 60%, transparent);
 }
+/* Destrutivo é papel próprio, não o grau "errei" da revisão. */
 .danger {
-  color: var(--mn-again);
-  border-color: var(--mn-again) !important;
+  color: var(--mn-destructive);
+  border-color: color-mix(in srgb, var(--mn-destructive) 40%, transparent) !important;
   background: none;
   padding: 11px 18px;
   border-radius: var(--mn-radius);

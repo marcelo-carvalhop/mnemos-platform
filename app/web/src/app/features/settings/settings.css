@@ -73,10 +73,11 @@ h2 {
   color: var(--mn-accent);
 }
 .danger {
-  color: var(--mn-again) !important;
+  color: var(--mn-destructive) !important;
 }
 .danger:hover {
-  border-color: var(--mn-again) !important;
+  border-color: var(--mn-destructive) !important;
+  background: color-mix(in srgb, var(--mn-destructive) 8%, transparent) !important;
 }
 
 .status {

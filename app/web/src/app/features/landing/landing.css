@@ -48,14 +48,17 @@
   margin: 0 auto 30px;
 }
 
+/* Pílula e não retângulo: o CTA de toda página de produto da apple.com é um
+ * raio total com rótulo de 17 px e padding generoso. Um retângulo de 135×45
+ * com raio 10 lê como botão de formulário, não como convite. */
 .cta {
   display: inline-block;
-  padding: 15px 34px;
+  padding: 14px 28px;
   background: var(--mn-accent);
   color: var(--mn-text-on-accent);
-  border-radius: var(--mn-radius);
+  border-radius: 999px;
   text-decoration: none;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
 }
 .cta:hover {

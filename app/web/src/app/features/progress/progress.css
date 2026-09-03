@@ -38,12 +38,24 @@ h2 {
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 12px;
+  gap: var(--mn-gap-3);
+}
+/* `align-items: start` na grade e distribuição dentro do card: os quatro
+ * ladrilhos ganhavam a altura do mais alto e os três curtos ficavam com ~68 px
+ * CSS de vazio no rodapé. O card de Destaques da Saúde põe o numeral no topo e
+ * o rótulo colado na base — a altura sobrando vira respiro entre os dois, não
+ * um buraco embaixo. */
+.cards {
+  align-items: stretch;
 }
 .cards article {
-  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--mn-gap-2);
+  padding: var(--mn-gap-4);
   border: 1px solid var(--mn-line);
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-lg);
   background: var(--mn-surface-raised);
 }
 .n {
@@ -70,9 +82,34 @@ h2 {
 }
 .bar {
   width: 100%;
-  min-height: 2px;
+  min-height: 3px;
   background: var(--mn-accent);
   border-radius: 2px 2px 0 0;
+}
+/* Dia sem revisão: a cor do trilho. Um zero desenhado na cor da barra parece
+ * um dia com uma revisão — e num mês de estudo irregular isso é a diferença
+ * entre um gráfico honesto e um lisonjeiro. */
+.bar.empty {
+  background: var(--mn-line-strong);
+}
+
+/* A linha de grade do pico, com o valor à direita. */
+.plot {
+  position: relative;
+}
+.plot .grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  border-top: 1px dashed var(--mn-line-strong);
+}
+.plot .grid-label {
+  position: absolute;
+  right: 0;
+  top: -16px;
+  font-size: 10.5px;
+  color: var(--mn-text-fainter);
 }
 
 .axis {
@@ -130,4 +167,131 @@ h2 {
 .empty {
   color: var(--mn-text-muted);
   font-size: 14px;
+}
+
+/* --- redesign: âncora, filtro de período e duas colunas ------------------- */
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mn-gap-4);
+}
+.chips {
+  display: flex;
+  gap: var(--mn-gap-2);
+}
+.chips button {
+  border: 1px solid var(--mn-line-strong);
+  background: none;
+  color: var(--mn-text-muted);
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: var(--mn-radius-lg);
+}
+.chips button.on {
+  background: var(--mn-accent);
+  border-color: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  font-weight: 500;
+}
+
+/* O primeiro cartão da fileira é o bloco-âncora: a métrica que o produto
+ * promete, separada por cor das que só descrevem esforço. */
+.cards .anchor {
+  background: var(--mn-accent);
+  border-color: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+}
+.cards .anchor .eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-accent-soft);
+}
+.cards .anchor .figure {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 8px 0 0;
+}
+.cards .anchor .figure .n {
+  font-family: var(--mn-font-content);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+}
+.cards .anchor .figure .unit {
+  font-family: var(--mn-font-content);
+  font-size: 20px;
+}
+.cards .anchor .note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--mn-accent-soft);
+}
+.cards .n.good {
+  color: var(--mn-good);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: var(--mn-gap-5);
+  margin-top: var(--mn-gap-5);
+}
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mn-gap-3);
+}
+.section-head .eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+
+h2.spaced {
+  margin-top: var(--mn-gap-6);
+}
+
+.maturity {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.maturity .row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13.5px;
+}
+.maturity .row .mn-mono {
+  font-size: 12px;
+  color: var(--mn-text-faint);
+}
+.maturity .track {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--mn-line);
+  margin-top: 6px;
+  overflow: hidden;
+}
+.maturity .fill {
+  display: block;
+  height: 8px;
+  background: var(--mn-accent);
+}
+
+@media (max-width: 1000px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
 }

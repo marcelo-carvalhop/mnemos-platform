@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers_sync.dart';
 import '../sync/sync_controller.dart';
-import '../theme.dart';
+import '../theme/tokens.dart';
+import '../theme/typography.dart';
 
 /// What the app says about syncing (§2.2, §5.14).
 ///
@@ -25,27 +26,27 @@ class SyncBadge extends ConsumerWidget {
       SyncPhase.idle when sync.pending == 0 => (null, null, null),
       SyncPhase.idle => (
           '${sync.pending} ${sync.pending == 1 ? "mudança" : "mudanças"} para enviar',
-          AppColors.faint,
+          MnemosColors.faint,
           Icons.cloud_upload_outlined,
         ),
-      SyncPhase.syncing => ('Sincronizando', AppColors.faint, Icons.sync),
+      SyncPhase.syncing => ('Sincronizando', MnemosColors.faint, Icons.sync),
       SyncPhase.resyncing => (
           'Recarregando tudo',
-          AppColors.faint,
+          MnemosColors.faint,
           Icons.sync,
         ),
       SyncPhase.offline => (
           sync.pending == 0
               ? 'Sem conexão'
               : 'Sem conexão · ${sync.pending} para enviar',
-          AppColors.muted,
+          MnemosColors.muted,
           Icons.cloud_off_outlined,
         ),
       // The only state worth a colour: something is wrong that waiting will
       // not fix.
       SyncPhase.failed => (
           'Não consegui sincronizar',
-          AppColors.again,
+          MnemosColors.due,
           Icons.error_outline,
         ),
     };
@@ -54,7 +55,7 @@ class SyncBadge extends ConsumerWidget {
 
     return InkWell(
       onTap: () => ref.read(syncControllerProvider.notifier).syncNow(),
-      borderRadius: BorderRadius.circular(20),
+      customBorder: squircle(MnemosRadii.card),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Row(
@@ -62,7 +63,7 @@ class SyncBadge extends ConsumerWidget {
           children: [
             Icon(icon, size: 13, color: colour),
             const SizedBox(width: 5),
-            Text(label, style: TextStyle(fontSize: 11, color: colour)),
+            Text(label, style: MnemosText.monoSmall.copyWith(color: colour)),
           ],
         ),
       ),

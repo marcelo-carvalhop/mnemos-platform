@@ -1,7 +1,11 @@
+/* Centrado nos dois eixos, como a tela de login do iCloud.com: o painel
+ * começava em y≈250 e deixava ~750 px vazios embaixo, o que numa tela de uma
+ * coisa só lê como página que não terminou de carregar. */
 :host {
-  display: block;
-  min-height: 100vh;
-  padding: 32px;
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--mn-gap-5);
 }
 
 .brand {
@@ -71,9 +75,10 @@ small {
   font-size: 15.5px;
   font-weight: 600;
 }
+/* Mantém a cor, perde a promessa — a mesma regra de `create.css`. */
 .primary:disabled {
-  background: var(--mn-line);
-  color: var(--mn-text-muted);
+  background: color-mix(in srgb, var(--mn-accent) 30%, transparent);
+  color: color-mix(in srgb, var(--mn-text-on-accent) 60%, transparent);
 }
 
 .switch {

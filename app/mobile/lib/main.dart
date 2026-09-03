@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 
-import 'features/home_screen.dart';
+import 'features/app_shell.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'providers.dart';
 import 'providers_sync.dart';
@@ -102,7 +102,7 @@ class _BootstrapState extends ConsumerState<_Bootstrap> with WidgetsBindingObser
                     const Scaffold(body: Center(child: CircularProgressIndicator())),
                 error: (e, _) => Scaffold(body: Center(child: Text('$e'))),
                 data: (done) => done
-                    ? const HomeScreen()
+                    ? const AppShell()
                     : OnboardingScreen(
                         onDone: () => ref.invalidate(onboardingDoneProvider),
                       ),

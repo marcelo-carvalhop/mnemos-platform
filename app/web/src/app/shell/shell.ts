@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter, map, startWith } from 'rxjs';
 import { Session } from '../core/session';
 import { Store } from '../core/store';
 import { Sync } from '../core/sync';
@@ -22,7 +24,13 @@ import { Sync } from '../core/sync';
   template: `
     <a class="skip" href="#conteudo">Pular para o conteúdo</a>
 
-    <div class="frame">
+    <div class="frame" [class.focus]="focus()">
+      <!-- A revisão esconde a navegação: durante o estudo a barra completa
+           continuava na tela, com badge de vencimento e bloco de sincronização
+           disputando atenção com a pergunta. Toda superfície de foco da Apple
+           tira o cromo — Fotos em tela cheia, o leitor de Books, o player da
+           TV. Aqui o "X" e a régua de progresso da própria tela bastam. -->
+      @if (!focus()) {
       <nav class="rail" aria-label="Seções">
         <a class="brand" routerLink="/hoje">
           <span class="mark" aria-hidden="true"></span>
@@ -39,7 +47,10 @@ import { Sync } from '../core/sync';
               >
                 <span>{{ item.label }}</span>
                 @if (item.path === '/hoje' && dueCount() > 0) {
-                  <span class="badge mn-mono">{{ dueCount() }}</span>
+                  <span class="badge">{{ dueCount() }}</span>
+                }
+                @if (item.path === '/biblioteca' && cardCount() > 0) {
+                  <span class="count mn-mono">{{ cardCount() }}</span>
                 }
               </a>
             </li>
@@ -53,19 +64,44 @@ import { Sync } from '../core/sync';
 
         <div class="spacer"></div>
 
-        @if (pending() > 0) {
-          <p class="pending">
-            <span class="dot" aria-hidden="true"></span>
-            {{ pending() }} {{ pending() === 1 ? 'mudança' : 'mudanças' }} para enviar
-          </p>
-        } @else if (sync.phase() === 'offline') {
-          <!-- §5.14 — offline não é erro. O texto é deliberadamente sem drama. -->
-          <p class="pending">Sem conexão. Nada foi perdido.</p>
-        }
+        <!-- O canvas põe aqui o estado do T5. A web não tem cliente de
+             terminal — só as rotas de autenticação existem no bundle — então o
+             bloco mostra o que ela de fato sabe: o estado da sincronização.
+             Inventar uma barra de bateria seria desenho bonito e mentira. -->
+        <div class="status">
+          <p class="eyebrow mn-mono">Sincronização</p>
+          @if (pending() > 0) {
+            <p class="line">
+              <span class="dot pending" aria-hidden="true"></span>
+              {{ pending() }} {{ pending() === 1 ? 'mudança' : 'mudanças' }} para enviar
+            </p>
+          } @else if (sync.phase() === 'offline') {
+            <!-- §5.14 — offline não é erro. O texto é deliberadamente sem drama. -->
+            <p class="line">
+              <span class="dot offline" aria-hidden="true"></span>
+              Sem conexão. Nada foi perdido.
+            </p>
+          } @else {
+            <p class="line">
+              <span class="dot ok" aria-hidden="true"></span>
+              Tudo enviado
+            </p>
+          }
+        </div>
 
-        <a class="quiet" routerLink="/configuracoes" routerLinkActive="on">Configurações</a>
+        <!-- "exact: false" como nos demais: sem isto, a rota
+             "/configuracoes" deixava a barra inteira sem nenhum item marcado,
+             porque o único item do rodapé não recebia a pílula. -->
+        <a
+          class="quiet"
+          routerLink="/configuracoes"
+          routerLinkActive="on"
+          [routerLinkActiveOptions]="{ exact: false }"
+          >Configurações</a
+        >
         <button class="quiet" type="button" (click)="leave()">Sair</button>
       </nav>
+      }
 
       <main id="conteudo" class="content">
         <router-outlet />
@@ -86,7 +122,23 @@ export class Shell {
     { path: '/dispositivo', label: 'Dispositivo' },
   ];
 
+  /** A rota atual, como sinal. */
+  private readonly route = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects),
+      startWith(this.router.url),
+    ),
+    { initialValue: this.router.url },
+  );
+
+  /** A revisão é modo de foco: a moldura sai de cena enquanto ela dura. */
+  protected readonly focus = computed(() => this.route().startsWith('/estudar'));
+
   protected readonly dueCount = computed(() => this.store.due().length);
+
+  /** Quantos cards a biblioteca tem, ao lado do seu nome na navegação. */
+  protected readonly cardCount = computed(() => this.store.liveCards().length);
 
   /** O número honesto de mostrar offline: "3 esperando" é verdade e não alarma. */
   protected readonly pending = computed(() => {

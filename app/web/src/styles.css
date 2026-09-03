@@ -1,67 +1,160 @@
-/* Tokens do Mnemos.
+/* Tokens do Mnemos — paleta G2, lavanda e coral.
  *
- * A paleta vem de `app/mobile/lib/theme.dart` e as correções de contraste de
- * `docs/design/web-brief/CORES.md`, onde cada valor tem o contraste medido.
- * Três cores da paleta reprovam WCAG AA como texto pequeno sobre marfim; a web
- * usa as variantes escurecidas para texto e reserva as originais para
- * superfícies grandes, onde contraste de texto não se aplica.
+ * Mesma paleta e mesma tipografia do aplicativo (`app/mobile/lib/theme/`),
+ * conforme o canvas `Mnemos Web.dc.html`. Lavanda é o produto, menta é o que
+ * já está firme, coral é o que vence — a cor carrega significado e nunca é
+ * escolhida por gosto de tela.
  *
- * Não há preto puro nem branco puro. É deliberado: o produto tem um terminal
- * de tinta eletrônica, e a interface na tela combina com o objeto na mesa.
+ * Onde a cor de origem reprova contraste como texto pequeno, existe uma
+ * variante escurecida: as originais ficam reservadas para preencher área, onde
+ * contraste de texto não se aplica. Não há preto nem branco puros; o produto
+ * tem um terminal de tinta eletrônica, e a tela combina com o objeto na mesa.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   /* Superfícies */
-  --mn-surface: #f4f1e8;
-  --mn-surface-sunken: #ede9de;
-  --mn-surface-raised: #fbfaf6;
-  --mn-line: #d9d5cc;
+  --mn-surface: #f2f1f6;
+  --mn-surface-sunken: #ebeaf1;
+  /* Branco puro, como no aplicativo (`MnemosColors.raised`). `#fcfbfe` dava
+   * 1,09:1 contra a tela; branco dá 1,124:1, que é a separação do agrupado do
+   * iOS. Mesma superfície nas duas superfícies, mesmo valor. */
+  --mn-surface-raised: #ffffff;
+  --mn-surface-soft: #efecf7;
+  --mn-line: #e5e1ee;
+  --mn-line-strong: #dedae8;
+  --mn-outline: #cbc7dc;
 
   /* Texto */
-  --mn-text: #1f1f1f;
-  --mn-text-muted: #535f4e;
-  --mn-text-on-accent: #f4f1e8;
+  --mn-text: #232130;
+  --mn-text-muted: #4c4a5c;
+  --mn-text-faint: #5a5868;
+  --mn-text-fainter: #6a6878;
+  --mn-text-on-accent: #f6f4fa;
 
   /* Ação */
-  --mn-accent: #365462;
-  --mn-accent-hover: #2b4450;
-  --mn-accent-soft: #e4e8e6;
+  --mn-accent: #6e6fa0;
+  --mn-accent-hover: #55568a;
+  --mn-accent-soft: #e1e1f3;
+  --mn-accent-40: #c9c8e1;
+  --mn-accent-60: #a9a9ce;
+  --mn-accent-dark: #3b3b63;
 
   /* Os quatro graus, sempre nesta ordem: errei, difícil, bom, fácil.
    * A ordem carrega significado e nunca é alfabética nem por frequência. */
-  --mn-again: #9e5d44;
-  --mn-again-bg: #f3e7e2;
-  --mn-hard: #806b44;
-  --mn-hard-bg: #f1ebde;
-  --mn-good: #535f4e;
-  --mn-good-bg: #e7eae4;
-  --mn-easy: #365462;
-  --mn-easy-bg: #e2e8eb;
+  --mn-again: #9e4a2c;
+  --mn-again-bg: #f7f1ee;
+  --mn-hard: #55568a;
+  --mn-hard-bg: #efecf7;
+  --mn-good: #4a6b5c;
+  --mn-good-bg: #e8efea;
+  --mn-easy: #6e6fa0;
+  --mn-easy-bg: #e1e1f3;
 
   /* Cores de origem — só para preencher área, nunca para texto pequeno. */
-  --mn-sage: #7a8b72;
-  --mn-brass: #b8a27a;
-  --mn-terracotta: #b56e52;
+  --mn-sage: #7fa894;
+  --mn-brass: #a9a9ce;
+  --mn-terracotta: #e08a72;
+  --mn-on-terracotta: #48261b;
+
+  /* A cor de um numeral é da **métrica**, não da tela em que ele aparece:
+   * retenção é menta, vencimento é coral escuro, memória acumulada é lavanda,
+   * e contagem sem juízo é tinta. Quatro telas com quatro critérios fazem o
+   * mesmo "98%" mudar de cor ao mudar de rota, e aí a cor deixa de informar.
+   * A mesma regra vale no aplicativo. */
+
+  /* Destrutivo é um papel próprio, não um tom do vencimento. O coral diz
+   * "isto vence"; esta cor diz "isto some para sempre", e confundir as duas
+   * ensina a pessoa a ignorar exatamente o aviso que não deveria. */
+  --mn-destructive: #7a2410;
 
   /* Tipografia. O card é conteúdo para ler, a interface é controle para
-   * operar: serifada no conteúdo, sem serifa na interface, mono no que é
-   * técnico (atalhos, ids, rótulos de seção). */
+   * operar: serifada no conteúdo e nos numerais, sem serifa na interface,
+   * mono no que é técnico (atalhos, ids, rótulos de seção). */
   --mn-font-ui: 'Public Sans', system-ui, -apple-system, sans-serif;
-  --mn-font-content: 'Source Serif 4', Georgia, serif;
-  --mn-font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --mn-font-content: Literata, Georgia, serif;
+  --mn-font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --mn-radius: 8px;
-  --mn-radius-lg: 14px;
+  /* Três raios, os mesmos do aplicativo (`MnemosRadii` em tokens.dart):
+   * controle dentro de bloco, card, e o objeto central da tela. Para um
+   * elemento aninhado o raio interno é o do pai menos o padding — é o que
+   * deixa as duas curvas paralelas em vez de uma caixa dentro da outra. */
+  --mn-radius: 12px;
+  --mn-radius-lg: 20px;
+  --mn-radius-xl: 28px;
 
-  /* Uma escala só, para que espaçamento não vire opinião por tela. */
+  /* Uma escala só, para que espaçamento não vire opinião por tela — e **os
+   * mesmos seis degraus do aplicativo**. Antes eram `18` e `26` aqui contra
+   * `16`, `20`, `24` e `32` lá, com três valores em comum: nenhum padding de
+   * card podia coincidir entre as duas superfícies, por construção. Um degrau
+   * novo entra nos dois arquivos ou não entra em nenhum. */
   --mn-gap-1: 4px;
   --mn-gap-2: 8px;
   --mn-gap-3: 12px;
-  --mn-gap-4: 18px;
-  --mn-gap-5: 26px;
+  --mn-gap-4: 16px;
+  --mn-gap-5: 24px;
   --mn-gap-6: 40px;
+
+  /* Superfície neutra: o lavanda era o botão, o herói, o item ativo **e** o
+   * papel de parede. Quando tudo é lavanda, o botão lavanda não se destaca de
+   * nada — é a raridade do acento que o torna uma indicação.
+   *
+   * Cinza e não branco, pela mesma razão do aplicativo: estas telas são cards
+   * e listas, a família do `systemGroupedBackground` do iOS (`#F2F2F7`), não a
+   * do `systemBackground`. A lightness é a da Apple; o tom é o da marca. */
+}
+
+/* Modo escuro.
+ *
+ * Como todas as cores já vivem em token, isto é uma segunda tabela de valores
+ * e não um redesenho. O produto tem por objeto companheiro um terminal de
+ * tinta eletrônica usado à noite; entregar só o claro obriga quem estuda no
+ * escuro a escolher entre o app e os próprios olhos.
+ *
+ * As superfícies não são cinzas neutros: recebem a mesma pitada de lavanda que
+ * as claras, para que a identidade sobreviva à inversão. E os tons de ação
+ * clareiam — `#6e6fa0` sobre um fundo escuro dá 3,1:1, abaixo do mínimo. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mn-surface: #131218;
+    --mn-surface-sunken: #0e0d12;
+    --mn-surface-raised: #1c1b23;
+    --mn-surface-soft: #232231;
+
+    --mn-line: #2a2934;
+    --mn-line-strong: #343341;
+    --mn-outline: #454353;
+
+    --mn-text: #ecebf2;
+    --mn-text-muted: #c3c1d0;
+    --mn-text-faint: #a3a1b2;
+    --mn-text-fainter: #8b8999;
+    --mn-text-on-accent: #14131a;
+
+    --mn-accent: #a9a9d6;
+    --mn-accent-hover: #c2c2e6;
+    --mn-accent-soft: #2b2a3d;
+    --mn-accent-40: #3b3a52;
+    --mn-accent-60: #6f6e93;
+    --mn-accent-dark: #1e1d2b;
+
+    --mn-again: #e39b7e;
+    --mn-again-bg: #33231d;
+    --mn-hard: #a9a9d6;
+    --mn-hard-bg: #26253a;
+    --mn-good: #8fc0a6;
+    --mn-good-bg: #1c2b23;
+    --mn-easy: #a9a9d6;
+    --mn-easy-bg: #2b2a3d;
+
+    --mn-sage: #7fa894;
+    --mn-brass: #6f6e93;
+    --mn-terracotta: #e08a72;
+    --mn-on-terracotta: #2a1610;
+
+    --mn-destructive: #e08a72;
+  }
 }
 
 * {

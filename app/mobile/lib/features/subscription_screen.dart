@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers_sync.dart';
-import '../theme.dart';
+import '../theme/tokens.dart';
+import '../theme/typography.dart';
+import '../ui/ui.dart';
 import 'generation/paywall_screen.dart';
 
 /// Screen `35 Assinatura` — §5.13.
@@ -27,16 +29,21 @@ class SubscriptionScreen extends ConsumerWidget {
     final paying = plan != 'free' && plan != 'unknown';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Assinatura')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-        children: [
+      
+      body: SafeArea(
+        bottom: false,
+        child: ScreenBody(
+          children: [
+            BackHeader(label: 'Configurações'),
+            const SizedBox(height: MnemosSpacing.md),
+            const Text('Assinatura', style: MnemosText.screenTitle),
+            const SizedBox(height: MnemosSpacing.xl),
           Container(
             padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: paying ? AppColors.goodBg : AppColors.fill,
-              borderRadius: BorderRadius.circular(16),
-            ),
+            decoration: ShapeDecoration(
+        color: paying ? MnemosColors.softer : MnemosColors.raised,
+        shape: squircle(16),
+      ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -45,7 +52,7 @@ class SubscriptionScreen extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w500,
-                    color: paying ? AppColors.good : AppColors.ink,
+                    color: paying ? MnemosColors.settled : MnemosColors.ink,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -60,7 +67,7 @@ class SubscriptionScreen extends ConsumerWidget {
                         ? '1 de $l geração disponível.'
                         : '$r de $l gerações disponíveis.',
                   },
-                  style: const TextStyle(fontSize: 13, height: 1.45, color: AppColors.muted),
+                  style: const TextStyle(fontSize: 13, height: 1.45, color: MnemosColors.muted),
                 ),
               ],
             ),
@@ -79,7 +86,7 @@ class SubscriptionScreen extends ConsumerWidget {
           const Text(
             'A assinatura paga a geração por IA, que custa por uso. O resto é '
             'seu e roda no seu aparelho.',
-            style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.faint),
+            style: TextStyle(fontSize: 12.5, height: 1.5, color: MnemosColors.faint),
           ),
           const SizedBox(height: 30),
           if (!paying)
@@ -100,8 +107,8 @@ class SubscriptionScreen extends ConsumerWidget {
           const SizedBox(height: 6),
           const Center(
             child: Text(
-              'A loja ainda não está ligada nesta build.',
-              style: TextStyle(fontSize: 11.5, color: AppColors.faint),
+              'A compra pelo app ainda não está disponível.',
+              style: TextStyle(fontSize: 11.5, color: MnemosColors.faint),
             ),
           ),
           if (paying) ...[
@@ -109,11 +116,12 @@ class SubscriptionScreen extends ConsumerWidget {
             const Text(
               'Para cancelar, use a assinatura na loja do seu aparelho — é lá '
               'que a cobrança vive, e cancelar por aqui não pararia nada.',
-              style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.faint),
+              style: TextStyle(fontSize: 12.5, height: 1.5, color: MnemosColors.faint),
             ),
           ],
         ],
       ),
+        ),
     );
   }
 }
@@ -130,11 +138,11 @@ class _Kept extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.check, size: 16, color: AppColors.good),
+          const Icon(Icons.check, size: 16, color: MnemosColors.settled),
           const SizedBox(width: 10),
           Expanded(
             child: Text(text,
-                style: const TextStyle(fontSize: 13.5, height: 1.4, color: AppColors.ink)),
+                style: const TextStyle(fontSize: 13.5, height: 1.4, color: MnemosColors.ink)),
           ),
         ],
       ),

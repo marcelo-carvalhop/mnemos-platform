@@ -21,6 +21,8 @@ describe('Create', () => {
   const api = {
     quota: vi.fn(),
     create: vi.fn(),
+    createUpload: vi.fn(),
+    upload: vi.fn(),
   };
 
   const text = () => fixture.nativeElement.textContent as string;
@@ -34,6 +36,8 @@ describe('Create', () => {
   beforeEach(() => {
     api.quota.mockReset();
     api.create.mockReset();
+    api.createUpload.mockReset();
+    api.upload.mockReset();
     api.quota.mockResolvedValue({ remaining: 1, limit: 1, plan: 'free' });
 
     TestBed.configureTestingModule({
@@ -138,6 +142,121 @@ describe('Create', () => {
 
     expect(store.decks().map((d) => d.name)).toEqual(['Ciclo de Krebs']);
     expect(text()).toContain('escrever os cards à mão');
+  });
+
+  it('as quatro origens estão disponíveis, nenhuma prometida para depois', async () => {
+    // A tela dizia "Disponível no aplicativo; chega ao navegador em seguida" com
+    // três botões mortos. Uma superfície de estudo que só aceita digitar não é
+    // a mesma superfície (§1).
+    await build();
+    const sources = [...fixture.nativeElement.querySelectorAll('.sources button')];
+
+    expect(sources.map((b: HTMLButtonElement) => b.textContent?.trim())).toEqual([
+      'Tópico',
+      'Texto colado',
+      'PDF',
+      'Foto',
+    ]);
+    expect(sources.every((b: HTMLButtonElement) => !b.disabled)).toBe(true);
+  });
+
+  it('texto colado vai como material, não como assunto', async () => {
+    // §7.3 — o servidor escreve *sobre* um tópico e extrai *de* um texto. Mandar
+    // um capítulo colado como `topic` faria o modelo inventar sobre ele.
+    api.create.mockResolvedValue({ id: 'job', status: 'queued', stage: 'na fila' });
+    await build();
+
+    fixture.componentInstance['source'].set('text');
+    fixture.componentInstance['material'].set('A glicólise ocorre no citosol e rende duas moléculas de ATP.');
+    await fixture.componentInstance['generate']();
+
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sourceType: 'text',
+        topic: 'A glicólise ocorre no citosol e rende duas moléculas de ATP.',
+      }),
+    );
+  });
+
+  it('o arquivo sobe antes de o baralho nascer', async () => {
+    // Na ordem inversa, um 415 no upload deixa para trás um baralho vazio que
+    // ninguém pediu.
+    const order: string[] = [];
+    api.createUpload.mockImplementation(async () => {
+      order.push('upload');
+      return { upload_key: 'uploads/u/abc', url: 'https://storage.test/put' };
+    });
+    api.upload.mockResolvedValue(undefined);
+    api.create.mockImplementation(async () => {
+      order.push('create');
+      return { id: 'job', status: 'queued', stage: 'na fila' };
+    });
+    await build();
+
+    fixture.componentInstance['source'].set('pdf');
+    fixture.componentInstance['file'].set({
+      name: 'Redes de computadores - cap 3.pdf',
+      blob: new File(['%PDF'], 'x.pdf', { type: 'application/pdf' }),
+      contentType: 'application/pdf',
+      size: 2048,
+    });
+    await fixture.componentInstance['generate']();
+
+    expect(order).toEqual(['upload', 'create']);
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceType: 'pdf', uploadKey: 'uploads/u/abc' }),
+    );
+    // O nome do arquivo já disse do que trata; perguntar de novo seria pedir
+    // duas vezes a mesma coisa. A extensão não faz parte do nome do baralho.
+    expect(store.decks().map((d) => d.name)).toEqual(['Redes de computadores - cap 3']);
+  });
+
+  it('upload que falha não deixa baralho vazio para trás', async () => {
+    api.createUpload.mockRejectedValue(new ApiError(415));
+    await build();
+
+    fixture.componentInstance['source'].set('photo');
+    fixture.componentInstance['file'].set({
+      name: 'caderno.jpg',
+      blob: new File([''], 'caderno.jpg', { type: 'image/jpeg' }),
+      contentType: 'image/jpeg',
+      size: 1024,
+    });
+    await fixture.componentInstance['generate']();
+
+    expect(store.decks()).toEqual([]);
+    expect(api.create).not.toHaveBeenCalled();
+  });
+
+  it('arquivo grande demais é recusado aqui, não depois de 25 MB de upload', async () => {
+    await build();
+    fixture.componentInstance['source'].set('pdf');
+
+    const huge = new File(['x'], 'apostila.pdf', { type: 'application/pdf' });
+    Object.defineProperty(huge, 'size', { value: 26 * 1024 * 1024 });
+    fixture.componentInstance['accept_'](huge);
+    fixture.detectChanges();
+
+    expect(fixture.componentInstance['file']()).toBeNull();
+    expect(text()).toContain('Arquivo grande demais');
+    expect(api.createUpload).not.toHaveBeenCalled();
+  });
+
+  it('trocar de origem larga o arquivo escolhido', async () => {
+    // Um PDF pendurado enquanto a tela mostra "Foto" é a tela dizendo uma coisa
+    // e o botão fazendo outra.
+    await build();
+    fixture.componentInstance['source'].set('pdf');
+    fixture.componentInstance['file'].set({
+      name: 'a.pdf',
+      blob: new File(['%PDF'], 'a.pdf', { type: 'application/pdf' }),
+      contentType: 'application/pdf',
+      size: 10,
+    });
+
+    fixture.componentInstance['choose']('photo');
+
+    expect(fixture.componentInstance['file']()).toBeNull();
   });
 });
 

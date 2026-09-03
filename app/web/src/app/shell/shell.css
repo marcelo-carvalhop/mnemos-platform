@@ -84,12 +84,21 @@
   font-weight: 600;
 }
 
+/* Coral, não lavanda: o número ao lado de "Hoje" é o que vence, e vencimento
+ * tem uma cor só em todo o produto. */
 .badge {
-  font-size: 12px;
-  background: var(--mn-accent);
-  color: var(--mn-text-on-accent);
-  border-radius: 10px;
-  padding: 1px 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--mn-terracotta);
+  color: var(--mn-on-terracotta);
+  border-radius: var(--mn-radius);
+  padding: 2px 8px;
+}
+
+/* Contagem neutra: quantos cards existem não é um alerta. */
+.count {
+  font-size: 11.5px;
+  color: var(--mn-text-fainter);
 }
 
 .write {
@@ -108,32 +117,58 @@
 .write:hover {
   background: var(--mn-accent-soft);
 }
+.write {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mn-gap-3);
+}
 .write kbd {
   font-size: 11px;
-  color: var(--mn-text-muted);
+  color: var(--mn-text-fainter);
 }
 
 .spacer {
   flex: 1;
 }
 
-.pending {
+/* O bloco-âncora do rodapé da barra, como o canvas o desenha. */
+.status {
+  background: var(--mn-surface-raised);
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius);
+  padding: 14px;
+  margin-bottom: 20px;
+}
+.status .eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+.status .line {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  background: var(--mn-line);
-  border-radius: var(--mn-radius);
-  margin: 0 0 10px;
-  font-size: 12.5px;
+  gap: 7px;
+  margin: 7px 0 0;
+  font-size: 13px;
   color: var(--mn-text-muted);
 }
 .dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--mn-hard);
-  flex: 0 0 6px;
+  flex: 0 0 7px;
+}
+.dot.ok {
+  background: var(--mn-sage);
+}
+.dot.pending {
+  background: var(--mn-terracotta);
+}
+.dot.offline {
+  background: var(--mn-text-fainter);
 }
 
 .quiet {
@@ -154,6 +189,24 @@
   flex: 1;
   min-width: 0;
   padding: 44px 56px 96px;
+}
+
+/* Uma medida, e centrada. As rotas de coluna única deixavam ~1200 px CSS de
+ * largura sem uso à direita, o que lê como layout quebrado e não como respiro;
+ * as de duas colunas esticavam sem limite num monitor largo. iCloud.com e a
+ * App Store para web limitam a medida e centram, sempre. 1180 é largo o
+ * bastante para as duas colunas de Hoje e estreito o bastante para a leitura
+ * das telas de uma coluna só. */
+.content > * {
+  display: block;
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+/* Modo de foco: sem a barra, o conteúdo fica com a página inteira e a medida
+ * de leitura passa a ser a única coisa que o segura. */
+.frame.focus .content {
+  padding: var(--mn-gap-6) var(--mn-gap-5) 96px;
 }
 
 /* Abaixo de 900px a coluna vira uma barra no topo: é a mesma navegação, na
@@ -183,7 +236,7 @@
     margin-top: 0;
   }
   .spacer,
-  .pending {
+  .status {
     display: none;
   }
   .content {

@@ -85,31 +85,38 @@
   font-size: 10.5px;
   color: var(--mn-text-muted);
   background: color-mix(in srgb, var(--mn-line) 55%, transparent);
-  border-radius: 20px;
+  border-radius: var(--mn-radius-lg);
   padding: 3px 9px;
 }
 
+/* A única ação da tela era a coisa mais fraca dela: um retângulo de largura
+ * total com fundo quase igual ao do card e um fio de 1 px, mais leve que a
+ * pergunta acima. Em qualquer fluxo de leitura ou revisão da Apple a ação de
+ * avanço é a mais pesada da tela. Preenchida, e com largura de botão em vez de
+ * largura de página. */
 .reveal {
-  margin-top: 22px;
+  margin: var(--mn-gap-5) auto 0;
+  display: flex;
   width: 100%;
-  padding: 16px;
-  border: 1px solid var(--mn-line);
-  background: var(--mn-surface);
+  max-width: 420px;
+  min-height: 52px;
+  padding: 0 var(--mn-gap-5);
+  border: 0;
+  background: var(--mn-accent);
   border-radius: var(--mn-radius-lg);
   font-size: 16px;
-  color: var(--mn-text);
-  display: flex;
+  font-weight: 600;
+  color: var(--mn-text-on-accent);
   align-items: center;
   justify-content: center;
   gap: 12px;
 }
 .reveal:hover {
-  border-color: var(--mn-accent);
-  color: var(--mn-accent);
+  background: var(--mn-accent-hover);
 }
 .reveal kbd {
   font-size: 12px;
-  color: var(--mn-text-muted);
+  color: color-mix(in srgb, var(--mn-text-on-accent) 70%, transparent);
 }
 
 /* Quatro colunas: com a largura disponível os graus ficam lado a lado, na
@@ -205,4 +212,114 @@
   text-align: center;
   padding: 60px 20px;
   color: var(--mn-text-muted);
+}
+
+/* --- redesign: barra da sessão, card e graus ------------------------------ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mn-gap-5);
+  padding: 20px 36px;
+  border-bottom: 1px solid var(--mn-line);
+  background: none;
+}
+.bar .left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.bar .leave {
+  font-size: 15px;
+  color: var(--mn-text-muted);
+  text-decoration: none;
+}
+.bar .deck {
+  font-size: 15px;
+  font-weight: 600;
+}
+.bar .middle {
+  flex: 1;
+  max-width: 520px;
+}
+.ruler {
+  display: flex;
+  gap: 4px;
+}
+.ruler span {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--mn-line-strong);
+}
+.ruler span.right {
+  background: var(--mn-sage);
+}
+.ruler span.wrong {
+  background: var(--mn-terracotta);
+}
+.ruler span.now {
+  background: var(--mn-accent);
+}
+.counts {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: var(--mn-text-faint);
+}
+.counts .split {
+  color: var(--mn-text-fainter);
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+.eyebrow.centred {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.card .front {
+  font-family: var(--mn-font-content);
+  font-size: 38px;
+  font-weight: 600;
+  line-height: 1.28;
+  margin: 16px 0 0;
+  text-wrap: pretty;
+}
+.card hr {
+  border: 0;
+  border-top: 1px solid var(--mn-line);
+  margin: 36px 0 28px;
+}
+.card .back {
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--mn-text);
+  margin: 14px 0 0;
+  max-width: 640px;
+}
+.card .foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mn-gap-4);
+  margin-top: 34px;
+}
+.card .seen {
+  font-size: 13.5px;
+  color: var(--mn-text-fainter);
+}
+
+.grades {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
 }
