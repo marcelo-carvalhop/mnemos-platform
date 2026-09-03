@@ -1,0 +1,86 @@
+:host {
+  display: block;
+  max-width: 640px;
+}
+
+h1 {
+  font-size: 32px;
+  margin-bottom: 26px;
+}
+
+section {
+  border-top: 1px solid var(--mn-line);
+  padding: 22px 0;
+}
+section:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+h2 {
+  font-size: 17px;
+  font-family: var(--mn-font-ui);
+  letter-spacing: 0;
+  margin-bottom: 10px;
+}
+
+.quiet {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mn-text);
+}
+
+.note {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--mn-text-muted);
+  max-width: 52ch;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 14px;
+}
+.field input {
+  flex: 1;
+  accent-color: var(--mn-accent);
+}
+.field output {
+  min-width: 4ch;
+  text-align: right;
+  color: var(--mn-accent);
+  font-size: 15px;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.row button {
+  padding: 11px 18px;
+  border: 1px solid var(--mn-line);
+  background: none;
+  border-radius: var(--mn-radius);
+  font-size: 14px;
+  color: var(--mn-text);
+}
+.row button:hover {
+  border-color: var(--mn-accent);
+  color: var(--mn-accent);
+}
+.danger {
+  color: var(--mn-again) !important;
+}
+.danger:hover {
+  border-color: var(--mn-again) !important;
+}
+
+.status {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--mn-text-muted);
+}

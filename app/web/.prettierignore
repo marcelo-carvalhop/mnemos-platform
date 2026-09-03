@@ -1,0 +1,10 @@
+# Arquivos gerados: a fonte é `shared/contract.yaml` e o script que a lê.
+# Formatá-los aqui faz o `--check` do CI falhar contra o próprio gerador — que
+# foi exatamente o que aconteceu.
+src/app/core/contract.g.ts
+
+# Fixtures gerados por packages/scheduler/tool/dump_fixtures.dart.
+src/app/core/fsrs-fixtures.json
+
+dist/
+node_modules/
