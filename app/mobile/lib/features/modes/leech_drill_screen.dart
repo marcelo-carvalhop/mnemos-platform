@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers_modes.dart';
 import '../../theme/tokens.dart';
+import '../../theme/typography.dart';
 import 'counts_badge.dart';
 
 /// Screen `29 Só os que erro muito` — §5.9.
@@ -26,7 +27,6 @@ class _LeechDrillScreenState extends ConsumerState<LeechDrillScreen> {
     final leeches = ref.watch(leechesProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Só os que erro muito')),
       body: leeches.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
@@ -38,7 +38,7 @@ class _LeechDrillScreenState extends ConsumerState<LeechDrillScreen> {
                 child: Text(
                   'Nenhum card seu voltou ao começo vezes o bastante para entrar aqui.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(height: 1.5, color: MnemosColors.muted),
+                  style: MnemosText.bodyLong,
                 ),
               ),
             );
@@ -68,32 +68,30 @@ class _LeechDrillScreenState extends ConsumerState<LeechDrillScreen> {
                         children: [
                           Text(
                             'errado ${card.lapses} vezes',
-                            style: const TextStyle(fontSize: 12, color: MnemosColors.hard),
+                            style: MnemosText.caption.copyWith(color: MnemosColors.hard),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: MnemosSpacing.lg),
                           Text(
                             card.front,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                fontSize: 22, height: 1.35, color: MnemosColors.ink),
+                            style: MnemosText.prompt,
                           ),
                           if (_revealed) ...[
-                            const SizedBox(height: 28),
+                            const SizedBox(height: MnemosSpacing.xl),
                             const SizedBox(
                               width: 40,
                               child: Divider(color: MnemosColors.hairline, thickness: 1.5),
                             ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: MnemosSpacing.xl),
                             Text(
                               card.back,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontSize: 17, height: 1.5, color: MnemosColors.muted),
+                              style: MnemosText.bodyLong,
                             ),
                           ] else ...[
-                            const SizedBox(height: 40),
+                            const SizedBox(height: MnemosSpacing.xxl),
                             const Text('Toque para revelar',
-                                style: TextStyle(fontSize: 13, color: MnemosColors.faint)),
+                                style: MnemosText.caption),
                           ],
                         ],
                       ),
@@ -141,14 +139,14 @@ class _Done extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.fitness_center_outlined, size: 40, color: MnemosColors.hard),
-            const SizedBox(height: 18),
+            const SizedBox(height: MnemosSpacing.lg),
             const Text('Treino feito',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 10),
+                style: MnemosText.sectionTitle),
+            const SizedBox(height: MnemosSpacing.md),
             const Text(
               'Seu cronograma continua igual. Estes cards voltam na hora que já iam voltar.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13, height: 1.5, color: MnemosColors.muted),
+              style: MnemosText.bodySmall,
             ),
             const SizedBox(height: 30),
             FilledButton(onPressed: onPop, child: const Text('Voltar')),

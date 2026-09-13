@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers.dart';
 import '../../providers_sync.dart';
 import '../../theme/tokens.dart';
+import '../../theme/typography.dart';
 import 'error_copy.dart';
 
 /// A fila de aprovação — §7.8.
@@ -165,7 +166,7 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
             child: Text(
               '${failure.title}\n\n${failure.detail}',
               textAlign: TextAlign.center,
-              style: const TextStyle(height: 1.5, color: MnemosColors.faint),
+              style: MnemosText.bodyLong.copyWith(color: MnemosColors.faint),
             ),
           ),
         ),
@@ -340,16 +341,25 @@ class _Card extends StatelessWidget {
     )!;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: MnemosSpacing.xl,
+        vertical: MnemosSpacing.md,
+      ),
       child: Container(
         width: double.infinity,
         constraints: const BoxConstraints(minHeight: 300),
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFBFAF6),
-          border: Border.all(color: edge, width: 1 + tint),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: interactive
+        padding: const EdgeInsets.all(MnemosSpacing.xl),
+        decoration: ShapeDecoration(
+          // O card em revisão é o objeto central da tela: raio `sheet`, o
+          // maior dos três, e superelipse como todo o resto do sistema. O
+          // marfim `#FBFAF6` era da paleta anterior e destoava do branco de
+          // todos os outros cards.
+          color: MnemosColors.raised,
+          shape: squircle(
+            MnemosRadii.sheet,
+            side: BorderSide(color: edge, width: 1 + tint),
+          ),
+          shadows: interactive
               ? [
                   BoxShadow(
                     color: MnemosColors.ink.withValues(alpha: .06),
@@ -390,7 +400,7 @@ class _Card extends StatelessWidget {
                     ],
                   ),
                 ),
-              const SizedBox(height: 12),
+              const SizedBox(height: MnemosSpacing.md),
               Text(
                 card.front,
                 textAlign: TextAlign.center,
@@ -401,14 +411,14 @@ class _Card extends StatelessWidget {
                   color: MnemosColors.ink,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: MnemosSpacing.lg),
               Center(
                 child: SizedBox(
                   width: 34,
                   child: Divider(color: MnemosColors.line, thickness: 1.4),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: MnemosSpacing.lg),
               Text(
                 card.back,
                 textAlign: TextAlign.center,
@@ -419,7 +429,7 @@ class _Card extends StatelessWidget {
                 ),
               ),
               if (card.tags.isNotEmpty) ...[
-                const SizedBox(height: 22),
+                const SizedBox(height: MnemosSpacing.xl),
                 Wrap(
                   alignment: WrapAlignment.center,
                   spacing: 6,
@@ -433,7 +443,7 @@ class _Card extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: MnemosColors.line.withValues(alpha: .5),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(MnemosRadii.card),
                         ),
                         child: Text(
                           tag,
@@ -555,7 +565,7 @@ class _Footer extends StatelessWidget {
                   onTap: busy ? null : onDiscard,
                   tooltip: 'Descartar',
                 ),
-                const SizedBox(width: 40),
+                const SizedBox(width: MnemosSpacing.xxl),
                 _Round(
                   icon: Icons.check,
                   colour: MnemosColors.faint,
@@ -565,12 +575,12 @@ class _Footer extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: MnemosSpacing.md),
             Text(
               'Arraste para os lados, ou use os botões.',
-              style: const TextStyle(fontSize: 11.5, color: MnemosColors.faint),
+              style: MnemosText.caption,
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: MnemosSpacing.md),
             TextButton(
               onPressed: busy ? null : onApproveRest,
               child: Text('Aprovar os $remaining restantes'),
@@ -587,7 +597,7 @@ class _Footer extends StatelessWidget {
                 side: const BorderSide(color: MnemosColors.line),
                 foregroundColor: MnemosColors.primary,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(MnemosRadii.control),
                 ),
               ),
               child: const Text('Voltar'),
@@ -676,7 +686,7 @@ class _AllJudged extends StatelessWidget {
               size: 34,
               color: nothingCame ? MnemosColors.primary60 : MnemosColors.faint,
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: MnemosSpacing.lg),
             Text(
               nothingCame
                   ? 'Nenhum card chegou'
@@ -685,7 +695,7 @@ class _AllJudged extends StatelessWidget {
                   : '$approved de $total aprovados',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: MnemosSpacing.sm),
             Text(
               nothingCame
                   ? 'Esta geração não produziu nada para aprovar. '
@@ -721,7 +731,7 @@ class _Loading extends StatelessWidget {
           height: 320,
           decoration: BoxDecoration(
             color: MnemosColors.line.withValues(alpha: .35),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(MnemosRadii.card),
           ),
         ),
       ),

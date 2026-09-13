@@ -8,6 +8,8 @@ import 'package:modes/modes.dart';
 import '../../providers.dart';
 import '../../providers_modes.dart';
 import '../../theme/tokens.dart';
+import '../../theme/typography.dart';
+import '../../ui/ui.dart';
 import 'counts_badge.dart';
 
 /// Screen `30 Simulado — preparar` — §5.9.
@@ -28,14 +30,18 @@ class _SimuladoSetupScreenState extends ConsumerState<SimuladoSetupScreen> {
     final decks = ref.watch(decksProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Simulado')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
+      body: SafeArea(
+        bottom: false,
+        child: ScreenBody(
+          children: [
+            const BackHeader(label: 'Modos'),
+            const SizedBox(height: MnemosSpacing.md),
+            const Text('Simulado', style: MnemosText.screenTitle),
+            const SizedBox(height: MnemosSpacing.lg),
           const CountsBadge(counts: false, expanded: true),
-          const SizedBox(height: 24),
-          const Text('Baralho', style: TextStyle(fontSize: 12, color: MnemosColors.faint)),
-          const SizedBox(height: 8),
+          const SizedBox(height: MnemosSpacing.xl),
+          const Eyebrow('baralho'),
+          const SizedBox(height: MnemosSpacing.sm),
           decks.when(
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Text('$e'),
@@ -50,7 +56,7 @@ class _SimuladoSetupScreenState extends ConsumerState<SimuladoSetupScreen> {
               onChanged: (v) => setState(() => _deckId = v),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: MnemosSpacing.xl),
           _Stepper(
             label: 'Questões',
             value: _questions,
@@ -59,7 +65,7 @@ class _SimuladoSetupScreenState extends ConsumerState<SimuladoSetupScreen> {
             step: 5,
             onChanged: (v) => setState(() => _questions = v),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: MnemosSpacing.lg),
           _Stepper(
             label: 'Minutos',
             value: _minutes,
@@ -68,7 +74,7 @@ class _SimuladoSetupScreenState extends ConsumerState<SimuladoSetupScreen> {
             step: 5,
             onChanged: (v) => setState(() => _minutes = v),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: MnemosSpacing.xxl),
           FilledButton(
             onPressed: () async {
               final paper = await ref.read(simuladoProvider).build(
@@ -87,8 +93,9 @@ class _SimuladoSetupScreenState extends ConsumerState<SimuladoSetupScreen> {
               );
             },
             child: const Text('Começar'),
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -235,7 +242,7 @@ class _SimuladoRunScreenState extends ConsumerState<SimuladoRunScreen> {
                 style: TextStyle(fontSize: 12, color: MnemosColors.faint),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: MnemosSpacing.lg),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
               child: SizedBox(
@@ -310,7 +317,7 @@ class _SimuladoMarkScreenState extends ConsumerState<SimuladoMarkScreen> {
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
           const CountsBadge(counts: false, expanded: true),
-          const SizedBox(height: 20),
+          const SizedBox(height: MnemosSpacing.lg),
           if (marked == seen.length && seen.isNotEmpty) ...[
             Text(
               '${(result.score * 100).round()}%',
@@ -322,9 +329,9 @@ class _SimuladoMarkScreenState extends ConsumerState<SimuladoMarkScreen> {
               '${result.correctCardIds.length} de ${result.answered} certas'
               '${result.unanswered.isEmpty ? "" : " · ${result.unanswered.length} não respondidas"}',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: MnemosColors.faint),
+              style: MnemosText.caption,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: MnemosSpacing.lg),
           ] else
             Padding(
               padding: const EdgeInsets.only(bottom: 16),
@@ -348,9 +355,9 @@ class _SimuladoMarkScreenState extends ConsumerState<SimuladoMarkScreen> {
                 (right ? _correct : _wrong).add(q.cardId);
               }),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: MnemosSpacing.md),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: MnemosSpacing.md),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Terminar'),
@@ -380,16 +387,16 @@ class _MarkTile extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         border: Border.all(color: MnemosColors.hairline),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(MnemosRadii.control),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(prompt, style: const TextStyle(fontSize: 15, height: 1.35)),
-          const SizedBox(height: 8),
+          const SizedBox(height: MnemosSpacing.sm),
           Text(expected,
               style: const TextStyle(fontSize: 13, height: 1.4, color: MnemosColors.muted)),
-          const SizedBox(height: 12),
+          const SizedBox(height: MnemosSpacing.md),
           Row(
             children: [
               Expanded(
@@ -401,7 +408,7 @@ class _MarkTile extends StatelessWidget {
                   onTap: () => onMark(false),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: MnemosSpacing.sm),
               Expanded(
                 child: _MarkButton(
                   label: 'Acertei',
@@ -438,14 +445,14 @@ class _MarkButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(MnemosRadii.control),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         alignment: Alignment.center,
         decoration: BoxDecoration(
           color: selected ? background : Colors.white,
           border: Border.all(color: selected ? colour : MnemosColors.hairline),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(MnemosRadii.control),
         ),
         child: Text(label,
             style: TextStyle(

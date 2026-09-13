@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/tokens.dart';
+import '../../theme/typography.dart';
 
 /// The distinction §5.9 insists must be visible.
 ///
@@ -36,24 +37,23 @@ class CountsBadge extends StatelessWidget {
         children: [
           Icon(counts ? Icons.event_available_outlined : Icons.fitness_center_outlined,
               size: expanded ? 16 : 13, color: colour),
-          const SizedBox(width: 6),
+          const SizedBox(width: MnemosSpacing.sm),
           if (!expanded)
             Text(label,
-                style: TextStyle(fontSize: 11, color: colour, fontWeight: FontWeight.w500))
+                style: MnemosText.caption.copyWith(color: colour, fontWeight: FontWeight.w500))
           else
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(label,
-                      style: TextStyle(
-                          fontSize: 12, color: colour, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
+                      style: MnemosText.caption.copyWith(color: colour, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: MnemosSpacing.xs),
                   Text(
                     counts
                         ? 'Suas respostas aqui entram no seu histórico e mudam quando cada card volta.'
                         : 'Nada aqui altera seu cronograma. É prática a mais, não revisão.',
-                    style: TextStyle(fontSize: 11, height: 1.35, color: colour),
+                    style: MnemosText.caption.copyWith(color: colour),
                   ),
                 ],
               ),

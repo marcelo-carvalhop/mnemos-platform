@@ -7,6 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers.dart';
 import '../providers_sync.dart';
 import '../theme/tokens.dart';
+import '../theme/typography.dart';
+import '../ui/ui.dart';
 
 /// Screens `04 Card frente`, `05 Card verso` and `26 Card verso corrigido`.
 ///
@@ -72,21 +74,45 @@ class _StudyScreenState extends ConsumerState<StudyScreen> {
     final card = ref.watch(cardProvider(cardId));
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('${_index + 1} / ${widget.queue.length}'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-      ),
       body: SafeArea(
         child: Column(
           children: [
-            LinearProgressIndicator(
-              value: (_index + 1) / widget.queue.length,
-              minHeight: 3,
-              backgroundColor: MnemosColors.hairline,
-              valueColor: const AlwaysStoppedAnimation(MnemosColors.primary),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                MnemosSpacing.md,
+                MnemosSpacing.sm,
+                MnemosSpacing.screen,
+                MnemosSpacing.sm,
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 22),
+                    color: MnemosColors.muted,
+                    tooltip: 'Sair da sessão',
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                  const Spacer(),
+                  // Posição, não pontuação: "3 de 12" diz onde a pessoa está.
+                  // Um placar de acertos no meio da revisão transformaria uma
+                  // ferramenta de memória numa prova.
+                  Text(
+                    '${_index + 1} de ${widget.queue.length}',
+                    style: MnemosText.mono.copyWith(color: MnemosColors.faint),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: MnemosSpacing.screen,
+              ),
+              child: MeterBar(
+                fraction: (_index + 1) / widget.queue.length,
+                height: 4,
+                semanticLabel:
+                    'Card ${_index + 1} de ${widget.queue.length}',
+              ),
             ),
             Expanded(
               child: card.when(
@@ -136,22 +162,22 @@ class _CardFace extends StatelessWidget {
             Text(
               front,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 22, height: 1.35, color: MnemosColors.ink),
+              style: MnemosText.prompt,
             ),
             if (revealed) ...[
-              const SizedBox(height: 28),
+              const SizedBox(height: MnemosSpacing.xl),
               const SizedBox(
                 width: 40,
                 child: Divider(color: MnemosColors.hairline, thickness: 1.5),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: MnemosSpacing.xl),
               Text(
                 back,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 17, height: 1.5, color: MnemosColors.muted),
               ),
             ] else ...[
-              const SizedBox(height: 40),
+              const SizedBox(height: MnemosSpacing.xxl),
               const Text('Toque para revelar',
                   style: TextStyle(fontSize: 13, color: MnemosColors.faint)),
             ],
@@ -186,7 +212,7 @@ class _GradeBar extends ConsumerWidget {
         children: [
           const Text('Como você lembrou?',
               style: TextStyle(fontSize: 13, color: MnemosColors.faint)),
-          const SizedBox(height: 12),
+          const SizedBox(height: MnemosSpacing.md),
           Row(
             children: [
               for (final grade in Grade.values) ...[
@@ -199,7 +225,7 @@ class _GradeBar extends ConsumerWidget {
                     onTap: () => onGrade(grade),
                   ),
                 ),
-                if (grade != Grade.easy) const SizedBox(width: 8),
+                if (grade != Grade.easy) const SizedBox(width: MnemosSpacing.sm),
               ],
             ],
           ),
@@ -228,18 +254,18 @@ class _GradeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(MnemosRadii.control),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
         decoration: BoxDecoration(
           color: background,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(MnemosRadii.control),
         ),
         child: Column(
           children: [
             Text(label,
                 style: TextStyle(fontSize: 13, color: colour, fontWeight: FontWeight.w500)),
-            const SizedBox(height: 4),
+            const SizedBox(height: MnemosSpacing.xs),
             Text(
               interval == null ? '—' : formatInterval(interval!),
               style: TextStyle(fontSize: 12, color: colour.withValues(alpha: .85)),
@@ -276,33 +302,58 @@ class _SessionSummary extends ConsumerWidget {
     final memory = ref.watch(accumulatedMemoryProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sessão concluída')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.landscape_outlined, size: 48, color: MnemosColors.primary),
-              const SizedBox(height: 20),
-              const Text('Um pouco mais alto',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 12),
-              // §5.11 — the summary leads with memory, never with a card count.
-              Text(
-                memory.valueOrNull?.label ?? '—',
-                style: const TextStyle(
-                    fontSize: 26, fontWeight: FontWeight.w500, color: MnemosColors.primary),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 320),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: MnemosSpacing.screen,
               ),
-              const SizedBox(height: 6),
-              const Text('de memória guardada',
-                  style: TextStyle(fontSize: 13, color: MnemosColors.faint)),
-              const SizedBox(height: 32),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Voltar'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.landscape_outlined,
+                    size: 48,
+                    color: MnemosColors.settledDeep,
+                  ),
+                  const SizedBox(height: MnemosSpacing.lg),
+                  const Eyebrow('sessão concluída'),
+                  const SizedBox(height: MnemosSpacing.sm),
+                  const Text(
+                    'Um pouco mais alto',
+                    style: MnemosText.sectionTitle,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: MnemosSpacing.xl),
+                  // §5.11 — o resumo abre pela memória, nunca por uma contagem
+                  // de cards. Lavanda porque memória acumulada é lavanda em
+                  // toda superfície; a regra está em `tokens.dart`.
+                  Numeral(
+                    memory.valueOrNull?.label ?? '—',
+                    style: MnemosText.numeralLarge
+                        .copyWith(color: MnemosColors.primaryDeep),
+                  ),
+                  const SizedBox(height: MnemosSpacing.xs),
+                  const Text(
+                    'de memória guardada',
+                    style: MnemosText.caption,
+                  ),
+                  const SizedBox(height: MnemosSpacing.xxl),
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: MnemosSpacing.xl,
+                      ),
+                    ),
+                    child: const Text('Voltar'),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

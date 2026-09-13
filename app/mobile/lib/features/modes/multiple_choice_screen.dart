@@ -5,6 +5,7 @@ import 'package:modes/modes.dart';
 import '../../providers.dart';
 import '../../providers_modes.dart';
 import '../../theme/tokens.dart';
+import '../../theme/typography.dart';
 import 'counts_badge.dart';
 
 /// Screen `28 Múltipla escolha` — §5.9.
@@ -86,7 +87,6 @@ class _MultipleChoiceScreenState extends ConsumerState<MultipleChoiceScreen> {
     // small to supply distractors cannot produce an honest question.
     if (questions.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Múltipla escolha')),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(32),
@@ -94,7 +94,7 @@ class _MultipleChoiceScreenState extends ConsumerState<MultipleChoiceScreen> {
               'Este baralho ainda é pequeno demais para montar alternativas '
               'convincentes. Crie mais alguns cards e volte.',
               textAlign: TextAlign.center,
-              style: TextStyle(height: 1.5, color: MnemosColors.muted),
+              style: MnemosText.bodyLong,
             ),
           ),
         ),
@@ -122,16 +122,16 @@ class _MultipleChoiceScreenState extends ConsumerState<MultipleChoiceScreen> {
                 children: [
                   Text(
                     question.prompt,
-                    style: const TextStyle(fontSize: 20, height: 1.35, color: MnemosColors.ink),
+                    style: MnemosText.prompt,
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: MnemosSpacing.xl),
                   for (var i = 0; i < question.options.length; i++) ...[
                     _Option(
                       text: question.options[i],
                       state: _stateOf(i, question.answerIndex),
                       onTap: () => _choose(i),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: MnemosSpacing.md),
                   ],
                 ],
               ),
@@ -182,16 +182,16 @@ class _Option extends StatelessWidget {
 
     return InkWell(
       onTap: state == _OptionState.idle ? onTap : null,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(MnemosRadii.control),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
         decoration: BoxDecoration(
           color: fill,
           border: Border.all(color: border, width: state == _OptionState.idle ? 1 : 1.5),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(MnemosRadii.control),
         ),
-        child: Text(text, style: TextStyle(fontSize: 15, height: 1.35, color: colour)),
+        child: Text(text, style: MnemosText.body.copyWith(color: colour)),
       ),
     );
   }
@@ -218,16 +218,15 @@ class _Summary extends ConsumerWidget {
               // §5.11 — memory leads, the count follows.
               Text(
                 memory.valueOrNull?.label ?? '—',
-                style: const TextStyle(
-                    fontSize: 26, fontWeight: FontWeight.w500, color: MnemosColors.primary),
+                style: MnemosText.numeralSmall.copyWith(color: MnemosColors.primaryDeep),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: MnemosSpacing.sm),
               const Text('de memória guardada',
-                  style: TextStyle(fontSize: 13, color: MnemosColors.faint)),
-              const SizedBox(height: 24),
+                  style: MnemosText.caption),
+              const SizedBox(height: MnemosSpacing.xl),
               Text('$correct de $total certas',
-                  style: const TextStyle(fontSize: 15, color: MnemosColors.muted)),
-              const SizedBox(height: 32),
+                  style: MnemosText.body.copyWith(color: MnemosColors.muted)),
+              const SizedBox(height: MnemosSpacing.xxl),
               FilledButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Voltar'),

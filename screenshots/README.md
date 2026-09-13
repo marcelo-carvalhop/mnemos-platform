@@ -7,7 +7,7 @@ mudar a interface é um comando só.
 
 | Pasta | O quê | Como | Quantas |
 |---|---|---|---|
-| [`mobile/`](mobile/) | App Flutter (`app/mobile`) | goldens do `flutter test` | 25 |
+| [`mobile/`](mobile/) | App Flutter (`app/mobile`) | goldens do `flutter test` | 29 |
 | [`web/`](web/) | Cliente web (`app/web/dist`) | Chrome headless | 11 |
 
 Nenhuma das duas precisa de emulador, dispositivo físico, Docker, backend ou
@@ -95,6 +95,14 @@ Formato: 400×880 pt a 2x → **800×1760 px**.
 | 22 | `22-dispositivo-sem-terminal.png` | `DeviceScreen`, sem terminal | 08 |
 | 23 | `23-dispositivo-conectado.png` | `DeviceScreen`, T5 pareado | 08 |
 | 24 | `24-conectar-terminal.png` | `TerminalScreen`, pareamento | — |
+| 25 | `25-estudar.png` | `StudyScreen`, pergunta | — |
+| 26 | `26-estudar-resposta.png` | `StudyScreen`, resposta revelada | — |
+| 27 | `27-outros-modos.png` | `ModesScreen` | — |
+| 28 | `28-simulado.png` | `SimuladoSetupScreen` | — |
+
+As quatro últimas vieram da `integration/v0.6-multiclient` — estudo pelo
+telefone e os modos alternativos — e receberam a camada visual do sistema nesta
+branch. Não têm artboard porque o canvas foi desenhado antes de elas existirem.
 
 As telas marcadas com "—" não têm artboard: foram desenhadas extrapolando a
 linguagem do design (serifa Literata nos títulos, sobrancelhas em JetBrains

@@ -10,6 +10,9 @@ import 'package:flashcards/features/generation/paywall_screen.dart';
 import 'package:flashcards/features/onboarding/onboarding_screen.dart';
 import 'package:flashcards/features/settings_screen.dart';
 import 'package:flashcards/features/subscription_screen.dart';
+import 'package:flashcards/features/modes/modes_screen.dart';
+import 'package:flashcards/features/modes/simulado_screen.dart';
+import 'package:flashcards/features/study_screen.dart';
 import 'package:flashcards/features/terminal_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -366,6 +369,49 @@ void main() {
   testWidgets('24 conectar terminal', (tester) async {
     await open();
     await shoot(tester, '24-conectar-terminal', const TerminalScreen(),
+        overrides: appOverrides(db: db, backend: mockBackend()));
+  });
+
+  // ---------------------------------------------------------------------------
+  // Estudo pelo telefone e os outros modos — vieram da integration/v0.6 e
+  // passaram pelo design nesta branch.
+  // ---------------------------------------------------------------------------
+
+  testWidgets('25 estudar', (tester) async {
+    await open();
+    final cards = await db.select(db.cards).get();
+    await shoot(
+      tester,
+      '25-estudar',
+      StudyScreen(queue: cards.take(7).map((c) => c.id).toList()),
+      overrides: appOverrides(db: db, backend: mockBackend()),
+    );
+  });
+
+  testWidgets('26 estudar resposta revelada', (tester) async {
+    await open();
+    final cards = await db.select(db.cards).get();
+    await shoot(
+      tester,
+      '26-estudar-resposta',
+      StudyScreen(queue: cards.take(7).map((c) => c.id).toList()),
+      overrides: appOverrides(db: db, backend: mockBackend()),
+      act: (tester) async {
+        await tester.tap(find.byType(GestureDetector).first);
+        await tester.pumpAndSettle();
+      },
+    );
+  });
+
+  testWidgets('27 outros modos', (tester) async {
+    await open();
+    await shoot(tester, '27-outros-modos', const ModesScreen(),
+        overrides: appOverrides(db: db, backend: mockBackend()));
+  });
+
+  testWidgets('28 simulado', (tester) async {
+    await open();
+    await shoot(tester, '28-simulado', const SimuladoSetupScreen(),
         overrides: appOverrides(db: db, backend: mockBackend()));
   });
 }

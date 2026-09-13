@@ -7,6 +7,8 @@ import 'package:modes/modes.dart';
 
 import '../../providers_modes.dart';
 import '../../theme/tokens.dart';
+import '../../theme/typography.dart';
+import '../../ui/ui.dart';
 import 'counts_badge.dart';
 
 /// Screen `33 Áudio` — §5.9, §11.6.
@@ -96,10 +98,26 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
     final done = _index >= steps.length;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Áudio')),
       body: SafeArea(
+        bottom: false,
         child: Column(
           children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: MnemosSpacing.screen),
+              child: BackHeader(label: 'Modos'),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(
+                MnemosSpacing.screen,
+                MnemosSpacing.md,
+                MnemosSpacing.screen,
+                MnemosSpacing.lg,
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Áudio', style: MnemosText.screenTitle),
+              ),
+            ),
             const Padding(
               padding: EdgeInsets.fromLTRB(20, 4, 20, 0),
               child: CountsBadge(counts: false, expanded: true),
@@ -123,7 +141,7 @@ class _AudioScreenState extends ConsumerState<AudioScreen> {
                                   : 'resposta',
                           style: const TextStyle(fontSize: 12, color: MnemosColors.faint),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: MnemosSpacing.md),
                         Text(
                           speaking?.text ?? 'pensando…',
                           textAlign: TextAlign.center,
