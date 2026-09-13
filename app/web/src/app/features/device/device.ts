@@ -78,9 +78,7 @@ interface Terminal {
                   <span [style.width.%]="fill(terminal)"></span>
                 </p>
               </div>
-              <p class="gap mn-mono">
-                Firmware {{ terminal.firmware || 'desconhecido' }}
-              </p>
+              <p class="gap mn-mono">Firmware {{ terminal.firmware || 'desconhecido' }}</p>
             </div>
 
             <div>

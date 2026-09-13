@@ -63,8 +63,8 @@ import { OpenGenerations } from '../create/open-generations';
           <p class="eyebrow mn-mono">Nada vencendo</p>
           <p class="figure"><span class="n">0</span><span class="unit">cards para hoje</span></p>
           <p class="prose">
-            Sua memória segue trabalhando sozinha. Voltamos a te chamar quando algo estiver
-            prestes a escapar.
+            Sua memória segue trabalhando sozinha. Voltamos a te chamar quando algo estiver prestes
+            a escapar.
           </p>
         } @else {
           <p class="eyebrow mn-mono">Comece por aqui</p>
@@ -86,16 +86,22 @@ import { OpenGenerations } from '../create/open-generations';
                cor da categoria, sempre a mesma para a mesma medida. -->
           <div>
             <p class="eyebrow mn-mono">Memória acumulada</p>
-            <p class="figure small accent"><span class="n">{{ memory() }}</span></p>
+            <p class="figure small accent">
+              <span class="n">{{ memory() }}</span>
+            </p>
           </div>
           <div class="right">
             <p class="eyebrow mn-mono">Retenção 90 d</p>
-            <p class="figure small settled"><span class="n">{{ retention() }}</span></p>
+            <p class="figure small settled">
+              <span class="n">{{ retention() }}</span>
+            </p>
           </div>
         </section>
 
         <section class="tile" aria-label="Sequência">
-          <p class="eyebrow mn-mono">Meta de hoje · {{ store.studiedToday() }} de {{ store.dailyGoal() }}</p>
+          <p class="eyebrow mn-mono">
+            Meta de hoje · {{ store.studiedToday() }} de {{ store.dailyGoal() }}
+          </p>
           <div class="week">
             @for (day of week(); track day.label) {
               <div>
@@ -223,9 +229,7 @@ export class Today {
   /** §9 — medida sobre o log de revisões, nunca sobre o que se esperava. */
   protected readonly retention = computed(() => {
     const since = Date.now() - 90 * 86_400_000;
-    const graded = this.store
-      .reviews()
-      .filter((r) => new Date(r.reviewed_at).getTime() >= since);
+    const graded = this.store.reviews().filter((r) => new Date(r.reviewed_at).getTime() >= since);
     if (graded.length === 0) return '—';
     const right = graded.filter((r) => r.grade > 1).length;
     return `${Math.round((right / graded.length) * 100)}%`;

@@ -63,10 +63,9 @@ export class Generation {
    */
   async createUpload(contentType: string): Promise<{ upload_key: string; url: string }> {
     return this.call<{ upload_key: string; url: string }>(
-      this.http.post<{ upload_key: string; url: string }>(
-        `${this.baseUrl}/v1/generation/uploads`,
-        { content_type: contentType },
-      ),
+      this.http.post<{ upload_key: string; url: string }>(`${this.baseUrl}/v1/generation/uploads`, {
+        content_type: contentType,
+      }),
     );
   }
 

@@ -31,76 +31,76 @@ import { Sync } from '../core/sync';
            tira o cromo — Fotos em tela cheia, o leitor de Books, o player da
            TV. Aqui o "X" e a régua de progresso da própria tela bastam. -->
       @if (!focus()) {
-      <nav class="rail" aria-label="Seções">
-        <a class="brand" routerLink="/hoje">
-          <span class="mark" aria-hidden="true"></span>
-          <span class="name">Mnemos</span>
-        </a>
+        <nav class="rail" aria-label="Seções">
+          <a class="brand" routerLink="/hoje">
+            <span class="mark" aria-hidden="true"></span>
+            <span class="name">Mnemos</span>
+          </a>
 
-        <ul class="sections">
-          @for (item of sections; track item.path) {
-            <li>
-              <a
-                [routerLink]="item.path"
-                routerLinkActive="on"
-                [routerLinkActiveOptions]="{ exact: false }"
-              >
-                <span>{{ item.label }}</span>
-                @if (item.path === '/hoje' && dueCount() > 0) {
-                  <span class="badge">{{ dueCount() }}</span>
-                }
-                @if (item.path === '/biblioteca' && cardCount() > 0) {
-                  <span class="count mn-mono">{{ cardCount() }}</span>
-                }
-              </a>
-            </li>
-          }
-        </ul>
+          <ul class="sections">
+            @for (item of sections; track item.path) {
+              <li>
+                <a
+                  [routerLink]="item.path"
+                  routerLinkActive="on"
+                  [routerLinkActiveOptions]="{ exact: false }"
+                >
+                  <span>{{ item.label }}</span>
+                  @if (item.path === '/hoje' && dueCount() > 0) {
+                    <span class="badge">{{ dueCount() }}</span>
+                  }
+                  @if (item.path === '/biblioteca' && cardCount() > 0) {
+                    <span class="count mn-mono">{{ cardCount() }}</span>
+                  }
+                </a>
+              </li>
+            }
+          </ul>
 
-        <a class="write" routerLink="/criar">
-          <span>Criar</span>
-          <kbd class="mn-mono">N</kbd>
-        </a>
+          <a class="write" routerLink="/criar">
+            <span>Criar</span>
+            <kbd class="mn-mono">N</kbd>
+          </a>
 
-        <div class="spacer"></div>
+          <div class="spacer"></div>
 
-        <!-- O canvas põe aqui o estado do T5. A web não tem cliente de
+          <!-- O canvas põe aqui o estado do T5. A web não tem cliente de
              terminal — só as rotas de autenticação existem no bundle — então o
              bloco mostra o que ela de fato sabe: o estado da sincronização.
              Inventar uma barra de bateria seria desenho bonito e mentira. -->
-        <div class="status">
-          <p class="eyebrow mn-mono">Sincronização</p>
-          @if (pending() > 0) {
-            <p class="line">
-              <span class="dot pending" aria-hidden="true"></span>
-              {{ pending() }} {{ pending() === 1 ? 'mudança' : 'mudanças' }} para enviar
-            </p>
-          } @else if (sync.phase() === 'offline') {
-            <!-- §5.14 — offline não é erro. O texto é deliberadamente sem drama. -->
-            <p class="line">
-              <span class="dot offline" aria-hidden="true"></span>
-              Sem conexão. Nada foi perdido.
-            </p>
-          } @else {
-            <p class="line">
-              <span class="dot ok" aria-hidden="true"></span>
-              Tudo enviado
-            </p>
-          }
-        </div>
+          <div class="status">
+            <p class="eyebrow mn-mono">Sincronização</p>
+            @if (pending() > 0) {
+              <p class="line">
+                <span class="dot pending" aria-hidden="true"></span>
+                {{ pending() }} {{ pending() === 1 ? 'mudança' : 'mudanças' }} para enviar
+              </p>
+            } @else if (sync.phase() === 'offline') {
+              <!-- §5.14 — offline não é erro. O texto é deliberadamente sem drama. -->
+              <p class="line">
+                <span class="dot offline" aria-hidden="true"></span>
+                Sem conexão. Nada foi perdido.
+              </p>
+            } @else {
+              <p class="line">
+                <span class="dot ok" aria-hidden="true"></span>
+                Tudo enviado
+              </p>
+            }
+          </div>
 
-        <!-- "exact: false" como nos demais: sem isto, a rota
+          <!-- "exact: false" como nos demais: sem isto, a rota
              "/configuracoes" deixava a barra inteira sem nenhum item marcado,
              porque o único item do rodapé não recebia a pílula. -->
-        <a
-          class="quiet"
-          routerLink="/configuracoes"
-          routerLinkActive="on"
-          [routerLinkActiveOptions]="{ exact: false }"
-          >Configurações</a
-        >
-        <button class="quiet" type="button" (click)="leave()">Sair</button>
-      </nav>
+          <a
+            class="quiet"
+            routerLink="/configuracoes"
+            routerLinkActive="on"
+            [routerLinkActiveOptions]="{ exact: false }"
+            >Configurações</a
+          >
+          <button class="quiet" type="button" (click)="leave()">Sair</button>
+        </nav>
       }
 
       <main id="conteudo" class="content">

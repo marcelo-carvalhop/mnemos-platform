@@ -22,7 +22,11 @@ import { Store, dayStart } from '../../core/store';
       <h1>Progresso</h1>
       <div class="chips" role="group" aria-label="Período">
         @for (option of windows; track option.days) {
-          <button type="button" [class.on]="window() === option.days" (click)="window.set(option.days)">
+          <button
+            type="button"
+            [class.on]="window() === option.days"
+            (click)="window.set(option.days)"
+          >
             {{ option.label }}
           </button>
         }
@@ -61,53 +65,53 @@ import { Store, dayStart } from '../../core/store';
           <h2>Revisões por dia</h2>
           <span class="eyebrow mn-mono">Últimos {{ window() }} dias</span>
         </div>
-      @if (byDay().every((d) => d.count === 0)) {
-        <p class="empty">Sem revisões neste período.</p>
-      } @else {
-        <!-- Uma linha de grade rotulada com o pico: sem referência de altura,
+        @if (byDay().every((d) => d.count === 0)) {
+          <p class="empty">Sem revisões neste período.</p>
+        } @else {
+          <!-- Uma linha de grade rotulada com o pico: sem referência de altura,
              trinta barras e duas datas não dizem se o dia mais alto foram
              oito revisões ou oitenta. Os gráficos de Saúde e de Tempo de Uso
              sempre trazem linha de base e ao menos um valor. -->
-        <div class="plot">
-          <span class="grid" aria-hidden="true"></span>
-          <span class="grid-label mn-mono" aria-hidden="true">{{ peak() }}</span>
-          <ol class="chart">
-            @for (day of byDay(); track day.iso) {
-              <li>
-                <span
-                  class="bar"
-                  [class.empty]="day.count === 0"
-                  [style.height.%]="peak() ? (day.count / peak()) * 100 : 0"
-                  [attr.title]="day.count + ' em ' + day.label"
-                ></span>
-              </li>
-            }
-          </ol>
-        </div>
-        <p class="axis mn-mono">
-          <span>{{ byDay()[0].label }}</span>
-          <span>hoje</span>
-        </p>
-      }
+          <div class="plot">
+            <span class="grid" aria-hidden="true"></span>
+            <span class="grid-label mn-mono" aria-hidden="true">{{ peak() }}</span>
+            <ol class="chart">
+              @for (day of byDay(); track day.iso) {
+                <li>
+                  <span
+                    class="bar"
+                    [class.empty]="day.count === 0"
+                    [style.height.%]="peak() ? (day.count / peak()) * 100 : 0"
+                    [attr.title]="day.count + ' em ' + day.label"
+                  ></span>
+                </li>
+              }
+            </ol>
+          </div>
+          <p class="axis mn-mono">
+            <span>{{ byDay()[0].label }}</span>
+            <span>hoje</span>
+          </p>
+        }
       </section>
 
       <section aria-label="Distribuição dos graus">
         <h2>Como você respondeu</h2>
-      @if (store.reviews().length === 0) {
-        <p class="empty">Ainda não há revisões para distribuir.</p>
-      } @else {
-        <ul class="grades">
-          @for (grade of grades; track grade) {
-            <li>
-              <span class="name">{{ labels[grade] }}</span>
-              <span class="track" aria-hidden="true">
-                <span [class]="'fill g' + grade" [style.width.%]="share(grade)"></span>
-              </span>
-              <span class="pct mn-mono">{{ share(grade) }}%</span>
-            </li>
-          }
-        </ul>
-      }
+        @if (store.reviews().length === 0) {
+          <p class="empty">Ainda não há revisões para distribuir.</p>
+        } @else {
+          <ul class="grades">
+            @for (grade of grades; track grade) {
+              <li>
+                <span class="name">{{ labels[grade] }}</span>
+                <span class="track" aria-hidden="true">
+                  <span [class]="'fill g' + grade" [style.width.%]="share(grade)"></span>
+                </span>
+                <span class="pct mn-mono">{{ share(grade) }}%</span>
+              </li>
+            }
+          </ul>
+        }
 
         <h2 class="spaced">Maturidade por baralho</h2>
         @if (store.liveDecks().length === 0) {
@@ -118,7 +122,9 @@ import { Store, dayStart } from '../../core/store';
               <li>
                 <span class="row">
                   <span>{{ deck.name }}</span>
-                  <span class="mn-mono">{{ store.matureCount(deck.id) }}/{{ store.cardsOfDeck(deck.id).length }}</span>
+                  <span class="mn-mono"
+                    >{{ store.matureCount(deck.id) }}/{{ store.cardsOfDeck(deck.id).length }}</span
+                  >
                 </span>
                 <span class="track" aria-hidden="true">
                   <span class="fill" [style.width.%]="maturityOf(deck.id)"></span>

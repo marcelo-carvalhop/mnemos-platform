@@ -148,9 +148,7 @@ export class Study implements OnDestroy {
   protected readonly correct = signal(0);
 
   /** Um índice por card da sessão, para desenhar a régua. */
-  protected readonly segments = computed(() =>
-    Array.from({ length: this.total() }, (_, i) => i),
-  );
+  protected readonly segments = computed(() => Array.from({ length: this.total() }, (_, i) => i));
 
   protected deckName(deckId: string): string {
     return this.store.liveDecks().find((d) => d.id === deckId)?.name ?? 'Sessão';

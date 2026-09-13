@@ -65,9 +65,9 @@ import { Sync } from '../../core/sync';
     <section>
       <h2>No aplicativo</h2>
       <p class="note">
-        O limite de cards novos e de revisões por dia, a hora em que o dia vira, o fuso horário e
-        o lembrete diário ficam no aplicativo. São ajustes de rotina, e a rotina acontece no
-        telefone — o navegador respeita os que você definiu lá.
+        O limite de cards novos e de revisões por dia, a hora em que o dia vira, o fuso horário e o
+        lembrete diário ficam no aplicativo. São ajustes de rotina, e a rotina acontece no telefone
+        — o navegador respeita os que você definiu lá.
       </p>
     </section>
 

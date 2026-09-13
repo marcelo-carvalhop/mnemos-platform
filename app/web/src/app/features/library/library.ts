@@ -36,11 +36,7 @@ import { Store } from '../../core/store';
       />
       <div class="chips" role="group" aria-label="Filtro">
         @for (option of filters; track option.id) {
-          <button
-            type="button"
-            [class.on]="filter() === option.id"
-            (click)="filter.set(option.id)"
-          >
+          <button type="button" [class.on]="filter() === option.id" (click)="filter.set(option.id)">
             {{ option.label }}
           </button>
         }
@@ -105,13 +101,17 @@ import { Store } from '../../core/store';
                    só "vencendo" tinha cor, o que não diz qual segmento é qual. -->
               <p class="meta">
                 @if (dueOf(deck.id) > 0) {
-                  <span class="due"><i class="dot" aria-hidden="true"></i>{{ dueOf(deck.id) }} vencendo</span>
+                  <span class="due"
+                    ><i class="dot" aria-hidden="true"></i>{{ dueOf(deck.id) }} vencendo</span
+                  >
                 }
                 <span class="mature-label"
                   ><i class="dot" aria-hidden="true"></i>{{ matureOf(deck.id) }}
                   {{ matureOf(deck.id) === 1 ? 'maduro' : 'maduros' }}</span
                 >
-                <span class="total"><i class="dot" aria-hidden="true"></i>{{ countOf(deck.id) }} total</span>
+                <span class="total"
+                  ><i class="dot" aria-hidden="true"></i>{{ countOf(deck.id) }} total</span
+                >
               </p>
             }
             <div class="actions">

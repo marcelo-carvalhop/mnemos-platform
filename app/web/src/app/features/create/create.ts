@@ -146,11 +146,7 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
             <p class="eyebrow mn-mono">Quantos cards</p>
             <div class="counts">
               @for (option of countOptions; track option) {
-                <button
-                  type="button"
-                  [class.on]="count() === option"
-                  (click)="count.set(option)"
-                >
+                <button type="button" [class.on]="count() === option" (click)="count.set(option)">
                   {{ option }}
                 </button>
               }
@@ -180,7 +176,12 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
           @if (spent()) {
             <a class="primary" routerLink="/configuracoes">Assinar para gerar</a>
           } @else {
-            <button class="primary" type="button" [disabled]="!ready() || busy()" (click)="generate()">
+            <button
+              class="primary"
+              type="button"
+              [disabled]="!ready() || busy()"
+              (click)="generate()"
+            >
               {{ busyLabel() }}
             </button>
           }
@@ -189,7 +190,9 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
                mentindo. -->
           <button class="secondary" type="button" (click)="writeByHand()">Escrever eu mesmo</button>
         </div>
-        <p class="foot">{{ ready() ? 'Nada vira card sem você aprovar, um por vez.' : missing() }}</p>
+        <p class="foot">
+          {{ ready() ? 'Nada vira card sem você aprovar, um por vez.' : missing() }}
+        </p>
       </div>
 
       <!-- A coluna da direita mostra o formato antes de gastar a geração:
@@ -272,9 +275,12 @@ export class Create {
   protected readonly source = signal<CreateSource>('topic');
   protected readonly subject = signal('');
   protected readonly material = signal('');
-  protected readonly file = signal<{ name: string; blob: File; contentType: string; size: number } | null>(
-    null,
-  );
+  protected readonly file = signal<{
+    name: string;
+    blob: File;
+    contentType: string;
+    size: number;
+  } | null>(null);
   protected readonly dragging = signal(false);
   protected readonly level = signal('intermediario');
   protected readonly count = signal(12);
@@ -303,22 +309,24 @@ export class Create {
    * "O que você quer aprender?" sobre um PDF já escolhido não faz sentido: o
    * assunto é o arquivo, e o que resta decidir é o formato.
    */
-  protected readonly heading = computed(() =>
-    ({
-      topic: 'O que você quer aprender?',
-      text: 'Cole o seu material',
-      pdf: 'Mande o seu PDF',
-      photo: 'Fotografe o seu material',
-    })[this.source()],
+  protected readonly heading = computed(
+    () =>
+      ({
+        topic: 'O que você quer aprender?',
+        text: 'Cole o seu material',
+        pdf: 'Mande o seu PDF',
+        photo: 'Fotografe o seu material',
+      })[this.source()],
   );
 
-  protected readonly hint = computed(() =>
-    ({
-      topic: 'Descreva o assunto. Quanto mais estreito o recorte, melhores os cards.',
-      text: 'Os cards saem do que está escrito aqui — o Mnemos extrai, não inventa.',
-      pdf: 'Uma apostila, um artigo, um capítulo. Os cards saem do conteúdo do arquivo.',
-      photo: 'Uma página do caderno ou do livro. Texto nítido e página plana lêem melhor.',
-    })[this.source()],
+  protected readonly hint = computed(
+    () =>
+      ({
+        topic: 'Descreva o assunto. Quanto mais estreito o recorte, melhores os cards.',
+        text: 'Os cards saem do que está escrito aqui — o Mnemos extrai, não inventa.',
+        pdf: 'Uma apostila, um artigo, um capítulo. Os cards saem do conteúdo do arquivo.',
+        photo: 'Uma página do caderno ou do livro. Texto nítido e página plana lêem melhor.',
+      })[this.source()],
   );
 
   protected readonly accept = computed(() =>
@@ -337,13 +345,14 @@ export class Create {
   });
 
   /** O que ainda falta para o botão acender — dito no lugar da frase genérica. */
-  protected readonly missing = computed(() =>
-    ({
-      topic: 'Escreva o assunto para continuar.',
-      text: 'Cole o texto para continuar.',
-      pdf: 'Escolha um PDF para continuar.',
-      photo: 'Escolha uma foto para continuar.',
-    })[this.source()],
+  protected readonly missing = computed(
+    () =>
+      ({
+        topic: 'Escreva o assunto para continuar.',
+        text: 'Cole o texto para continuar.',
+        pdf: 'Escolha um PDF para continuar.',
+        photo: 'Escolha uma foto para continuar.',
+      })[this.source()],
   );
 
   protected readonly busyLabel = computed(() => {

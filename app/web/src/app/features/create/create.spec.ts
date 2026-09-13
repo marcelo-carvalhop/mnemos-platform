@@ -167,7 +167,9 @@ describe('Create', () => {
     await build();
 
     fixture.componentInstance['source'].set('text');
-    fixture.componentInstance['material'].set('A glicólise ocorre no citosol e rende duas moléculas de ATP.');
+    fixture.componentInstance['material'].set(
+      'A glicólise ocorre no citosol e rende duas moléculas de ATP.',
+    );
     await fixture.componentInstance['generate']();
 
     expect(api.create).toHaveBeenCalledWith(
