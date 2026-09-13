@@ -9,7 +9,9 @@ import 'package:share_plus/share_plus.dart';
 
 import '../providers.dart';
 import '../providers_sync.dart';
-import '../theme.dart';
+import '../theme/tokens.dart';
+import '../theme/typography.dart';
+import '../ui/ui.dart';
 
 /// §8.4 — export and deletion.
 ///
@@ -92,20 +94,25 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Seus dados')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
-        children: [
-          const Text(
+      
+      body: SafeArea(
+        bottom: false,
+        child: ScreenBody(
+          children: [
+            BackHeader(label: 'Configurações'),
+            const SizedBox(height: MnemosSpacing.md),
+            const Text('Seus dados', style: MnemosText.screenTitle),
+            const SizedBox(height: MnemosSpacing.xl),
+          Text(
             'Exportar seus dados',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: MnemosText.itemTitle.copyWith(fontSize: 16),
           ),
           const SizedBox(height: 8),
           const Text(
             'Um arquivo JSON com seus baralhos, seus cards e todo o histórico '
             'de revisões. É o suficiente para reconstruir tudo — inclusive se '
             'você parar de pagar.',
-            style: TextStyle(fontSize: 13, height: 1.5, color: AppColors.muted),
+            style: MnemosText.bodySmall,
           ),
           const SizedBox(height: 14),
           OutlinedButton(
@@ -113,17 +120,17 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
             child: const Text('Exportar'),
           ),
           const SizedBox(height: 36),
-          const Divider(color: AppColors.hairline),
+          const Divider(color: MnemosColors.hairline),
           const SizedBox(height: 24),
-          const Text(
+          Text(
             'Apagar a conta',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+            style: MnemosText.itemTitle.copyWith(fontSize: 16),
           ),
           const SizedBox(height: 8),
           const Text(
             'Apaga os cards, o histórico e a conta, no servidor e neste '
             'aparelho. Não dá para desfazer, e não guardamos cópia.',
-            style: TextStyle(fontSize: 13, height: 1.5, color: AppColors.muted),
+            style: MnemosText.bodySmall,
           ),
           const SizedBox(height: 8),
           // Said out loud rather than discovered later: §8.1 attaches the free
@@ -133,19 +140,20 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           const Text(
             'Sua geração grátis não volta — ela é uma por aparelho, para '
             'sempre.',
-            style: TextStyle(fontSize: 12, height: 1.45, color: AppColors.faint),
+            style: TextStyle(fontSize: 12, height: 1.45, color: MnemosColors.faint),
           ),
           const SizedBox(height: 14),
           OutlinedButton(
             onPressed: _busy ? null : _delete,
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.again,
-              side: const BorderSide(color: AppColors.again),
+              foregroundColor: MnemosColors.destructive,
+              side: const BorderSide(color: MnemosColors.destructive),
             ),
             child: const Text('Apagar minha conta'),
           ),
         ],
       ),
+        ),
     );
   }
 }
@@ -203,7 +211,7 @@ class _DeleteDialogState extends State<_DeleteDialog> {
         ),
         FilledButton(
           onPressed: ready ? () => Navigator.of(context).pop(true) : null,
-          style: FilledButton.styleFrom(backgroundColor: AppColors.again),
+          style: FilledButton.styleFrom(backgroundColor: MnemosColors.destructive),
           child: const Text('Apagar'),
         ),
       ],

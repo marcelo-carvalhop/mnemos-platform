@@ -11,7 +11,9 @@ import '../device/terminal_local_store.dart';
 import '../device/terminal_protocol.dart';
 import '../providers.dart';
 import '../providers_sync.dart';
-import '../theme.dart';
+import '../theme/tokens.dart';
+import '../theme/typography.dart';
+import '../ui/ui.dart';
 
 /// Connection-only screen.
 ///
@@ -241,7 +243,7 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
       setState(() {
         _busy = false;
         _pairing = null;
-        _message = 'Conexão configurada. O conteúdo do Mnemos é definido separadamente em Sincronização.';
+        _message = 'Conexão configurada. Agora escolha os baralhos que vão para o aparelho, na tela Dispositivo.';
         _error = false;
       });
     } catch (e) {
@@ -261,16 +263,20 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
     final pairing = _pairing;
     final selected = _selectedNetwork;
     return Scaffold(
-      appBar: AppBar(title: const Text('Conexão')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 36),
-        children: [
+      body: SafeArea(
+        bottom: false,
+        child: ScreenBody(
+          children: [
+            const BackHeader(label: 'Dispositivo'),
+            const SizedBox(height: MnemosSpacing.md),
+            const Text('Conexão', style: MnemosText.screenTitle),
+            const SizedBox(height: MnemosSpacing.xl),
           if (pairing == null) ...[
             const Text('Conectar um Mnemos', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             const Text(
-              'Esta tela configura somente a conexão do dispositivo. Cards e decks são escolhidos depois, em Sincronização.',
-              style: TextStyle(height: 1.5, color: AppColors.sage),
+              'Esta tela configura somente a conexão. Depois de conectar, você escolhe os baralhos que vão para o aparelho nesta mesma tela.',
+              style: TextStyle(height: 1.5, color: MnemosColors.faint),
             ),
             const SizedBox(height: 24),
             FilledButton(onPressed: _busy ? null : _scanQr, child: const Text('Ler QR Code do Mnemos')),
@@ -301,9 +307,9 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
                   title: Text(network.ssid),
                   subtitle: Text(
                     '${network.securityLabel} · ${network.band}${network.compatibleWithCurrentTerminal ? '' : ' · incompatível'}',
-                    style: TextStyle(color: network.compatibleWithCurrentTerminal ? AppColors.sage : AppColors.terracotta),
+                    style: TextStyle(color: network.compatibleWithCurrentTerminal ? MnemosColors.faint : MnemosColors.dueText),
                   ),
-                  trailing: _ssid.text == network.ssid ? const Icon(Icons.check, color: AppColors.petrol) : null,
+                  trailing: _ssid.text == network.ssid ? const Icon(Icons.check, color: MnemosColors.primary) : null,
                   onTap: network.compatibleWithCurrentTerminal
                       ? () => setState(() {
                             _selectedNetwork = network;
@@ -369,9 +375,10 @@ class _TerminalScreenState extends ConsumerState<TerminalScreen> {
           ],
           if (_message != null) ...[
             const SizedBox(height: 18),
-            Text(_message!, style: TextStyle(color: _error ? AppColors.terracotta : AppColors.sage, height: 1.45)),
+            Text(_message!, style: TextStyle(color: _error ? MnemosColors.dueText : MnemosColors.faint, height: 1.45)),
           ],
         ],
+      ),
       ),
     );
   }

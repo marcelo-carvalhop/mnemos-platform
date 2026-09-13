@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.contract import ErrorCode
@@ -62,7 +62,7 @@ def enqueue(
     queue in Redis it is a distributed commit, and its failure mode is charging
     a user for a job that never ran.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     if source_type not in SOURCE_TYPES:
         raise ValueError(f"unknown source_type: {source_type}")
@@ -104,7 +104,7 @@ def claim_next(session: Session, *, now: datetime | None = None) -> GenerationJo
     same one, and a crash between claim and completion leaves the row visible
     again once the transaction rolls back.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     job = session.execute(
         select(GenerationJob)
@@ -140,7 +140,7 @@ def complete(
     now: datetime | None = None,
 ) -> list[PendingCard]:
     """Stages the cards and commits the quota (§7.6, §7.7, §7.8)."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     job = session.get(GenerationJob, job_id)
     if job is None:
@@ -206,7 +206,7 @@ def fail(
     job = session.get(GenerationJob, job_id)
     if job is None:
         raise JobNotFound(job_id)
-    _fail(session, job, error_code, detail, now or datetime.now(timezone.utc), refund=refund)
+    _fail(session, job, error_code, detail, now or datetime.now(UTC), refund=refund)
 
 
 def _fail(
@@ -238,6 +238,43 @@ def _fail(
 # ---------------------------------------------------------------------------
 
 
+def open_jobs(session: Session, user_id: str) -> list[tuple[GenerationJob, int]]:
+    """Every generation that still owes this user something, newest first.
+
+    Two kinds are open, and they are open for different reasons:
+
+    * still running — queued, reading, generating;
+    * ready with undecided cards — the worker is done, the human is not.
+
+    `failed` is closed: the quota was released and there is nothing to return
+    to. A `ready` job whose cards have all been judged is closed too, which is
+    why the count is a join and not a status: nothing marks a queue as emptied,
+    and adding a status for it would be a second fact that can disagree with
+    the rows.
+    """
+    pending = (
+        select(PendingCard.job_id, func.count().label("n"))
+        .where(PendingCard.user_id == user_id, PendingCard.decision.is_(None))
+        .group_by(PendingCard.job_id)
+        .subquery()
+    )
+
+    rows = session.execute(
+        select(GenerationJob, func.coalesce(pending.c.n, 0))
+        .outerjoin(pending, pending.c.job_id == GenerationJob.id)
+        .where(
+            GenerationJob.user_id == user_id,
+            or_(
+                GenerationJob.status.in_(("queued", "reading", "generating")),
+                and_(GenerationJob.status == "ready", pending.c.n > 0),
+            ),
+        )
+        .order_by(GenerationJob.created_at.desc())
+    ).all()
+
+    return [(job, count) for job, count in rows]
+
+
 def queue_for(session: Session, user_id: str, job_id: str) -> list[PendingCard]:
     return list(
         session.execute(
@@ -266,7 +303,7 @@ def decide(
     if decision not in (None, "approved", "discarded"):
         raise ValueError(f"unknown decision: {decision}")
 
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     card = session.execute(
         select(PendingCard).where(
             PendingCard.id == pending_id, PendingCard.user_id == user_id
@@ -285,7 +322,7 @@ def approve_remaining(
     session: Session, user_id: str, job_id: str, *, now: datetime | None = None
 ) -> int:
     """§5.7's "aprovar todos os restantes" — one bulk update."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     result = session.execute(
         update(PendingCard)
         .where(
@@ -313,7 +350,7 @@ def materialise(
     Called when the queue is closed. Idempotent because the card reuses the
     pending id, so re-running inserts nothing new.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     approved = session.execute(
         select(PendingCard).where(
             PendingCard.job_id == job_id,

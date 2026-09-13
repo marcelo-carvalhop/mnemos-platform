@@ -1,0 +1,245 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+/* Primeiro elemento focável da página: quem navega por teclado não deveria ter
+ * de percorrer a navegação inteira em cada tela para chegar ao conteúdo. */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 10;
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  padding: 10px 16px;
+  border-radius: 0 0 var(--mn-radius) 0;
+}
+.skip:focus {
+  left: 0;
+}
+
+.frame {
+  display: flex;
+  min-height: 100vh;
+}
+
+.rail {
+  width: 240px;
+  flex: 0 0 240px;
+  background: var(--mn-surface-sunken);
+  border-right: 1px solid var(--mn-line);
+  display: flex;
+  flex-direction: column;
+  padding: 28px 18px;
+  gap: 2px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 26px;
+  text-decoration: none;
+}
+.mark {
+  width: 10px;
+  height: 10px;
+  background: var(--mn-accent);
+  border-radius: 2px;
+}
+.name {
+  font-family: var(--mn-font-content);
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--mn-text);
+  letter-spacing: -0.01em;
+}
+
+.sections {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sections a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--mn-radius);
+  font-size: 15px;
+  color: var(--mn-text);
+  text-decoration: none;
+}
+.sections a:hover {
+  background: color-mix(in srgb, var(--mn-line) 45%, transparent);
+}
+.sections a.on {
+  background: var(--mn-accent-soft);
+  color: var(--mn-accent);
+  font-weight: 600;
+}
+
+/* Coral, não lavanda: o número ao lado de "Hoje" é o que vence, e vencimento
+ * tem uma cor só em todo o produto. */
+.badge {
+  font-size: 11.5px;
+  font-weight: 600;
+  background: var(--mn-terracotta);
+  color: var(--mn-on-terracotta);
+  border-radius: var(--mn-radius);
+  padding: 2px 8px;
+}
+
+/* Contagem neutra: quantos cards existem não é um alerta. */
+.count {
+  font-size: 11.5px;
+  color: var(--mn-text-fainter);
+}
+
+.write {
+  margin-top: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--mn-accent);
+  color: var(--mn-accent);
+  border-radius: var(--mn-radius);
+  padding: 9px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.write:hover {
+  background: var(--mn-accent-soft);
+}
+.write {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mn-gap-3);
+}
+.write kbd {
+  font-size: 11px;
+  color: var(--mn-text-fainter);
+}
+
+.spacer {
+  flex: 1;
+}
+
+/* O bloco-âncora do rodapé da barra, como o canvas o desenha. */
+.status {
+  background: var(--mn-surface-raised);
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius);
+  padding: 14px;
+  margin-bottom: 20px;
+}
+.status .eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+.status .line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 7px 0 0;
+  font-size: 13px;
+  color: var(--mn-text-muted);
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 7px;
+}
+.dot.ok {
+  background: var(--mn-sage);
+}
+.dot.pending {
+  background: var(--mn-terracotta);
+}
+.dot.offline {
+  background: var(--mn-text-fainter);
+}
+
+.quiet {
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--mn-text-muted);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  text-align: left;
+  border-radius: var(--mn-radius);
+}
+.quiet:hover {
+  background: color-mix(in srgb, var(--mn-line) 45%, transparent);
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+  padding: 44px 56px 96px;
+}
+
+/* Uma medida, e centrada. As rotas de coluna única deixavam ~1200 px CSS de
+ * largura sem uso à direita, o que lê como layout quebrado e não como respiro;
+ * as de duas colunas esticavam sem limite num monitor largo. iCloud.com e a
+ * App Store para web limitam a medida e centram, sempre. 1180 é largo o
+ * bastante para as duas colunas de Hoje e estreito o bastante para a leitura
+ * das telas de uma coluna só. */
+.content > * {
+  display: block;
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+/* Modo de foco: sem a barra, o conteúdo fica com a página inteira e a medida
+ * de leitura passa a ser a única coisa que o segura. */
+.frame.focus .content {
+  padding: var(--mn-gap-6) var(--mn-gap-5) 96px;
+}
+
+/* Abaixo de 900px a coluna vira uma barra no topo: é a mesma navegação, na
+ * posição que um toque alcança. */
+@media (max-width: 900px) {
+  .frame {
+    flex-direction: column;
+  }
+  .rail {
+    width: auto;
+    flex: none;
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-right: 0;
+    border-bottom: 1px solid var(--mn-line);
+    overflow-x: auto;
+  }
+  .brand {
+    padding: 0 8px 0 0;
+  }
+  .sections {
+    flex-direction: row;
+  }
+  .write {
+    margin-top: 0;
+  }
+  .spacer,
+  .status {
+    display: none;
+  }
+  .content {
+    padding: 24px 20px 64px;
+  }
+}

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text, update
@@ -27,7 +27,7 @@ from app.quota import service as quota
 from app.sync import service as sync
 from tests.test_sync import engine
 
-NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 DEVICE = "11111111-1111-7111-8111-111111111111"
 
 

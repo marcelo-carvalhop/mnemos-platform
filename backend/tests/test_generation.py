@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import unicodedata
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 
 import pytest
 from sqlalchemy import text
@@ -24,7 +24,7 @@ from app.quota.service import QuotaExhausted
 from app.sync import service as sync
 from tests.test_sync import SessionFactory
 
-NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 DEVICE = "11111111-1111-7111-8111-111111111111"
 
 # Built at runtime, never written as a literal. A literal decomposed string is
@@ -396,7 +396,11 @@ def test_one_account_cannot_decide_on_anothers_queue(db, user, ready_job):
     db.execute(text("INSERT INTO users (id) VALUES (:id)"), {"id": intruder})
     queue = generation.queue_for(db, user, ready_job.id)
 
-    with pytest.raises(Exception):
+    # `JobNotFound` e não `Exception`: a asserção genérica passaria também se
+    # `decide` estourasse por qualquer outro motivo — um erro de digitação no
+    # id, um schema fora de sincronia. Nomear a exceção é o que prova que a
+    # recusa veio da checagem de dono.
+    with pytest.raises(generation.JobNotFound):
         generation.decide(db, intruder, queue[0].id, "approved", now=NOW)
 
     assert generation.queue_for(db, intruder, ready_job.id) == []

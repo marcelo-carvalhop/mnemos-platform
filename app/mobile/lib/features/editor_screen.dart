@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
-import '../theme.dart';
+import '../theme/tokens.dart';
+import '../theme/typography.dart';
+import '../ui/ui.dart';
 
 /// Screen `17 Criar card`.
 ///
@@ -74,14 +76,27 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
     }
   }
 
+  /// Há trabalho na tela que um gesto de voltar apagaria.
+  bool get _dirty => _front.text.trim().isNotEmpty || _back.text.trim().isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.deckName)),
+    return PopScope(
+      canPop: !_dirty,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || !mounted) return;
+        final navigator = Navigator.of(context);
+        if (await confirmDiscard(context)) navigator.pop();
+      },
+      child: Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
+        bottom: false,
+        child: ScreenBody(
           children: [
+            BackHeader(label: widget.deckName),
+            const SizedBox(height: MnemosSpacing.md),
+            const Text('Novo card', style: MnemosText.screenTitle),
+            const SizedBox(height: MnemosSpacing.xl),
             _Field(
               label: 'Frente',
               controller: _front,
@@ -101,29 +116,41 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
             ),
             const SizedBox(height: 26),
             const Text('Como fica no aparelho',
-                style: TextStyle(fontSize: 12, color: AppColors.faint)),
+                style: MnemosText.caption),
             const SizedBox(height: 8),
             _DevicePreview(text: _front.text.isEmpty ? 'Frente do card' : _front.text),
-            const SizedBox(height: 28),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _canSave ? () => _save(another: false) : null,
-                    child: const Text('Salvar e sair'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: _canSave ? () => _save(another: true) : null,
-                    child: const Text('Salvar e criar outro'),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
+      ),
+      // Fixa no rodapé, como o artboard 04 faz com "Gerar": a ação principal
+      // de um formulário não deve depender de rolar até o fim para existir.
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            MnemosSpacing.screen,
+            MnemosSpacing.sm,
+            MnemosSpacing.screen,
+            MnemosSpacing.md,
+          ),
+          // Empilhados e não lado a lado: "Salvar e criar outro" não cabe em
+          // meia largura sem quebrar em duas linhas, e um rótulo quebrado num
+          // botão lê como defeito.
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton(
+                onPressed: _canSave ? () => _save(another: true) : null,
+                child: const Text('Salvar e criar outro'),
+              ),
+              const SizedBox(height: MnemosSpacing.sm),
+              OutlinedButton(
+                onPressed: _canSave ? () => _save(another: false) : null,
+                child: const Text('Salvar e sair'),
+              ),
+            ],
+          ),
+        ),
+      ),
       ),
     );
   }
@@ -156,12 +183,12 @@ class _Field extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: AppColors.faint)),
+            Text(label, style: MnemosText.caption),
             Text(
               '$length / $limit',
               style: TextStyle(
                 fontSize: 12,
-                color: over ? AppColors.again : AppColors.faint,
+                color: over ? MnemosColors.dueText : MnemosColors.faint,
                 fontWeight: over ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -173,19 +200,27 @@ class _Field extends StatelessWidget {
           minLines: minLines,
           maxLines: minLines + 3,
           onChanged: (_) => onChanged(),
+          // Preenchido, não um retângulo do mesmo tom do fundo com um fio de
+          // 1 px em volta. Os campos de Lembretes e Notas têm superfície
+          // própria, que funciona com brilho baixo e sem foco — aqui o campo
+          // só ganhava estado ao ser tocado, o que é tarde para dizer "digite
+          // aqui".
           decoration: InputDecoration(
             filled: true,
-            fillColor: over ? const Color(0xFFFEFBFB) : AppColors.ivory,
+            fillColor: over ? const Color(0xFFFEFBFB) : MnemosColors.raised,
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(MnemosRadii.control),
               borderSide: BorderSide(
-                color: over ? const Color(0xFFE8B4AE) : AppColors.hairline,
+                color: over ? const Color(0xFFE8B4AE) : MnemosColors.hairline,
                 width: over ? 1.6 : 1,
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: over ? AppColors.again : AppColors.navy),
+              borderRadius: BorderRadius.circular(MnemosRadii.control),
+              borderSide: BorderSide(
+                width: 2,
+                color: over ? MnemosColors.dueText : MnemosColors.primary,
+              ),
             ),
           ),
         ),
@@ -194,7 +229,7 @@ class _Field extends StatelessWidget {
           Text(
             '${length - limit} ${length - limit == 1 ? "caractere acima" : "caracteres acima"} do limite. '
             'O card precisa caber na tela do aparelho.',
-            style: const TextStyle(fontSize: 11, color: AppColors.again),
+            style: MnemosText.caption.copyWith(color: MnemosColors.dueText),
           ),
         ],
       ],
@@ -217,19 +252,20 @@ class _DevicePreview extends StatelessWidget {
       height: 130,
       alignment: Alignment.center,
       padding: const EdgeInsets.symmetric(horizontal: 22),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBFBF9),
-        border: Border.all(color: AppColors.hairline),
-        borderRadius: BorderRadius.circular(10),
+      decoration: ShapeDecoration(
+        color: MnemosColors.raised,
+        shape: squircle(10, side: BorderSide(color: MnemosColors.hairline)),
       ),
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: const TextStyle(
+        // A mesma Literata do terminal: o preview só vale se for o que o
+        // aparelho realmente desenha.
+        style: MnemosText.cardTitle.copyWith(
           fontSize: 15,
+          fontWeight: FontWeight.w400,
           height: 1.4,
-          color: Color(0xFF2A2A28),
-          fontFamily: 'serif',
+          color: MnemosColors.inkSoft,
         ),
       ),
     );

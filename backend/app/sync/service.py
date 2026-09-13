@@ -13,7 +13,7 @@ Two merge rules, chosen to match the value of the data:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Date, DateTime, select
@@ -112,7 +112,7 @@ def _epoch_ms(value: datetime) -> int:
 
 
 def _from_epoch_ms(value: int) -> datetime:
-    return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+    return datetime.fromtimestamp(value / 1000, tz=UTC)
 
 
 def _to_database(table: str, row: dict) -> dict:
@@ -336,7 +336,7 @@ def _guard_resync(session: Session, user_id: str, since_seq: int) -> None:
     if since_seq == 0:
         return  # bootstrap: nothing to resurrect
 
-    horizon = datetime.now(timezone.utc) - TOMBSTONE_RETENTION
+    horizon = datetime.now(UTC) - TOMBSTONE_RETENTION
     stale = session.execute(
         select(Deck.id)
         .where(

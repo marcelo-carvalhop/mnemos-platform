@@ -35,6 +35,25 @@ struct CardState {
     uint16_t lapses = 0;
     uint8_t lastRating = 0;
     bool illusionOfMastery = false;
+
+    // Estado FSRS v0.6. Mantido em paralelo ao estado legado durante
+    // a migração. A fonte canônica é o histórico de revisões.
+    double fsrsDifficulty = 0.0;
+    double fsrsStabilityDays = 0.0;
+
+    uint64_t fsrsDueAtMs = 0;
+    uint64_t fsrsLastReviewAtMs = 0;
+
+    uint32_t fsrsRepetitions = 0;
+    uint32_t fsrsLapses = 0;
+
+    // 1 = Learning, 2 = Review, 3 = Relearning.
+    uint8_t fsrsPhase = 1;
+
+    // -1 quando o cartão já está em Review.
+    int8_t fsrsStep = 0;
+
+    bool fsrsInitialized = false;
 };
 
 enum class Confidence : uint8_t {
@@ -63,6 +82,22 @@ enum class Rating : uint8_t {
     Good = 3,
     Easy = 4,
 };
+
+static_assert(static_cast<uint8_t>(Rating::Again) ==
+              MnemosContract::GRADE_AGAIN,
+              "Rating::Again divergiu do contrato Mnemos");
+
+static_assert(static_cast<uint8_t>(Rating::Hard) ==
+              MnemosContract::GRADE_HARD,
+              "Rating::Hard divergiu do contrato Mnemos");
+
+static_assert(static_cast<uint8_t>(Rating::Good) ==
+              MnemosContract::GRADE_GOOD,
+              "Rating::Good divergiu do contrato Mnemos");
+
+static_assert(static_cast<uint8_t>(Rating::Easy) ==
+              MnemosContract::GRADE_EASY,
+              "Rating::Easy divergiu do contrato Mnemos");
 
 enum class SessionMode : uint8_t {
     Review = 1,
@@ -102,6 +137,7 @@ struct ReviewEvent {
     String deckId;
     String cardType;
     uint32_t reviewedAt = 0;
+    uint64_t reviewedAtMs = 0;
     uint32_t responseTimeMs = 0;
     uint8_t confidence = 0;
     Outcome outcome = Outcome::Unknown;
@@ -118,6 +154,8 @@ struct ReviewEvent {
     float retrievabilityBefore = 0.0f;
     uint32_t dueBefore = 0;
     uint32_t dueAfter = 0;
+    uint64_t dueBeforeMs = 0;
+    uint64_t dueAfterMs = 0;
 };
 
 struct SessionStats {

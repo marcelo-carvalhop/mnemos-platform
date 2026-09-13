@@ -22,3 +22,10 @@ source .venv/bin/activate
 pip install -e '.[dev]'
 pytest
 ```
+
+A suíte roda contra um banco próprio, derivado de `DATABASE_URL` com o sufixo
+`_test` (`flashcards` → `flashcards_test`). Ele é criado, migrado e limpo pela
+própria suíte: não há nada a exportar antes de rodar, e `pytest` com o
+`docker compose up` ligado não toca nos dados de desenvolvimento. Se a
+derivação falhar, a suíte se recusa a rodar em vez de apagar o banco errado —
+os testes apagam linhas de propósito, e o dano só apareceria depois.

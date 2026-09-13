@@ -30,7 +30,7 @@ O terminal não mantém BLE anunciando permanentemente. A sessão BLE é explíc
 
 ### 2.3 Web
 
-`app/web/` permanece sem framework escolhido. Quando implementado, o web será um ambiente de autoria em escala, organização, administração de dispositivos e estatísticas. Não será uma segunda superfície de estudo e não deverá transformar todas as páginas em dashboards.
+`app/web/` permanece sem framework escolhido. Quando implementado, o web será um ambiente de autoria em escala, organização, administração de dispositivos, estatísticas e também de estudo. Estudar pelo navegador é uso legítimo: quem está na frente do computador deve poder responder os cards vencidos sem trocar de aparelho. A regra não proíbe uma segunda superfície de estudo — proíbe uma superfície pior. A sessão de revisão no web segue a mesma disciplina das demais (um card por vez, sem dashboards, sem widgets de engajamento) e grava no mesmo log de revisões, para que o cronograma não se divida por dispositivo.
 
 ## 3. Autoridade dos dados
 

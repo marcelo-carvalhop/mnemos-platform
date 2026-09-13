@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -27,7 +27,7 @@ DATABASE_URL = os.getenv(
 engine = create_engine(DATABASE_URL, future=True)
 SessionFactory = sessionmaker(bind=engine, expire_on_commit=False)
 
-NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 PHONE = "11111111-1111-7111-8111-111111111111"
 TABLET = "22222222-2222-7222-8222-222222222222"
 
@@ -382,7 +382,7 @@ def test_a_cursor_past_the_tombstone_horizon_forces_a_resync(db, user):
 
     # The deletion itself happened long ago in wall-clock terms: the device has
     # been offline past the retention window.
-    ancient = datetime.now(timezone.utc) - timedelta(days=120)
+    ancient = datetime.now(UTC) - timedelta(days=120)
     db.execute(
         text("UPDATE decks SET deleted_at = :t WHERE id = :i"),
         {"t": ancient, "i": deck_id},
@@ -396,7 +396,7 @@ def test_a_cursor_past_the_tombstone_horizon_forces_a_resync(db, user):
 def test_bootstrap_from_zero_is_always_allowed(db, user):
     """A fresh device is exactly the state a resync produces (§6.5)."""
     deck_id = uid()
-    ancient = datetime.now(timezone.utc) - timedelta(days=120)
+    ancient = datetime.now(UTC) - timedelta(days=120)
     service.push(db, user, "decks", [deck_row(deck_id, "b", NOW, PHONE)])
     db.execute(
         text("UPDATE decks SET deleted_at = :t WHERE id = :i"), {"t": ancient, "i": deck_id}

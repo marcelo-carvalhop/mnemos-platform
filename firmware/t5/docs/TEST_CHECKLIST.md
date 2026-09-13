@@ -1,4 +1,4 @@
-# Checklist físico — T5 v0.6.0-preview.1
+# Checklist físico — T5 v0.6.0-preview.2
 
 ## Bring-up
 

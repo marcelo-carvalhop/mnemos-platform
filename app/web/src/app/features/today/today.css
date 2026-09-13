@@ -1,0 +1,339 @@
+:host {
+  display: block;
+  max-width: 1120px;
+}
+
+/* --- cabeçalho ------------------------------------------------------------ */
+
+/* O botão alinha pela linha do título, não pelo topo da sobrancelha: a
+ * sobrancelha é um rótulo do título, e ancorar a ação nela deixa o botão
+ * flutuando acima de tudo. */
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--mn-gap-4);
+}
+.head h1 {
+  font-size: 34px;
+  margin-top: 6px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+
+.primary {
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  border-radius: var(--mn-radius);
+  padding: 11px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mn-gap-4);
+  white-space: nowrap;
+}
+.primary:hover {
+  background: var(--mn-accent-hover);
+}
+.primary kbd {
+  font-size: 11px;
+  opacity: 0.65;
+}
+
+/* --- as duas colunas ------------------------------------------------------ */
+
+/* §design — "a largura do conteúdo passa a ser usada em duas colunas". Num
+ * monitor, uma coluna única de 1120px deixa metade da tela vazia e obriga a
+ * rolar para ver o que caberia lado a lado. */
+.split {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: var(--mn-gap-4);
+  margin-top: var(--mn-gap-5);
+}
+
+/* --- bloco-âncora --------------------------------------------------------- */
+
+/* O bloco distribui o próprio conteúdo em vez de deixar um buraco no rodapé:
+ * eram 613×274 px CSS para quatro elementos curtos, com ~90 px de nada
+ * embaixo. Um card do resumo do Fitness dessa área carrega três anéis, três
+ * métricas e um chevron; se não há o que pôr, a altura que sobra tem de virar
+ * respiro entre as linhas, não vazio no pé. */
+.anchor {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  border-radius: var(--mn-radius-xl);
+  padding: var(--mn-gap-5);
+}
+.anchor .eyebrow {
+  color: var(--mn-accent-soft);
+}
+.figure {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin: 10px 0 0;
+}
+.figure .n {
+  font-family: var(--mn-font-content);
+  font-size: 64px;
+  font-weight: 600;
+  line-height: 1;
+}
+.figure .unit {
+  font-size: 17px;
+  color: var(--mn-accent-soft);
+}
+.anchor .prose {
+  margin: var(--mn-gap-4) 0 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--mn-accent-soft);
+  max-width: 46ch;
+}
+
+/* A proporção da fila entre baralhos, lida antes de qualquer legenda. */
+.split-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 22px;
+}
+.split-bar span {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--mn-surface);
+}
+.split-bar span.second {
+  background: var(--mn-accent-60);
+}
+.legend {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  color: var(--mn-accent-soft);
+}
+
+.onDark {
+  display: inline-block;
+  margin-top: var(--mn-gap-4);
+  background: var(--mn-surface);
+  color: var(--mn-accent-hover);
+  border-radius: var(--mn-radius);
+  padding: 11px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* --- ladrilhos ------------------------------------------------------------ */
+
+.stack {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--mn-gap-4);
+}
+.tile {
+  background: var(--mn-surface-raised);
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-xl);
+  padding: 22px;
+}
+.tile.pair {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mn-gap-3);
+}
+.tile .right {
+  text-align: right;
+}
+.figure.small {
+  margin-top: 6px;
+}
+.figure.small .n {
+  font-size: 30px;
+}
+.figure.small.accent .n {
+  color: var(--mn-accent-hover);
+}
+.figure.small.settled .n {
+  color: var(--mn-good);
+}
+
+.week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+  margin-top: 14px;
+}
+.week > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.week .bar {
+  height: 26px;
+  border-radius: 5px;
+  background: var(--mn-accent-soft);
+}
+.week .bar.met {
+  background: var(--mn-accent);
+}
+/* Hoje em menta: é a única meta do gráfico que ainda pode mudar. */
+.week .bar.met.today {
+  background: var(--mn-sage);
+}
+.week .mn-mono {
+  font-size: 10px;
+  color: var(--mn-text-fainter);
+  text-align: center;
+}
+
+/* --- fila e previsão ------------------------------------------------------ */
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mn-gap-3);
+}
+.section-head h2 {
+  font-size: 19px;
+}
+.section-head a {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--mn-accent-hover);
+  text-decoration: none;
+}
+
+.decks {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  border-bottom: 1px solid var(--mn-line);
+}
+.decks li {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 15px 0;
+  border-top: 1px solid var(--mn-line);
+}
+.decks .rule {
+  width: 4px;
+  height: 34px;
+  border-radius: 2px;
+  background: var(--mn-accent);
+  flex: 0 0 4px;
+}
+.decks .who {
+  flex: 1;
+  min-width: 0;
+}
+.decks .name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+.decks .meta {
+  display: block;
+  font-size: 13px;
+  color: var(--mn-text-faint);
+  margin-top: 3px;
+}
+.decks .badge {
+  background: var(--mn-terracotta);
+  color: var(--mn-on-terracotta);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: var(--mn-radius-lg);
+  white-space: nowrap;
+}
+.decks .ghost {
+  border: 1px solid var(--mn-outline);
+  border-radius: var(--mn-radius);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mn-text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.decks .ghost:hover {
+  background: var(--mn-surface-soft);
+}
+
+.forecast {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 104px;
+  margin-top: 16px;
+}
+/* Catorze colunas em vez de sete de 46 px: com `flex: 1` a régua ocupa a
+ * largura disponível e cada dia fica com a mesma fatia, que é o que faz o
+ * intervalo entre eles ser legível. */
+.forecast > div {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.forecast .bar {
+  width: 100%;
+  border-radius: 5px 5px 3px 3px;
+  background: var(--mn-accent-60);
+}
+/* O pico é a informação: é o dia que dói. */
+.forecast .bar.peak {
+  background: var(--mn-accent);
+}
+/* Dia sem vencimento: o trilho, não a barra. Um dia zerado na cor da barra
+ * lê como um dia com um card. */
+.forecast .bar.empty {
+  background: var(--mn-line-strong);
+}
+.forecast .mn-mono {
+  font-size: 10px;
+  color: var(--mn-text-fainter);
+}
+
+.prose {
+  font-size: 14px;
+  line-height: 1.55;
+}
+.prose.muted {
+  color: var(--mn-text-faint);
+  margin-top: 12px;
+}
+
+.problem {
+  margin-top: var(--mn-gap-5);
+  font-size: 13px;
+  color: var(--mn-again);
+}
+
+/* Uma coluna quando não há largura para duas. */
+@media (max-width: 900px) {
+  .split {
+    grid-template-columns: 1fr;
+  }
+}

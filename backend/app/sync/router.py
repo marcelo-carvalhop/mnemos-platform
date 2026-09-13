@@ -16,7 +16,10 @@ router = APIRouter(prefix="/v1/sync", tags=["sync"])
 
 
 class PushRequest(BaseModel):
-    table: str = Field(description="decks | cards | card_flags | user_settings | reviews | progress_resets | goal_history")
+    table: str = Field(
+        description="decks | cards | card_flags | user_settings | reviews "
+        "| progress_resets | goal_history"
+    )
     rows: list[dict[str, Any]]
     idempotency_key: str | None = Field(
         default=None,
