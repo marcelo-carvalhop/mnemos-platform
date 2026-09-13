@@ -167,6 +167,28 @@ abstract final class MnemosColors {
   ///
   /// Separado do coral de propósito. O coral ensina "tem coisa para fazer
   /// hoje"; encontrá-lo depois num botão que destrói dados desfaz a lição.
+  // -------------------------------------------------------------------------
+  // Os quatro graus de revisão
+  // -------------------------------------------------------------------------
+
+  /// Errei, difícil, bom, fácil — **sempre nesta ordem**.
+  ///
+  /// A ordem carrega significado e nunca é alfabética nem por frequência. Os
+  /// valores são exatamente os de `--mn-again/hard/good/easy` no cliente web:
+  /// a mesma decisão é o mesmo botão nas duas superfícies, e alguém que
+  /// estudou pelo navegador não deve reaprender as cores no telefone.
+  ///
+  /// Entraram com o estudo pelo telefone, que veio da `integration/v0.6`. Até
+  /// então o app não tinha tela de revisão e a paleta não precisava deles.
+  static const again = Color(0xFF9E4A2C);
+  static const againSurface = Color(0xFFF7F1EE);
+  static const hard = Color(0xFF55568A);
+  static const hardSurface = Color(0xFFEFECF7);
+  static const good = Color(0xFF4A6B5C);
+  static const goodSurface = Color(0xFFE8EFEA);
+  static const easy = Color(0xFF6E6FA0);
+  static const easySurface = Color(0xFFE1E1F3);
+
   /// A cor de um numeral é da **métrica**, não da tela.
   ///
   /// Retenção é menta ([settledDeep]), vencimento é coral escuro ([dueText]),

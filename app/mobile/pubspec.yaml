@@ -21,6 +21,10 @@ dependencies:
     path: packages/session
   authoring:
     path: packages/authoring
+  # §5.9 — the alternative study modes. Phone-only study is a first-class
+  # path, not a fallback for when the terminal is out of reach.
+  modes:
+    path: packages/modes
   api_client:
     path: packages/api_client
   progress:

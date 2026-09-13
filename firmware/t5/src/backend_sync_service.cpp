@@ -90,6 +90,336 @@ bool BackendSyncService::pushReviews() {
     return storage_.clearReviewOutbox();
 }
 
+bool BackendSyncService::pullReviews() {
+
+    uint64_t cursor =
+        storage_.reviewCursor();
+
+    // Limite defensivo: 32 páginas x 100 eventos por ciclo.
+    for (
+        uint8_t page = 0;
+        page < 32;
+        ++page
+    ) {
+        char cursorText[24];
+
+        snprintf(
+            cursorText,
+            sizeof(cursorText),
+            "%llu",
+            static_cast<unsigned long long>(
+                cursor));
+
+        const String path =
+            String(
+                "/v1/terminal/reviews?since=")
+            +
+            cursorText
+            +
+            "&limit=100";
+
+        int status = 0;
+        String body;
+
+        if (
+            !request(
+                "GET",
+                path,
+                "",
+                status,
+                body)
+        ) {
+            return false;
+        }
+
+        if (status == 410) {
+            Serial.println(
+                "[backend] review cursor expirado; "
+                "resync completo necessario");
+            return false;
+        }
+
+        if (
+            status < 200 ||
+            status >= 300
+        ) {
+            Serial.printf(
+                "[backend] review pull HTTP %d\n",
+                status);
+            return false;
+        }
+
+        SyncCodec::
+            ReviewDeltaApplyResult result;
+
+        String error;
+
+        if (
+            !SyncCodec::applyReviewDeltaV2(
+                body,
+                storage_,
+                result,
+                error)
+        ) {
+            Serial.printf(
+                "[backend] delta de reviews rejeitado: %s\n",
+                error.c_str());
+            return false;
+        }
+
+        if (result.appended > 0) {
+            // O nome histórico permanece por compatibilidade;
+            // o sinal agora significa conteúdo OU estado alterado.
+            libraryUpdated_ = true;
+
+            Serial.printf(
+                "[backend] reviews remotas=%u cursor=%llu\n",
+                static_cast<unsigned>(
+                    result.appended),
+                static_cast<unsigned long long>(
+                    result.cursor));
+        }
+
+        if (!result.hasMore) {
+            return true;
+        }
+
+        if (result.cursor <= cursor) {
+            Serial.println(
+                "[backend] cursor de reviews nao avancou");
+            return false;
+        }
+
+        cursor =
+            result.cursor;
+    }
+
+    Serial.println(
+        "[backend] limite de paginas de reviews atingido");
+
+    return false;
+}
+
+
+bool BackendSyncService::pullProgressResets() {
+
+    uint64_t cursor =
+        storage_.progressResetCursor();
+
+    for (
+        uint8_t page = 0;
+        page < 32;
+        ++page
+    ) {
+        char cursorText[24];
+
+        snprintf(
+            cursorText,
+            sizeof(cursorText),
+            "%llu",
+            static_cast<unsigned long long>(
+                cursor));
+
+        const String path =
+            String(
+                "/v1/terminal/progress-resets?since=")
+            +
+            cursorText
+            +
+            "&limit=100";
+
+        int status = 0;
+        String body;
+
+        if (
+            !request(
+                "GET",
+                path,
+                "",
+                status,
+                body)
+        ) {
+            return false;
+        }
+
+        if (status == 410) {
+            Serial.println(
+                "[backend] cursor de resets expirado");
+            return false;
+        }
+
+        if (
+            status < 200 ||
+            status >= 300
+        ) {
+            Serial.printf(
+                "[backend] progress resets HTTP %d\n",
+                status);
+            return false;
+        }
+
+        SyncCodec::
+            ProgressResetDeltaApplyResult result;
+
+        String error;
+
+        if (
+            !SyncCodec::
+                applyProgressResetDeltaV2(
+                    body,
+                    storage_,
+                    result,
+                    error)
+        ) {
+            Serial.printf(
+                "[backend] delta de resets rejeitado: %s\n",
+                error.c_str());
+            return false;
+        }
+
+        if (result.appended > 0) {
+            libraryUpdated_ = true;
+
+            Serial.printf(
+                "[backend] resets remotos=%u cursor=%llu\n",
+                static_cast<unsigned>(
+                    result.appended),
+                static_cast<unsigned long long>(
+                    result.cursor));
+        }
+
+        if (!result.hasMore) {
+            return true;
+        }
+
+        if (result.cursor <= cursor) {
+            Serial.println(
+                "[backend] cursor de resets nao avancou");
+            return false;
+        }
+
+        cursor =
+            result.cursor;
+    }
+
+    Serial.println(
+        "[backend] limite de paginas de resets atingido");
+
+    return false;
+}
+
+
+bool BackendSyncService::pullSettings() {
+
+    uint64_t cursor =
+        storage_.settingsCursor();
+
+    for (
+        uint8_t page = 0;
+        page < 32;
+        ++page
+    ) {
+        char cursorText[24];
+
+        snprintf(
+            cursorText,
+            sizeof(cursorText),
+            "%llu",
+            static_cast<unsigned long long>(
+                cursor));
+
+        const String path =
+            String(
+                "/v1/terminal/settings?since=")
+            +
+            cursorText
+            +
+            "&limit=100";
+
+        int status = 0;
+        String body;
+
+        if (
+            !request(
+                "GET",
+                path,
+                "",
+                status,
+                body)
+        ) {
+            return false;
+        }
+
+        if (status == 410) {
+            Serial.println(
+                "[backend] cursor de settings expirado");
+            return false;
+        }
+
+        if (
+            status < 200 ||
+            status >= 300
+        ) {
+            Serial.printf(
+                "[backend] settings HTTP %d\n",
+                status);
+            return false;
+        }
+
+        SyncCodec::
+            UserSettingDeltaApplyResult result;
+
+        String error;
+
+        if (
+            !SyncCodec::
+                applyUserSettingDeltaV2(
+                    body,
+                    storage_,
+                    result,
+                    error)
+        ) {
+            Serial.printf(
+                "[backend] delta de settings rejeitado: %s\n",
+                error.c_str());
+            return false;
+        }
+
+        if (result.applied > 0) {
+            // Mudança de retention exige reconstrução
+            // integral do estado derivado.
+            libraryUpdated_ = true;
+
+            Serial.printf(
+                "[backend] settings pedagogicos=%u cursor=%llu retention=%.4f\n",
+                static_cast<unsigned>(
+                    result.applied),
+                static_cast<unsigned long long>(
+                    result.cursor),
+                storage_.desiredRetention());
+        }
+
+        if (!result.hasMore) {
+            return true;
+        }
+
+        if (result.cursor <= cursor) {
+            Serial.println(
+                "[backend] cursor de settings nao avancou");
+            return false;
+        }
+
+        cursor =
+            result.cursor;
+    }
+
+    Serial.println(
+        "[backend] limite de paginas de settings atingido");
+
+    return false;
+}
+
+
 bool BackendSyncService::pullSnapshot() {
     int status = 0;
     String body;
@@ -144,14 +474,57 @@ bool BackendSyncService::reportStatus(bool synced) {
 }
 
 bool BackendSyncService::syncNow() {
-    if (!network_.connected() || network_.backendUrl().length() == 0 || network_.deviceToken().length() == 0) {
+
+    if (
+        !network_.connected() ||
+        network_.backendUrl().length() == 0 ||
+        network_.deviceToken().length() == 0
+    ) {
         return false;
     }
-    lastSyncMs_ = millis();
-    const bool reviewsOk = pushReviews();
-    const bool snapshotOk = pullSnapshot();
-    const bool synced = reviewsOk && snapshotOk;
-    const bool statusOk = reportStatus(synced);
-    Serial.printf("[backend] sync reviews=%d snapshot=%d status=%d\n", reviewsOk, snapshotOk, statusOk);
+
+    lastSyncMs_ =
+        millis();
+
+    const bool pushOk =
+        pushReviews();
+
+    const bool snapshotOk =
+        pullSnapshot();
+
+    const bool reviewsPullOk =
+        snapshotOk
+            ? pullReviews()
+            : false;
+
+    const bool resetsPullOk =
+        snapshotOk
+            ? pullProgressResets()
+            : false;
+
+    const bool settingsPullOk =
+        snapshotOk
+            ? pullSettings()
+            : false;
+
+    const bool synced =
+        pushOk &&
+        snapshotOk &&
+        reviewsPullOk &&
+        resetsPullOk &&
+        settingsPullOk;
+
+    const bool statusOk =
+        reportStatus(synced);
+
+    Serial.printf(
+        "[backend] sync push=%d snapshot=%d reviews=%d resets=%d settings=%d status=%d\n",
+        pushOk,
+        snapshotOk,
+        reviewsPullOk,
+        resetsPullOk,
+        settingsPullOk,
+        statusOk);
+
     return synced;
 }

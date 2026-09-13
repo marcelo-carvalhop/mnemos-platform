@@ -6,7 +6,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.contract import ErrorCode
@@ -236,6 +236,43 @@ def _fail(
 # ---------------------------------------------------------------------------
 # The approval queue (§7.8)
 # ---------------------------------------------------------------------------
+
+
+def open_jobs(session: Session, user_id: str) -> list[tuple[GenerationJob, int]]:
+    """Every generation that still owes this user something, newest first.
+
+    Two kinds are open, and they are open for different reasons:
+
+    * still running — queued, reading, generating;
+    * ready with undecided cards — the worker is done, the human is not.
+
+    `failed` is closed: the quota was released and there is nothing to return
+    to. A `ready` job whose cards have all been judged is closed too, which is
+    why the count is a join and not a status: nothing marks a queue as emptied,
+    and adding a status for it would be a second fact that can disagree with
+    the rows.
+    """
+    pending = (
+        select(PendingCard.job_id, func.count().label("n"))
+        .where(PendingCard.user_id == user_id, PendingCard.decision.is_(None))
+        .group_by(PendingCard.job_id)
+        .subquery()
+    )
+
+    rows = session.execute(
+        select(GenerationJob, func.coalesce(pending.c.n, 0))
+        .outerjoin(pending, pending.c.job_id == GenerationJob.id)
+        .where(
+            GenerationJob.user_id == user_id,
+            or_(
+                GenerationJob.status.in_(("queued", "reading", "generating")),
+                and_(GenerationJob.status == "ready", pending.c.n > 0),
+            ),
+        )
+        .order_by(GenerationJob.created_at.desc())
+    ).all()
+
+    return [(job, count) for job, count in rows]
 
 
 def queue_for(session: Session, user_id: str, job_id: str) -> list[PendingCard]:

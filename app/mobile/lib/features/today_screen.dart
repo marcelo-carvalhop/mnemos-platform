@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../format.dart';
+import 'package:api_client/api_client.dart' show OpenGeneration;
+
 import '../providers.dart';
 import '../providers_progress.dart';
+import '../providers_sync.dart';
 import '../providers_today.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../ui/ui.dart';
 import 'deck_detail_screen.dart';
 import 'device_screen.dart';
+import 'generation/approval_screen.dart';
+import 'generation/generating_screen.dart';
+import 'modes/modes_screen.dart';
 import 'settings_screen.dart';
 
 /// O painel do dia — artboard 01.
@@ -44,6 +50,7 @@ class TodayScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: MnemosSpacing.xl),
+        const _OpenGenerations(),
         const _DueHero(),
         const SizedBox(height: MnemosSpacing.md),
         const _StatRow(),
@@ -67,6 +74,20 @@ class TodayScreen extends ConsumerWidget {
         ),
         const SizedBox(height: MnemosSpacing.md),
         const _DeckList(),
+        const SizedBox(height: MnemosSpacing.xl),
+        // Os outros modos são um caminho lateral de propósito: a revisão
+        // agendada é o produto, e simulado, áudio e múltipla escolha são o que
+        // se faz **além** dela. Um segundo botão do mesmo peso ao lado de
+        // "Estudar" faria a pessoa escolher entre dois caminhos quando só um
+        // deles é o que o algoritmo pediu.
+        Center(
+          child: TextButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ModesScreen()),
+            ),
+            child: const Text('Outros modos de estudo'),
+          ),
+        ),
       ],
     );
   }
@@ -396,6 +417,114 @@ class _DeckList extends ConsumerWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+
+/// As gerações que o servidor ainda deve — §7.8.
+///
+/// Uma fila de aprovação abandonada não aparece em lugar nenhum depois que a
+/// pessoa sai da tela: os cards existem no servidor, nenhum virou card de
+/// verdade, e sem este aviso o único caminho de volta é lembrar que existia.
+/// Fica acima do bloco-âncora porque é a única coisa mais urgente que a fila
+/// do dia.
+class _OpenGenerations extends ConsumerWidget {
+  const _OpenGenerations();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final jobs = ref.watch(openGenerationsProvider).valueOrNull ?? const [];
+    if (jobs.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      children: [
+        for (final job in jobs) ...[
+          _OpenGenerationRow(job: job),
+          const SizedBox(height: MnemosSpacing.md),
+        ],
+      ],
+    );
+  }
+}
+
+class _OpenGenerationRow extends ConsumerWidget {
+  const _OpenGenerationRow({required this.job});
+
+  final OpenGeneration job;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Esperando resposta é um pedido; ainda rodando é um informe. O primeiro
+    // ganha o preenchimento lavanda, o segundo fica discreto — cobrar alguém
+    // por algo que o servidor ainda está fazendo seria cobrar pelo nosso
+    // tempo.
+    final waiting = job.isWaitingOnMe;
+
+    return SurfaceCard(
+      radius: MnemosRadii.card,
+      background: waiting ? MnemosColors.primary : MnemosColors.soft,
+      border: waiting ? MnemosColors.primary : MnemosColors.line,
+      padding: const EdgeInsets.symmetric(
+        horizontal: MnemosSpacing.lg,
+        vertical: MnemosSpacing.md,
+      ),
+      onTap: () async {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => waiting
+                ? ApprovalScreen(jobId: job.id, deckId: job.deckId)
+                : GeneratingScreen(jobId: job.id, deckId: job.deckId),
+          ),
+        );
+        ref
+          ..invalidate(openGenerationsProvider)
+          ..invalidate(queueProvider)
+          ..invalidate(dueByDeckProvider);
+      },
+      child: Row(
+        children: [
+          Icon(
+            waiting ? Icons.fact_check_outlined : Icons.auto_awesome_outlined,
+            size: 20,
+            color: waiting ? MnemosColors.onDark : MnemosColors.primaryDeep,
+          ),
+          const SizedBox(width: MnemosSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  waiting
+                      ? '${job.pending} ${job.pending == 1 ? 'card espera' : 'cards esperam'} sua aprovação'
+                      : 'Gerando seus cards',
+                  style: MnemosText.labelSmall.copyWith(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: waiting ? MnemosColors.onDark : MnemosColors.ink,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  // O assunto identifica a geração para quem a pediu; o nome
+                  // do baralho pode ainda nem existir.
+                  job.topic ?? job.stage,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: MnemosText.caption.copyWith(
+                    color: waiting ? MnemosColors.onPrimaryMuted : MnemosColors.faint,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            size: 20,
+            color: waiting ? MnemosColors.onPrimaryMuted : MnemosColors.fainter,
+          ),
+        ],
+      ),
     );
   }
 }

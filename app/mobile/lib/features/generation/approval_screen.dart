@@ -1,21 +1,29 @@
 import 'package:api_client/api_client.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers.dart';
 import '../../providers_sync.dart';
-import '../../providers_today.dart';
 import '../../theme/tokens.dart';
-import '../../theme/typography.dart';
-import '../../ui/ui.dart';
 import 'error_copy.dart';
 
-/// Revisar o que a IA escreveu — artboard 06.
+/// A fila de aprovação — §7.8.
 ///
-/// §7.8 — nada vira card sem uma decisão humana. O design troca a lista
-/// rolável por **um card de cada vez**: numa lista, aprovar oito é oito toques
-/// distraídos; um de cada vez obriga a ler o que se está aprovando, que é o
-/// ponto inteiro desta tela.
+/// Nada gerado vira card sem alguém dizer sim, um por vez. Isso era uma lista
+/// rolável com dois botões por linha, o que transformava a decisão mais
+/// importante do produto — "este card presta?" — num formulário. Aqui é uma
+/// pilha: um card por vez, grande, arrastável, com a próxima aparecendo atrás.
+///
+/// Três coisas que a pilha resolve e a lista não resolvia:
+///
+/// * **Atenção.** Julgar a qualidade de um card exige lê-lo. Vinte cards
+///   empilhados verticalmente convidam a apertar "aprovar restantes" sem ler
+///   nenhum, que é exatamente o comportamento que a fila existe para evitar.
+/// * **Velocidade.** Arrastar é mais rápido que mirar num botão, e a decisão
+///   é binária.
+/// * **Reversibilidade.** §5.7 torna o desfazer obrigatório. Numa pilha ele é
+///   um só, sempre no mesmo lugar, e devolve o card para o topo.
 class ApprovalScreen extends ConsumerStatefulWidget {
   const ApprovalScreen({super.key, required this.jobId, required this.deckId});
 
@@ -27,10 +35,11 @@ class ApprovalScreen extends ConsumerStatefulWidget {
 }
 
 class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
-  ApprovalQueue? _queue;
+  List<PendingCard> _cards = const [];
+  final List<({PendingCard card, String decision})> _decided = [];
   GenerationFailure? _failure;
+  bool _loading = true;
   bool _busy = false;
-  int _index = 0;
 
   @override
   void initState() {
@@ -41,117 +50,70 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
   Future<void> _load() async {
     try {
       final queue = await ref.read(generationApiProvider).queue(widget.jobId);
-      if (mounted) setState(() => _queue = queue);
+      if (!mounted) return;
+      setState(() {
+        // Já decididos ficam fora da pilha, mas contam no total: sair no meio
+        // e voltar tem de retomar de onde parou (§7.8).
+        _cards = queue.cards.where((c) => c.decision == null).toList();
+        _decided.addAll(
+          queue.cards
+              .where((c) => c.decision != null)
+              .map((c) => (card: c, decision: c.decision!)),
+        );
+        _loading = false;
+      });
     } on Object catch (e) {
-      if (mounted) setState(() => _failure = GenerationFailure.forException(e));
+      if (!mounted) return;
+      setState(() {
+        _failure = GenerationFailure.forException(e);
+        _loading = false;
+      });
     }
   }
 
-  Future<void> _decide(PendingCard card, String? decision) async {
-    // Otimista: o julgamento é de quem está lendo, e esperar uma ida ao
-    // servidor entre um card e outro faria revisar vinte parecer trabalho.
-    //
-    // O índice **não** avança. Decidir tira o card da lista de indecisos, e a
-    // lista encurtando já traz o próximo para a mesma posição; somar um em
-    // cima disso pulava um card a cada decisão — quem revisava oito via
-    // quatro, e os outros quatro saíam aprovados em massa no fim sem terem
-    // sido lidos.
+  Future<void> _decide(String decision) async {
+    if (_cards.isEmpty) return;
+    final card = _cards.first;
+
+    HapticFeedback.lightImpact();
     setState(() {
-      _queue = _replace(card.id, decision);
-      final undecided = _queue?.cards.where((c) => c.decision == null).length ?? 1;
-      _index = _index.clamp(0, undecided == 0 ? 0 : undecided - 1);
+      _cards = _cards.sublist(1);
+      _decided.add((card: card, decision: decision));
     });
+
+    // Otimista: o julgamento é do usuário, e esperar a rede entre um card e o
+    // seguinte transformaria vinte decisões em vinte esperas.
     try {
       await ref.read(generationApiProvider).decide(card.id, decision);
     } on Object {
       if (!mounted) return;
-      setState(() => _queue = _replace(card.id, card.decision));
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Não consegui salvar essa decisão. Tente de novo.')),
-      );
+      setState(() {
+        _decided.removeLast();
+        _cards = [card, ..._cards];
+      });
+      _say('Não consegui salvar essa decisão.');
     }
   }
 
-  /// Descartar, com o caminho de volta aberto.
-  ///
-  /// §7.8 — descartar é a decisão que apaga trabalho, e era a única aqui sem
-  /// nenhuma rede: um toque no botão redondo e o card sumia. Confirmar cada
-  /// descarte transformaria uma revisão de vinte cards em quarenta toques, e
-  /// por isso o desfazer vem depois do ato, não antes.
-  Future<void> _discard(PendingCard card, int position) async {
-    await _decide(card, 'discarded');
-    if (!mounted) return;
+  Future<void> _undo() async {
+    if (_decided.isEmpty) return;
+    final last = _decided.removeLast();
 
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: const Text('Card descartado.'),
-          action: SnackBarAction(
-            label: 'Desfazer',
-            onPressed: () {
-              _decide(card, null);
-              if (mounted) setState(() => _index = position);
-            },
-          ),
-        ),
-      );
-  }
+    HapticFeedback.selectionClick();
+    setState(() => _cards = [last.card, ..._cards]);
 
-  /// "Aprovar todos" com a conta na frente.
-  ///
-  /// É a única ação em massa da tela e não tem volta depois de gravada. Ela
-  /// morava num `TextButton` de canto, com o mesmo peso visual de um link.
-  Future<void> _approveRest(int remaining) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(remaining == 1
-            ? 'Aprovar o card restante?'
-            : 'Aprovar os $remaining cards restantes?'),
-        content: Text(
-          remaining == 1
-              ? 'Ele vira card sem passar pela sua leitura.'
-              : 'Eles viram cards sem passar pela sua leitura, um a um.',
-          style: MnemosText.bodySmall,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Continuar revisando'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(remaining == 1 ? 'Aprovar' : 'Aprovar os $remaining'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) await _finish(approveRest: true);
-  }
-
-  ApprovalQueue? _replace(String id, String? decision) {
-    final queue = _queue;
-    if (queue == null) return null;
-    final cards = [
-      for (final c in queue.cards)
-        if (c.id == id)
-          PendingCard(
-            id: c.id,
-            front: c.front,
-            back: c.back,
-            tags: c.tags,
-            position: c.position,
-            decision: decision,
-          )
-        else
-          c,
-    ];
-    return ApprovalQueue(
-      cards: cards,
-      decided: cards.where((c) => c.decision != null).length,
-      total: cards.length,
-    );
+    try {
+      // §5.7 — nulo é uma decisão de "des-decidir", que o servidor modela de
+      // propósito, e não um campo ausente.
+      await ref.read(generationApiProvider).decide(last.card.id, null);
+    } on Object {
+      if (!mounted) return;
+      setState(() {
+        _cards = _cards.sublist(1);
+        _decided.add(last);
+      });
+      _say('Não consegui desfazer.');
+    }
   }
 
   Future<void> _finish({required bool approveRest}) async {
@@ -161,28 +123,34 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
       if (approveRest) await api.approveRemaining(widget.jobId);
       final created = await api.close(widget.jobId);
 
-      // Os cards foram criados no servidor; é o pull que os traz para cá.
       await ref.read(syncControllerProvider.notifier).syncNow();
       ref
         ..invalidate(queueProvider)
         ..invalidate(decksProvider)
-        ..invalidate(deckMaturityProvider)
         ..invalidate(deckCardCountsProvider)
-        ..invalidate(dueByDeckProvider)
-        ..invalidate(quotaProvider);
+        ..invalidate(deckMaturityProvider)
+        ..invalidate(hasAnyCardsProvider)
+        ..invalidate(quotaProvider)
+        // A fila foi respondida: nada mais é devido, e o aviso em Hoje some.
+        ..invalidate(openGenerationsProvider);
 
       if (!mounted) return;
+      HapticFeedback.mediumImpact();
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(created == 1 ? '1 card criado' : '$created cards criados')),
-      );
+      _say(created == 1 ? '1 card criado' : '$created cards criados');
     } on Object catch (e) {
       if (!mounted) return;
       setState(() => _busy = false);
       final failure = GenerationFailure.forException(e);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('${failure.title}. ${failure.detail}')));
+      _say('${failure.title}. ${failure.detail}');
     }
+  }
+
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -190,280 +158,290 @@ class _ApprovalScreenState extends ConsumerState<ApprovalScreen> {
     final failure = _failure;
     if (failure != null) {
       return Scaffold(
-        body: SafeArea(
+        appBar: AppBar(),
+        body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(MnemosSpacing.xxl),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(failure.title, style: MnemosText.screenTitleWrapped),
-                  const SizedBox(height: MnemosSpacing.md),
-                  Text(failure.detail, style: MnemosText.bodySmall),
-                ],
-              ),
+            padding: const EdgeInsets.all(28),
+            child: Text(
+              '${failure.title}\n\n${failure.detail}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(height: 1.5, color: MnemosColors.faint),
             ),
           ),
         ),
       );
     }
 
-    final queue = _queue;
-    if (queue == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    if (_loading) return const _Loading();
 
-    final undecided = queue.cards.where((c) => c.decision == null).toList();
-    final approved = queue.cards.where((c) => c.decision == 'approved').length;
-    final discarded = queue.cards.where((c) => c.decision == 'discarded').length;
-
-    if (undecided.isEmpty) return _allDecided(queue.total);
-
-    final position = _index.clamp(0, undecided.length - 1);
-    final card = undecided[position];
+    final approved = _decided.where((d) => d.decision == 'approved').length;
+    final total = _cards.length + _decided.length;
+    final done = _decided.length;
 
     return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            MnemosSpacing.screen,
-            MnemosSpacing.sm,
-            MnemosSpacing.screen,
-            MnemosSpacing.xxl,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Havia dois `X` na tela com consequências opostas: o do topo
-              // fechava a revisão, o do rodapé apagava o card. Sobrou um, e o
-              // que apagava virou um botão que diz o que faz.
-              Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close, size: 18, color: MnemosColors.muted),
-                    label: const Text('Decidir depois'),
-                    style: TextButton.styleFrom(foregroundColor: MnemosColors.muted),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _busy ? null : () => _approveRest(undecided.length),
-                    child: const Text('Aprovar todos'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: MnemosSpacing.md),
-              _Progress(
-                total: queue.total,
-                decided: queue.decided,
-                cards: queue.cards,
-              ),
-              const SizedBox(height: MnemosSpacing.sm),
-              // Um contador só. O topo dizia "3 de 8" (o card em que você
-              // está) e o rodapé "2 de 8 decididos" — os dois verdadeiros e,
-              // um do lado do outro, incompreensíveis. Este é o número que
-              // responde "quanto falta", que é a pergunta de quem revisa.
-              //
-              // A API devolve o agregado `decided`, não a divisão entre
-              // aprovados e descartados de sessões anteriores; somar as
-              // decisões desta sessão é o que se pode afirmar sem inventar.
-              Text(
-                '${queue.decided + approved + discarded} de ${queue.total} decididos',
-                textAlign: TextAlign.center,
-                style: MnemosText.bodySmall,
-              ),
-              const SizedBox(height: MnemosSpacing.xl),
-              Expanded(child: SingleChildScrollView(child: _Card(card: card))),
-              const SizedBox(height: MnemosSpacing.lg),
-              Row(
-                children: [
-                  // Largura intrínseca e não `Expanded`: com flex 1 contra
-                  // flex 2 e nenhum piso, "Descartar" quebrava em `Descarta` /
-                  // `r` num telefone estreito. Um rótulo de botão partido no
-                  // meio da palavra lê como defeito, e esta é a tela em que a
-                  // pessoa decide o que fica e o que some.
-                  IntrinsicWidth(
-                    child: OutlinedButton(
-                      onPressed: _busy ? null : () => _discard(card, position),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: MnemosColors.muted,
-                        minimumSize: const Size(120, 58),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: MnemosSpacing.lg,
-                        ),
-                      ),
-                      child: const Text('Descartar', maxLines: 1, softWrap: false),
-                    ),
-                  ),
-                  const SizedBox(width: MnemosSpacing.md),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: _busy ? null : () => _decide(card, 'approved'),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(58),
-                      ),
-                      child: const Text('Aprovar'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: Text('$done de $total'),
+        leading: IconButton(
+          tooltip: 'Depois',
+          icon: const Icon(Icons.close),
+          // Sair no meio é permitido: as decisões estão no servidor e a fila
+          // retoma de onde parou.
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
         ),
+        actions: [
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 180),
+            opacity: _decided.isEmpty ? 0 : 1,
+            child: TextButton.icon(
+              onPressed: _decided.isEmpty || _busy ? null : _undo,
+              icon: const Icon(Icons.undo, size: 18),
+              label: const Text('Desfazer'),
+            ),
+          ),
+        ],
       ),
-    );
-  }
-
-  /// Todas as decisões tomadas: só falta gravar.
-  Widget _allDecided(int total) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(MnemosSpacing.xxl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Eyebrow('tudo decidido'),
-              const SizedBox(height: MnemosSpacing.md),
-              Text(
-                'Todos os $total cards\nforam decididos.',
-                style: MnemosText.screenTitleWrapped,
-              ),
-              const SizedBox(height: MnemosSpacing.xxl),
-              FilledButton(
-                onPressed: _busy ? null : () => _finish(approveRest: false),
-                child: Text(_busy ? 'Criando…' : 'Criar os cards'),
-              ),
-            ],
+      body: Column(
+        children: [
+          _Progress(done: done, total: total),
+          Expanded(
+            child: _cards.isEmpty
+                ? _AllJudged(approved: approved, total: total)
+                : _Stack(cards: _cards, onDecide: _decide),
           ),
-        ),
+          _Footer(
+            remaining: _cards.length,
+            approved: approved,
+            busy: _busy,
+            onApprove: _cards.isEmpty ? null : () => _decide('approved'),
+            onDiscard: _cards.isEmpty ? null : () => _decide('discarded'),
+            onApproveRest: _cards.isEmpty
+                ? null
+                : () => _finish(approveRest: true),
+            onCreate: approved == 0 || _busy
+                ? null
+                : () => _finish(approveRest: false),
+            onLeave: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// A régua de segmentos: um por card do job.
-///
-/// O total vem do job, não da página de cards que a API devolveu — ela traz
-/// só os indecisos, e desenhar a régua com eles faria a barra encolher a cada
-/// aprovação, como se o trabalho aumentasse ao ser feito.
-class _Progress extends StatelessWidget {
-  const _Progress({
-    required this.total,
-    required this.decided,
-    required this.cards,
+/// A pilha. O card do topo se arrasta; o de baixo espera, levemente menor.
+class _Stack extends StatefulWidget {
+  const _Stack({required this.cards, required this.onDecide});
+
+  final List<PendingCard> cards;
+  final ValueChanged<String> onDecide;
+
+  @override
+  State<_Stack> createState() => _StackState();
+}
+
+class _StackState extends State<_Stack> with SingleTickerProviderStateMixin {
+  double _dx = 0;
+  bool _settling = false;
+
+  /// Fração da largura a partir da qual soltar decide, em vez de voltar.
+  static const _threshold = .28;
+
+  void _onUpdate(DragUpdateDetails d) {
+    if (_settling) return;
+    setState(() => _dx += d.delta.dx);
+  }
+
+  void _onEnd(DragEndDetails d, double width) {
+    if (_settling) return;
+    final passed = _dx.abs() > width * _threshold;
+    final flung = d.velocity.pixelsPerSecond.dx.abs() > 900;
+
+    if (passed || flung) {
+      final decision = _dx > 0 ? 'approved' : 'discarded';
+      setState(() => _settling = true);
+      widget.onDecide(decision);
+      // O card sai da lista por cima; a posição volta ao centro para o
+      // próximo, sem animar de volta e sem piscar.
+      setState(() {
+        _dx = 0;
+        _settling = false;
+      });
+    } else {
+      setState(() => _dx = 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final progress = (_dx / (width * _threshold)).clamp(-1.0, 1.0);
+    final next = widget.cards.length > 1 ? widget.cards[1] : null;
+
+    return LayoutBuilder(
+      builder: (context, box) => Stack(
+        alignment: Alignment.center,
+        children: [
+          // O próximo, atrás: dá profundidade e diz que a fila continua.
+          if (next != null)
+            Transform.scale(
+              scale: .94 + .04 * progress.abs(),
+              child: Opacity(
+                opacity: .55 + .35 * progress.abs(),
+                child: _Card(card: next, interactive: false),
+              ),
+            ),
+          GestureDetector(
+            onHorizontalDragUpdate: _onUpdate,
+            onHorizontalDragEnd: (d) => _onEnd(d, width),
+            child: AnimatedContainer(
+              duration: _dx == 0
+                  ? const Duration(milliseconds: 220)
+                  : Duration.zero,
+              curve: Curves.easeOutCubic,
+              transform: Matrix4.identity()
+                ..translateByDouble(_dx, 0, 0, 1)
+                ..rotateZ(_dx / width * .18),
+              transformAlignment: Alignment.center,
+              child: _Card(
+                card: widget.cards.first,
+                interactive: true,
+                verdict: progress,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Card extends StatelessWidget {
+  const _Card({
+    required this.card,
+    required this.interactive,
+    this.verdict = 0,
   });
 
-  final int total;
-  final int decided;
-  final List<PendingCard> cards;
+  final PendingCard card;
+  final bool interactive;
+
+  /// −1 descartando, +1 aprovando, 0 parado. Tinge a borda e revela o selo.
+  final double verdict;
 
   @override
   Widget build(BuildContext context) {
-    // Decisões desta sessão, que a API ainda não devolveu num novo `decided`.
-    final approved = cards.where((c) => c.decision == 'approved').length;
-    final discarded = cards.where((c) => c.decision == 'discarded').length;
-    final done = decided + approved + discarded;
+    final approving = verdict > 0;
+    final tint = verdict.abs();
+    final edge = Color.lerp(
+      MnemosColors.line,
+      approving ? MnemosColors.faint : MnemosColors.dueText,
+      tint,
+    )!;
 
-    return Semantics(
-      container: true,
-      excludeSemantics: true,
-      label: '$done de $total cards decididos.',
-      child: SizedBox(
-        height: 4,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < total; i++) ...[
-              if (i > 0) const SizedBox(width: MnemosSpacing.xs),
-              Expanded(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: switch (i) {
-                      _ when i < done => MnemosColors.settled,
-                      _ when i == done => MnemosColors.primary,
-                      _ => MnemosColors.line,
-                    },
-                    borderRadius: BorderRadius.circular(2),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+      child: Container(
+        width: double.infinity,
+        constraints: const BoxConstraints(minHeight: 300),
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFBFAF6),
+          border: Border.all(color: edge, width: 1 + tint),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: interactive
+              ? [
+                  BoxShadow(
+                    color: MnemosColors.ink.withValues(alpha: .06),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : null,
+        ),
+        // Um card longo — pergunta grande, resposta grande, muitas etiquetas —
+        // passava da altura disponível e a coluna transbordava. Rolar é
+        // vertical e não briga com o arrasto, que é horizontal.
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // O selo fica do lado *oposto* ao arrasto. Arrastando para a
+              // direita, a metade do card que continua na tela é a esquerda —
+              // um selo na borda direita nasce fora do visor e nunca é lido, que
+              // foi exatamente o que apareceu no aparelho.
+              if (interactive)
+                SizedBox(
+                  height: 24,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _Verdict(
+                        label: 'APROVAR',
+                        colour: MnemosColors.faint,
+                        opacity: verdict > 0 ? tint : 0,
+                      ),
+                      _Verdict(
+                        label: 'DESCARTAR',
+                        colour: MnemosColors.dueText,
+                        opacity: verdict < 0 ? tint : 0,
+                      ),
+                    ],
                   ),
                 ),
+              const SizedBox(height: 12),
+              Text(
+                card.front,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 19,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500,
+                  color: MnemosColors.ink,
+                ),
               ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// O card em julgamento: frente, verso e as etiquetas propostas.
-class _Card extends StatelessWidget {
-  const _Card({required this.card});
-
-  final PendingCard card;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // As duas folhas atrás dizem, sem contar, que há mais na pilha.
-        Positioned(
-          left: 14,
-          right: 14,
-          top: 12,
-          child: Container(
-            height: 120,
-            decoration: ShapeDecoration(
-        color: MnemosColors.soft,
-        shape: squircle(MnemosRadii.sheet, side: BorderSide(color: MnemosColors.hairline)),
-      ),
-          ),
-        ),
-        Positioned(
-          left: 7,
-          right: 7,
-          top: 6,
-          child: Container(
-            height: 120,
-            decoration: ShapeDecoration(
-        color: MnemosColors.softer,
-        shape: squircle(MnemosRadii.sheet, side: BorderSide(color: MnemosColors.hairline)),
-      ),
-          ),
-        ),
-        SurfaceCard(
-          radius: MnemosRadii.sheet,
-          padding: const EdgeInsets.all(MnemosSpacing.xl),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Eyebrow('frente'),
-              const SizedBox(height: MnemosSpacing.md),
-              Text(card.front, style: MnemosText.prompt),
-              const SizedBox(height: MnemosSpacing.xl),
-              const Divider(),
-              const SizedBox(height: MnemosSpacing.lg),
-              const Eyebrow('verso'),
-              const SizedBox(height: MnemosSpacing.md),
-              Text(card.back, style: MnemosText.bodyLong),
+              const SizedBox(height: 20),
+              Center(
+                child: SizedBox(
+                  width: 34,
+                  child: Divider(color: MnemosColors.line, thickness: 1.4),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                card.back,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.5,
+                  color: MnemosColors.faint,
+                ),
+              ),
               if (card.tags.isNotEmpty) ...[
-                const SizedBox(height: MnemosSpacing.xl),
+                const SizedBox(height: 22),
                 Wrap(
-                  spacing: MnemosSpacing.sm,
-                  runSpacing: MnemosSpacing.sm,
+                  alignment: WrapAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: [
                     for (final tag in card.tags)
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: MnemosSpacing.md,
-                          vertical: 5,
+                          horizontal: 9,
+                          vertical: 4,
                         ),
-                        decoration: ShapeDecoration(
-        shape: squircle(MnemosRadii.card, side: BorderSide(color: MnemosColors.line)),
-      ),
-                        child: Text(tag.toUpperCase(), style: MnemosText.monoSmall),
+                        decoration: BoxDecoration(
+                          color: MnemosColors.line.withValues(alpha: .5),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          tag,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            color: MnemosColors.faint,
+                          ),
+                        ),
                       ),
                   ],
                 ),
@@ -471,7 +449,282 @@ class _Card extends StatelessWidget {
             ],
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _Verdict extends StatelessWidget {
+  const _Verdict({
+    required this.label,
+    required this.colour,
+    required this.opacity,
+  });
+
+  final String label;
+  final Color colour;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: opacity,
+      child: Transform.rotate(
+        // Cada selo inclina para longe da sua borda, contra a rotação do card.
+        angle: label == 'APROVAR' ? -.18 : .18,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(color: colour, width: 2),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1,
+              color: colour,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Progress extends StatelessWidget {
+  const _Progress({required this.done, required this.total});
+
+  final int done;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: total == 0 ? 0 : done / total),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOut,
+      builder: (context, value, _) => LinearProgressIndicator(
+        value: value,
+        minHeight: 3,
+        backgroundColor: MnemosColors.line,
+        valueColor: const AlwaysStoppedAnimation(MnemosColors.primary),
+      ),
+    );
+  }
+}
+
+class _Footer extends StatelessWidget {
+  const _Footer({
+    required this.remaining,
+    required this.approved,
+    required this.busy,
+    required this.onApprove,
+    required this.onDiscard,
+    required this.onApproveRest,
+    required this.onCreate,
+    required this.onLeave,
+  });
+
+  final int remaining;
+  final int approved;
+  final bool busy;
+  final VoidCallback? onApprove;
+  final VoidCallback? onDiscard;
+  final VoidCallback? onApproveRest;
+  final VoidCallback? onCreate;
+  final VoidCallback? onLeave;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: MnemosColors.line)),
+      ),
+      child: Column(
+        children: [
+          if (remaining > 0) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _Round(
+                  icon: Icons.close,
+                  colour: MnemosColors.dueText,
+                  onTap: busy ? null : onDiscard,
+                  tooltip: 'Descartar',
+                ),
+                const SizedBox(width: 40),
+                _Round(
+                  icon: Icons.check,
+                  colour: MnemosColors.faint,
+                  onTap: busy ? null : onApprove,
+                  tooltip: 'Aprovar',
+                  filled: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Arraste para os lados, ou use os botões.',
+              style: const TextStyle(fontSize: 11.5, color: MnemosColors.faint),
+            ),
+            const SizedBox(height: 14),
+            TextButton(
+              onPressed: busy ? null : onApproveRest,
+              child: Text('Aprovar os $remaining restantes'),
+            ),
+          ]
+          // Sem nada aprovado não há o que criar, e um botão morto deixava a
+          // tela sem saída nenhuma: aprovar, descartar e criar desabilitados
+          // ao mesmo tempo. Sair é a ação honesta, e ela funciona.
+          else if (approved == 0)
+            OutlinedButton(
+              onPressed: busy ? null : onLeave,
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                side: const BorderSide(color: MnemosColors.line),
+                foregroundColor: MnemosColors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: const Text('Voltar'),
+            )
+          else
+            FilledButton(
+              onPressed: onCreate,
+              child: Text(
+                'Criar $approved ${approved == 1 ? "card" : "cards"}',
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Round extends StatelessWidget {
+  const _Round({
+    required this.icon,
+    required this.colour,
+    required this.onTap,
+    required this.tooltip,
+    this.filled = false,
+  });
+
+  final IconData icon;
+  final Color colour;
+  final VoidCallback? onTap;
+  final String tooltip;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 62,
+          height: 62,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: filled && enabled ? colour : Colors.transparent,
+            border: Border.all(
+              color: enabled ? colour : MnemosColors.line,
+              width: 1.6,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 26,
+            color: filled && enabled
+                ? MnemosColors.canvas
+                : (enabled ? colour : MnemosColors.line),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AllJudged extends StatelessWidget {
+  const _AllJudged({required this.approved, required this.total});
+
+  final int approved;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    // Uma fila que chegou vazia não é uma fila terminada. `approved == total`
+    // é verdadeiro com zero e zero, e virava "Você aprovou todos" para alguém
+    // que não aprovou nada — a geração é que não produziu card algum.
+    final nothingCame = total == 0;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              nothingCame ? Icons.inbox_outlined : Icons.done_all,
+              size: 34,
+              color: nothingCame ? MnemosColors.primary60 : MnemosColors.faint,
+            ),
+            const SizedBox(height: 18),
+            Text(
+              nothingCame
+                  ? 'Nenhum card chegou'
+                  : approved == total
+                  ? 'Você aprovou todos'
+                  : '$approved de $total aprovados',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              nothingCame
+                  ? 'Esta geração não produziu nada para aprovar. '
+                        'Sua geração não foi gasta.'
+                  : 'Eles entram no baralho quando você criar.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.45,
+                color: MnemosColors.faint,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Esqueleto no lugar de um giro: a fila tem forma conhecida, e mostrá-la
+/// vazia comunica o que vem melhor que um indicador indeterminado.
+class _Loading extends StatelessWidget {
+  const _Loading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(automaticallyImplyLeading: false),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+        child: Container(
+          width: double.infinity,
+          height: 320,
+          decoration: BoxDecoration(
+            color: MnemosColors.line.withValues(alpha: .35),
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+      ),
     );
   }
 }

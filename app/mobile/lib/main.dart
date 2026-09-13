@@ -63,6 +63,9 @@ class _BootstrapState extends ConsumerState<_Bootstrap> with WidgetsBindingObser
     // in-flight sync joins it rather than starting a second.
     if (state == AppLifecycleState.resumed) {
       ref.read(syncControllerProvider.notifier).syncNow();
+      // A geração roda no servidor com ou sem este telefone olhando (§7.8), e
+      // voltar para o app é justamente quando ela costuma ter terminado.
+      ref.invalidate(openGenerationsProvider);
     }
   }
 

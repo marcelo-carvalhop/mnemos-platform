@@ -31,7 +31,10 @@ class TerminalSyncService {
     required int maxCards,
   }) async {
     final reviewResult = await _importReviews(client);
-    final bundle = await buildLibraryBundle(deckIds: deckIds, maxCards: maxCards);
+    final bundle = await buildLibraryBundle(
+      deckIds: deckIds,
+      maxCards: maxCards,
+    );
     final sent = await client.sendLibrary(bundle);
     await client.acknowledgeReviews();
     return TerminalSyncResult(
@@ -48,16 +51,18 @@ class TerminalSyncService {
 
     for (final remote in rows) {
       final reviewId = remote.id;
-      final already = await (db.select(db.reviews)..where((t) => t.id.equals(reviewId)))
-          .getSingleOrNull();
+      final already = await (db.select(
+        db.reviews,
+      )..where((t) => t.id.equals(reviewId))).getSingleOrNull();
       if (already != null) {
         skipped++;
         continue;
       }
-      final card = await (db.select(db.cards)
-            ..where((t) => t.id.equals(remote.cardId))
-            ..where((t) => t.deletedAt.isNull()))
-          .getSingleOrNull();
+      final card =
+          await (db.select(db.cards)
+                ..where((t) => t.id.equals(remote.cardId))
+                ..where((t) => t.deletedAt.isNull()))
+              .getSingleOrNull();
       if (card == null) {
         skipped++;
         continue;
@@ -66,7 +71,10 @@ class TerminalSyncService {
         await study.ingestRemoteReview(
           id: reviewId,
           cardId: remote.cardId,
-          reviewedAt: DateTime.fromMillisecondsSinceEpoch(remote.reviewedAt * 1000, isUtc: true),
+          reviewedAt: DateTime.fromMillisecondsSinceEpoch(
+            remote.reviewedAt * 1000,
+            isUtc: true,
+          ),
           grade: Grade.fromValue(remote.rating),
           source: ReviewSource.standard,
           fromDeviceId: client.pairing.deviceId,
@@ -80,10 +88,17 @@ class TerminalSyncService {
     return (imported, skipped);
   }
 
-  Future<(int, int)> importReviewBatchJson(String raw, {required String deviceId}) async {
+  Future<(int, int)> importReviewBatchJson(
+    String raw, {
+    required String deviceId,
+  }) async {
     if (raw.trim().isEmpty) return (0, 0);
     final decoded = jsonDecode(raw);
-    if (decoded is! Map || decoded['schema'] != 'mnemos.review-batch/v1') {
+    if (decoded is! Map ||
+        !const {
+          'mnemos.review-batch/v1',
+          'mnemos.review-batch/v2',
+        }.contains(decoded['schema'])) {
       throw const FormatException('Lote de revisões Bluetooth incompatível.');
     }
     final values = decoded['reviews'];
@@ -98,16 +113,18 @@ class TerminalSyncService {
       }
       final json = Map<String, Object?>.from(value);
       final remote = TerminalReview.fromJson(json);
-      final already = await (db.select(db.reviews)..where((t) => t.id.equals(remote.id)))
-          .getSingleOrNull();
+      final already = await (db.select(
+        db.reviews,
+      )..where((t) => t.id.equals(remote.id))).getSingleOrNull();
       if (already != null) {
         skipped++;
         continue;
       }
-      final card = await (db.select(db.cards)
-            ..where((t) => t.id.equals(remote.cardId))
-            ..where((t) => t.deletedAt.isNull()))
-          .getSingleOrNull();
+      final card =
+          await (db.select(db.cards)
+                ..where((t) => t.id.equals(remote.cardId))
+                ..where((t) => t.deletedAt.isNull()))
+              .getSingleOrNull();
       if (card == null) {
         skipped++;
         continue;
@@ -116,7 +133,10 @@ class TerminalSyncService {
         await study.ingestRemoteReview(
           id: remote.id,
           cardId: remote.cardId,
-          reviewedAt: DateTime.fromMillisecondsSinceEpoch(remote.reviewedAt * 1000, isUtc: true),
+          reviewedAt: DateTime.fromMillisecondsSinceEpoch(
+            remote.reviewedAt * 1000,
+            isUtc: true,
+          ),
           grade: Grade.fromValue(remote.rating),
           source: ReviewSource.standard,
           fromDeviceId: deviceId,
@@ -136,7 +156,7 @@ class TerminalSyncService {
   }) async {
     if (deckIds.isEmpty) {
       return <String, Object?>{
-        'schema': 'mnemos.sync/v1',
+        'schema': 'mnemos.sync/v2',
         'exportedAt': DateTime.now().toUtc().toIso8601String(),
         'decks': const <Object?>[],
         'cards': const <Object?>[],
@@ -145,8 +165,9 @@ class TerminalSyncService {
     }
 
     final placeholders = List.filled(deckIds.length, '?').join(',');
-    final deckRows = await db.customSelect(
-      '''
+    final deckRows = await db
+        .customSelect(
+          '''
       SELECT id, name, description, updated_at, server_seq
       FROM decks
       WHERE deleted_at IS NULL
@@ -154,12 +175,14 @@ class TerminalSyncService {
         AND id IN ($placeholders)
       ORDER BY name COLLATE NOCASE
       ''',
-      variables: [for (final id in deckIds) Variable<String>(id)],
-      readsFrom: {db.decks},
-    ).get();
+          variables: [for (final id in deckIds) Variable<String>(id)],
+          readsFrom: {db.decks},
+        )
+        .get();
 
-    final result = await db.customSelect(
-      '''
+    final result = await db
+        .customSelect(
+          '''
       SELECT
         c.id, c.deck_id, c.front, c.back, c.tags, c.updated_at,
         c.server_seq AS card_server_seq,
@@ -176,12 +199,13 @@ class TerminalSyncService {
       ORDER BY d.name COLLATE NOCASE, c.updated_at DESC
       LIMIT ?
       ''',
-      variables: [
-        for (final id in deckIds) Variable<String>(id),
-        Variable<int>(maxCards + 1),
-      ],
-      readsFrom: {db.cards, db.decks, db.cardStates, db.cardFlags},
-    ).get();
+          variables: [
+            for (final id in deckIds) Variable<String>(id),
+            Variable<int>(maxCards + 1),
+          ],
+          readsFrom: {db.cards, db.decks, db.cardStates, db.cardFlags},
+        )
+        .get();
 
     if (result.length > maxCards) {
       throw StateError(
@@ -189,14 +213,15 @@ class TerminalSyncService {
       );
     }
 
-    String iso(int ms) => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true).toIso8601String();
+    String iso(int ms) =>
+        DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true).toIso8601String();
     int revision(int? serverSeq, int updatedAt) =>
         serverSeq ?? (updatedAt ~/ 1000).clamp(1, 0x7FFFFFFF).toInt();
 
     final decks = <String, Map<String, Object?>>{
       for (final row in deckRows)
         row.read<String>('id'): <String, Object?>{
-          'schema': 'mnemos.deck/v1',
+          'schema': 'mnemos.deck/v2',
           'id': row.read<String>('id'),
           'name': row.read<String>('name'),
           'description': row.readNullable<String>('description'),
@@ -218,14 +243,17 @@ class TerminalSyncService {
       final updatedAt = row.read<int>('updated_at');
       List<String> tags = const [];
       try {
-        tags = [for (final value in jsonDecode(row.read<String>('tags')) as List) value.toString()];
+        tags = [
+          for (final value in jsonDecode(row.read<String>('tags')) as List)
+            value.toString(),
+        ];
       } catch (_) {}
 
       cards.add(<String, Object?>{
-        'schema': 'mnemos.card/v1',
+        'schema': 'mnemos.card/v2',
         'id': row.read<String>('id'),
         'deckId': deckId,
-        'type': 'basic',
+        'type': 'open_recall',
         'content': {
           'prompt': {'format': 'plain', 'text': row.read<String>('front')},
           'answer': {'format': 'plain', 'text': row.read<String>('back')},
@@ -235,7 +263,10 @@ class TerminalSyncService {
           'language': 'pt-BR',
           'createdAt': iso(updatedAt),
           'updatedAt': iso(updatedAt),
-          'revision': revision(row.readNullable<int>('card_server_seq'), updatedAt),
+          'revision': revision(
+            row.readNullable<int>('card_server_seq'),
+            updatedAt,
+          ),
         },
       });
 
@@ -253,17 +284,19 @@ class TerminalSyncService {
         'repetitions': row.readNullable<int>('reps') ?? 0,
         'lapses': row.readNullable<int>('lapses') ?? 0,
         'lastRating': 0,
-        'revision': revision(row.readNullable<int>('card_server_seq'), updatedAt),
+        'revision': revision(
+          row.readNullable<int>('card_server_seq'),
+          updatedAt,
+        ),
       });
     }
 
     return <String, Object?>{
-      'schema': 'mnemos.sync/v1',
+      'schema': 'mnemos.sync/v2',
       'exportedAt': DateTime.now().toUtc().toIso8601String(),
       'decks': decks.values.toList(growable: false),
       'cards': cards,
       'states': states,
     };
   }
-
 }

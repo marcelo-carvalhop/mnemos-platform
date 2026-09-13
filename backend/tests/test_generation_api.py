@@ -111,6 +111,7 @@ def test_nothing_in_generation_is_reachable_without_a_token(client):
     for method, path in [
         ("post", "/v1/generation/uploads"),
         ("post", "/v1/generation/jobs"),
+        ("get", "/v1/generation/jobs"),
         ("get", "/v1/generation/jobs/whatever"),
         ("get", "/v1/generation/jobs/whatever/queue"),
         ("post", "/v1/generation/pending/whatever"),
@@ -262,6 +263,82 @@ def test_a_deck_that_is_not_yours_is_not_a_target(client, account: Account):
 
 
 # ---------------------------------------------------------------------------
+# Getting back to an abandoned queue
+# ---------------------------------------------------------------------------
+
+
+def test_an_unfinished_queue_can_be_found_again(client, account: Account):
+    """The progress screen says the work continues if you leave. This is what
+    makes that true: on the free plan the abandoned queue holds the only
+    generation the account will ever get, and a queue reachable solely from the
+    screen that launched it is lost the moment the app is backgrounded.
+    """
+    created = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "Revolução Gloriosa",
+        },
+    )
+    job_id = created.json()["id"]
+
+    # Still running: open, with nothing to decide yet.
+    running = client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"]
+    assert [j["id"] for j in running] == [job_id]
+    assert running[0]["pending"] == 0
+
+    finish(job_id, sample_cards(3))
+
+    waiting = client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"]
+    assert waiting[0]["pending"] == 3
+    # The deck is how the app knows where to send the person back to.
+    assert waiting[0]["target_deck_id"] == account.deck_id
+    assert waiting[0]["topic"] == "Revolução Gloriosa"
+
+    client.post(f"/v1/generation/jobs/{job_id}/approve-all", headers=account.headers)
+
+    # Nothing is owed any more. Note that `close` never changes the status —
+    # the count is what closes the job, which is why this is a join.
+    assert client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"] == []
+
+
+def test_an_open_queue_belongs_to_one_account(client, account: Account):
+    client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "Revolução Gloriosa",
+        },
+    )
+    other = make_account()
+    assert client.get("/v1/generation/jobs", headers=other.headers).json()["jobs"] == []
+
+
+def test_a_failed_generation_is_not_something_to_come_back_to(client, account: Account):
+    """The quota was released and there is no queue. Listing it would send
+    someone back to a screen with nothing on it.
+    """
+    created = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "Revolução Gloriosa",
+        },
+    )
+    with SessionLocal() as session:
+        generation.fail(session, created.json()["id"], "topic_too_vague")
+        session.commit()
+
+    assert client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"] == []
+
+
+# ---------------------------------------------------------------------------
 # Refusals the client branches on
 # ---------------------------------------------------------------------------
 
@@ -375,3 +452,80 @@ def _drain_queue():
             .values(status="failed", error_code="test_teardown")
         )
         session.commit()
+
+
+# ---------------------------------------------------------------------------
+# Valores que ninguém desenhou
+# ---------------------------------------------------------------------------
+
+
+def test_a_whitespace_only_topic_is_not_a_topic(client, account: Account):
+    """`if not body.topic` deixa passar "   ": espaço em branco é truthy.
+
+    Um tópico em branco chega ao modelo como um pedido sem assunto, gasta a
+    geração da conta e volta com cards sobre nada.
+    """
+    response = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={"source_type": "topic", "target_deck_id": account.deck_id, "topic": "   \n  "},
+    )
+    assert response.status_code == 422
+    assert client.get("/v1/quota/", headers=account.headers).json()["remaining"] == 1
+
+
+def test_an_enormous_topic_is_refused_before_it_costs_anything(client, account: Account):
+    """Sem limite, o corpo da requisição vira o prompt. O custo de uma geração
+    é medido por token (§7.7), então um tópico sem teto é uma conta em aberto.
+    """
+    response = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "a" * 50_000,
+        },
+    )
+    assert response.status_code == 422
+    assert client.get("/v1/quota/", headers=account.headers).json()["remaining"] == 1
+
+
+def test_a_deck_id_that_is_not_an_id_is_refused(client, account: Account):
+    response = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={"source_type": "topic", "target_deck_id": "", "topic": "Bayes"},
+    )
+    assert response.status_code in (404, 422)
+    assert client.get("/v1/quota/", headers=account.headers).json()["remaining"] == 1
+
+
+def test_requested_count_stays_inside_its_bounds(client, account: Account):
+    for count in (0, 51, -3):
+        response = client.post(
+            "/v1/generation/jobs",
+            headers=account.headers,
+            json={
+                "source_type": "topic",
+                "target_deck_id": account.deck_id,
+                "topic": "Bayes",
+                "requested_count": count,
+            },
+        )
+        assert response.status_code == 422, count
+    assert client.get("/v1/quota/", headers=account.headers).json()["remaining"] == 1
+
+
+def test_a_ready_job_with_no_cards_is_not_owed_to_anyone(client, account: Account):
+    """O modelo pode terminar sem produzir card algum. Não há fila para voltar,
+    e listar isso mandaria a pessoa para uma tela vazia.
+    """
+    created = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={"source_type": "topic", "target_deck_id": account.deck_id, "topic": "Bayes"},
+    )
+    finish(created.json()["id"], [])
+
+    assert client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"] == []

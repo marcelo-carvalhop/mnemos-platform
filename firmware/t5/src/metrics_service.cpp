@@ -107,30 +107,71 @@ String MetricsService::buildJson() const {
         }
     }
 
-    uint16_t maturityNew = 0, maturityLearning = 0, maturityYoung = 0, maturityMature = 0;
+    uint16_t maturityNew = 0;
+    uint16_t maturityLearning = 0;
+    uint16_t maturityYoung = 0;
+    uint16_t maturityMature = 0;
+
     uint16_t difficultyBins[10] = {0};
     uint16_t forecast[30] = {0};
+
+    const uint64_t nowMs =
+        static_cast<uint64_t>(nowEpoch) * 1000ULL;
+
     for (size_t i = 0; i < cardCount_; ++i) {
         const CardState& state = states_[i];
-        if (state.lastReviewedAt == 0) ++maturityNew;
-        else if (state.stabilityDays < 1.0f) ++maturityLearning;
-        else if (state.stabilityDays < 21.0f) ++maturityYoung;
-        else ++maturityMature;
 
-        int bin = static_cast<int>(state.difficulty) - 1;
-        bin = std::max(0, std::min(9, bin));
+        if (!state.fsrsInitialized) {
+            ++maturityNew;
+        } else if (state.fsrsPhase != 2U) {
+            ++maturityLearning;
+        } else if (
+            state.fsrsStabilityDays <
+            static_cast<double>(
+                MnemosContract::MATURE_INTERVAL_DAYS)
+        ) {
+            ++maturityYoung;
+        } else {
+            ++maturityMature;
+        }
+
+        const double metricDifficulty =
+            state.fsrsInitialized
+                ? state.fsrsDifficulty
+                : 5.0;
+
+        int bin =
+            static_cast<int>(
+                metricDifficulty) - 1;
+
+        bin =
+            std::max(
+                0,
+                std::min(9, bin));
+
         ++difficultyBins[bin];
 
-        if (state.dueAt >= nowEpoch) {
-            const uint32_t day = (state.dueAt - nowEpoch) / 86400U;
-            if (day < 30) ++forecast[day];
+        if (
+            state.fsrsInitialized &&
+            state.fsrsDueAtMs >= nowMs
+        ) {
+            const uint64_t diffMs =
+                state.fsrsDueAtMs - nowMs;
+
+            const uint32_t day =
+                static_cast<uint32_t>(
+                    diffMs / 86400000ULL);
+
+            if (day < 30U) {
+                ++forecast[day];
+            }
         }
     }
 
     JsonDocument doc;
     doc["schema"] = "mnemos.metrics/v1";
     doc["generatedAt"] = nowEpoch;
-    doc["retentionTarget"] = Config::RETENTION_TARGET;
+    doc["retentionTarget"] = MnemosContract::DESIRED_RETENTION;
     doc["retention30d"]["total"] = scheduledTotal30;
     doc["retention30d"]["correct"] = scheduledCorrect30;
     doc["retention30d"]["percent"] = scheduledTotal30 == 0 ? 0.0f : 100.0f * scheduledCorrect30 / scheduledTotal30;

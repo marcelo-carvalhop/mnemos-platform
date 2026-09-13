@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from enum import IntEnum, StrEnum
 
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2
 
 # §7.6 — counted in grapheme clusters over NFC-normalised text.
 FRONT_MAX_GRAPHEMES = 120
@@ -16,12 +16,24 @@ MATURE_INTERVAL_DAYS = 21
 DESIRED_RETENTION = 0.9
 GRADUATION_MILESTONE_DAYS = (180, 365,)
 
+# §4.1 — the default FSRS vector, declared here because each platform's
+# package ships a DIFFERENT default and two clients must not disagree.
+FSRS_WEIGHTS = (0.2172, 1.1771, 3.2602, 16.1507, 7.0114, 0.57, 2.0966, 0.0069, 1.5261, 0.112, 1.0178, 1.849, 0.1133, 0.3127, 2.2934, 0.2191, 3.0004, 0.7536, 0.3332, 0.1437, 0.2,)
+
 # §5.7 — the day rolls over at 04:00 local, not midnight.
 DEFAULT_DAY_CUTOFF_HOUR = 4
+LEARNING_STEPS_SECONDS = tuple([60, 600])
+RELEARNING_STEPS_SECONDS = tuple([600])
+MAXIMUM_INTERVAL_DAYS = 36500
+ENABLE_FSRS_FUZZ = False
 
 # §7.7 — one generation for the lifetime of the account, not per month.
 FREE_GENERATIONS_LIFETIME = 1
 MAX_JOBS_IN_FLIGHT = 2
+
+# §7.3 — cap on the subject, or on pasted material. Without it the request body
+# becomes the prompt, and a generation is billed by token.
+TOPIC_MAX_CHARS = 20000
 
 # §5.9 — alternative modes. Present on the server only so that a future
 # server-side check has the same numbers; the modes themselves are on-device.

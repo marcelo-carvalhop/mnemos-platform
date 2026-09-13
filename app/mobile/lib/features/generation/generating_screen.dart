@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:api_client/api_client.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers_sync.dart';
@@ -75,6 +76,18 @@ class _GeneratingScreenState extends ConsumerState<GeneratingScreen> {
     try {
       final job = await ref.read(generationApiProvider).get(widget.jobId);
       if (!mounted) return;
+
+      // Um toque a cada etapa vencida, e um mais firme quando acaba. São dez a
+      // vinte segundos de espera com o telefone provavelmente fora do campo de
+      // visão; o háptico é o único canal que alcança alguém que já olhou para
+      // outra coisa. Vem da integration/v0.6.
+      if (job.status != _job?.status) {
+        if (job.isFinished) {
+          HapticFeedback.mediumImpact();
+        } else {
+          HapticFeedback.selectionClick();
+        }
+      }
       setState(() => _job = job);
 
       if (job.isReady) {

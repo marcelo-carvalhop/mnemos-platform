@@ -1,43 +1,32 @@
 #pragma once
 
 #include <Arduino.h>
+#include "mnemos_contract_generated.h"
 
 namespace Config {
 
 constexpr long GMT_OFFSET_SECONDS = -3L * 3600L;
 constexpr int DAYLIGHT_OFFSET_SECONDS = 0;
+constexpr uint8_t DAY_CUTOFF_HOUR = MnemosContract::DEFAULT_DAY_CUTOFF_HOUR;
 
 // Bancada: intervalos comprimidos para validar agenda/sessões sem esperar dias.
-constexpr bool DEMO_INTERVALS = true;
 
 constexpr uint8_t SESSION_MAX_CARDS = 10;
 constexpr uint8_t PRACTICE_CARD_LIMIT = 5;
 constexpr uint8_t MAX_DEVICE_CARDS = 48;
-constexpr uint8_t MAX_CARD_OPTIONS = 4;
+constexpr uint8_t MAX_CARD_OPTIONS = MnemosContract::MULTIPLE_CHOICE_OPTIONS;
 constexpr uint8_t MAX_CONSECUTIVE_SAME_DECK = 2;
 constexpr uint8_t BASE_NEW_CARDS_PER_SESSION = 4;
 constexpr uint8_t FORECAST_LOAD_THRESHOLD_7D = 20;
 
-constexpr char APP_VERSION[] = "0.6.0-preview.1";
+constexpr char APP_VERSION[] = "0.6.0-preview.2";
 constexpr uint8_t DEVICE_PROTOCOL_VERSION = 4;
 constexpr uint16_t LOCAL_LINK_TIMEOUT_SECONDS = 300;
 constexpr char DEVICE_MODEL[] = "LILYGO-T5-4.7-S3-CARDKB";
 
-constexpr float RETENTION_TARGET = 0.90f;
+constexpr float RETENTION_TARGET = MnemosContract::DESIRED_RETENTION;
 constexpr float MIN_DIFFICULTY = 1.0f;
 constexpr float MAX_DIFFICULTY = 10.0f;
-constexpr float MIN_STABILITY_DAYS = 0.05f;
-constexpr float MAX_STABILITY_DAYS = 36500.0f;
-
-constexpr float DSR_W1 = -0.50f;
-constexpr float DSR_W2 = 0.20f;
-constexpr float DSR_W3 = 1.30f;
-constexpr float DSR_W4 = 1.00f;
-constexpr float DSR_W5 = 0.20f;
-constexpr float DSR_W6 = 0.60f;
-constexpr float DSR_W7 = 0.90f;
-constexpr float CRAM_GAIN_FACTOR = 0.30f;
-constexpr float CRAM_RECONSOLIDATION_MAX_DAYS = 3.0f;
 
 // CardKB v1.1: I2C dedicado, sem conflitar com o barramento do RTC/touch.
 constexpr int CARDKB_SDA = 16;

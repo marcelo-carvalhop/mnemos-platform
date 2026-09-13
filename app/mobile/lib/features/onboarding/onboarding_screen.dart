@@ -195,8 +195,8 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: MnemosSpacing.xl),
         Text(
-          'O app organiza o conteúdo e o Mnemos cuida da revisão. '
-          'O estudo acontece no terminal, sem distrações.',
+          'Cards curtos, revisados na hora certa. Estude aqui pelo app, '
+          'ou no terminal Mnemos quando quiser ler sem distrações.',
           style: MnemosText.bodyLong.copyWith(fontSize: 16, color: MnemosColors.muted),
         ),
         const SizedBox(height: MnemosSpacing.xl),
@@ -507,7 +507,7 @@ class _FreeGeneration extends StatelessWidget {
         const SizedBox(height: 6),
         const Center(
           child: Text(
-            'Criar e organizar cards é livre. O estudo acontece no Mnemos.',
+            'Criar cards e estudar são livres, sempre — no app e no Mnemos.',
             style: TextStyle(fontSize: 11.5, color: MnemosColors.faint),
           ),
         ),

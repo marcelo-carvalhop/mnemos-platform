@@ -50,6 +50,16 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   static const _maxBytes = 25 * 1024 * 1024;
   static const _counts = [5, 8, 12, 20];
 
+  /// Os três níveis que o servidor aceita. O cliente web já os oferecia; o
+  /// aplicativo mandava sempre `intermediario` sem dizer a ninguém que havia
+  /// escolha. Vem do `create_flow_screen` da integration/v0.6, que esta tela
+  /// substitui.
+  static const _levels = {
+    'basico': 'Básico',
+    'intermediario': 'Médio',
+    'avancado': 'Avançado',
+  };
+
   /// §7.3 — o mesmo teto do contrato, para o assunto e para o material.
   static const _maxChars = 20000;
 
@@ -58,6 +68,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   CreateSource _source = CreateSource.topic;
   String? _deckId;
   int _count = 8;
+  String _level = 'intermediario';
   bool _busy = false;
   String? _problem;
   ({String name, Uint8List bytes, String contentType})? _picked;
@@ -75,14 +86,60 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     super.dispose();
   }
 
-  /// O baralho onde a geração vai cair.
+  /// O baralho onde a geração vai cair, se já existir um.
   ///
   /// Resolvido num lugar só, para o botão e o envio nunca discordarem — o bug
   /// que a tela antiga tinha era exatamente esse: o seletor mostrava o
   /// primeiro baralho enquanto o estado seguia nulo, e o botão parecia
   /// habilitado sem fazer nada.
+  ///
+  /// Nulo não bloqueia mais nada: quando não há baralho, [_deckFor] cria um a
+  /// partir do que a pessoa escreveu.
   String? _effectiveDeck(List<Deck> decks) =>
       _deckId ?? (decks.isNotEmpty ? decks.first.id : null);
+
+  /// O baralho de destino — criando um se ainda não existir.
+  ///
+  /// **O baralho e os cards nascem juntos** (vem da integration/v0.6). Não se
+  /// escolhe um destino porque ainda não existe destino: o que a pessoa
+  /// descreve vira o nome do baralho e o assunto da geração na mesma ação.
+  /// Antes, uma conta nova via o botão "Gerar" apagado sem nenhuma explicação
+  /// de que faltava criar um baralho primeiro.
+  Future<String> _deckFor(List<Deck> decks) async {
+    final existing = _effectiveDeck(decks);
+    if (existing != null) return existing;
+
+    final authoring = await ref.read(authoringServiceProvider.future);
+    final deckId = await authoring.createDeck(
+      name: deckNameFrom(
+        switch (_source) {
+          CreateSource.text => _material.text,
+          CreateSource.pdf || CreateSource.photo => _picked?.name ?? '',
+          _ => _topic.text,
+        },
+      ),
+      at: ref.read(clockProvider)(),
+    );
+    ref
+      ..invalidate(decksProvider)
+      ..invalidate(deckCardCountsProvider);
+
+    // O baralho existe agora, mas só neste telefone, e o servidor recusa gerar
+    // dentro de um baralho que não conhece (§7.3 → 404). Empurrar o outbox faz
+    // parte da mesma ação: sem isso a pessoa vê "algo deu errado" por um
+    // detalhe de sincronização que não é dela. `pushAll` respeita a ordem de
+    // dependências e é idempotente, então não custa nada quando não há nada a
+    // enviar. Vem da integration/v0.6, e o teste de lá foi o que pegou a
+    // falta dele aqui.
+    try {
+      await ref.read(syncClientProvider).pushAll();
+    } on Object {
+      // Offline, ou servidor fora do ar. Não há o que dizer ainda: a geração
+      // falha logo abaixo e a copy de lá é a certa.
+    }
+
+    return deckId;
+  }
 
   Future<void> _choose(CreateSource source, List<Deck> decks) async {
     if (source == CreateSource.byHand) {
@@ -177,11 +234,24 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     });
   }
 
-  Future<void> _generate(String deckId) async {
+  Future<void> _generate(List<Deck> decks) async {
     setState(() {
       _busy = true;
       _problem = null;
     });
+
+    final String deckId;
+    try {
+      deckId = await _deckFor(decks);
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _problem = 'Não consegui criar o baralho. $e';
+      });
+      return;
+    }
+    if (!mounted) return;
 
     final api = ref.read(generationApiProvider);
     try {
@@ -191,6 +261,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             targetDeckId: deckId,
             topic: _topic.text.trim(),
             requestedCount: _count,
+            level: _level,
           ),
         // O material colado viaja no mesmo campo `topic` do contrato; o que
         // muda o comportamento do servidor é o `source_type`.
@@ -199,6 +270,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
             targetDeckId: deckId,
             topic: _material.text.trim(),
             requestedCount: _count,
+            level: _level,
           ),
         _ => await () async {
             final picked = _picked!;
@@ -209,6 +281,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
               targetDeckId: deckId,
               uploadKey: target.uploadKey,
               requestedCount: _count,
+              level: _level,
             );
           }(),
       };
@@ -259,10 +332,15 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
     final quota = ref.watch(quotaProvider);
     final target = _effectiveDeck(decks);
 
+    // §7.7.1 — a geração grátis é uma para a vida da conta. Offline a cota
+    // volta -1, que é "não sei" e não "acabou": bloquear aí seria tirar da
+    // pessoa algo que ela talvez ainda tenha.
+    final spent = quota.valueOrNull?.remaining == 0;
+
     final ready = switch (_source) {
-      CreateSource.topic => _topic.text.trim().isNotEmpty && target != null,
-      CreateSource.text => _material.text.trim().isNotEmpty && target != null,
-      CreateSource.pdf || CreateSource.photo => _picked != null && target != null,
+      CreateSource.topic => _topic.text.trim().isNotEmpty,
+      CreateSource.text => _material.text.trim().isNotEmpty,
+      CreateSource.pdf || CreateSource.photo => _picked != null,
       CreateSource.byHand => false,
     };
 
@@ -329,6 +407,22 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                 ],
               ),
               const SizedBox(height: MnemosSpacing.xl),
+              const Eyebrow('nível'),
+              const SizedBox(height: MnemosSpacing.md),
+              Row(
+                children: [
+                  for (final (i, e) in _levels.entries.indexed) ...[
+                    if (i > 0) const SizedBox(width: MnemosSpacing.sm),
+                    MnemosChip(
+                      label: e.value,
+                      selected: _level == e.key,
+                      expand: true,
+                      onTap: () => setState(() => _level = e.key),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: MnemosSpacing.xl),
               _QuotaCard(quota: quota),
               if (_problem != null) ...[
                 const SizedBox(height: MnemosSpacing.lg),
@@ -349,10 +443,27 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
           ),
           child: Column(
             children: [
-              FilledButton(
-                onPressed: (!ready || _busy) ? null : () => _generate(target!),
-                child: Text(_busy ? 'Enviando…' : 'Gerar $_count cards'),
-              ),
+              // Com a cota gasta, o botão vira assinatura em vez de uma
+              // tentativa fadada: oferecer "Gerar" para depois devolver 402 é
+              // fazer a pessoa descobrir no erro o que a tela já sabia. O
+              // cliente web faz o mesmo, e o teste da integration/v0.6
+              // protegia exatamente isto.
+              if (spent)
+                FilledButton(
+                  onPressed: _busy
+                      ? null
+                      : () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const PaywallScreen(),
+                            ),
+                          ),
+                  child: const Text('Assinar para gerar'),
+                )
+              else
+                FilledButton(
+                  onPressed: (!ready || _busy) ? null : () => _generate(decks),
+                  child: Text(_busy ? 'Enviando…' : 'Gerar $_count cards'),
+                ),
               const SizedBox(height: MnemosSpacing.sm),
               // Escrever à mão não gasta geração e não depende de rede. O
               // caminho nunca some, nem quando a cota acabou.
@@ -634,4 +745,20 @@ class _QuotaCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// O nome do baralho sai do que a pessoa escreveu, sem perguntar duas vezes.
+///
+/// Espaço em branco vira um espaço só: o campo aceita várias linhas, e uma
+/// quebra no meio do nome quebraria a lista da biblioteca, que reserva uma
+/// linha por baralho. O corte é em palavra, nunca no meio de uma. Mesmo algoritmo do
+/// `deckNameFrom` do cliente web, para um assunto igual gerar um nome igual
+/// nas duas superfícies.
+String deckNameFrom(String subject) {
+  final trimmed = subject.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (trimmed.isEmpty) return 'Novo baralho';
+  if (trimmed.length <= 42) return trimmed;
+  final cut = trimmed.substring(0, 42);
+  final lastSpace = cut.lastIndexOf(' ');
+  return '${lastSpace > 20 ? cut.substring(0, lastSpace) : cut}…';
 }

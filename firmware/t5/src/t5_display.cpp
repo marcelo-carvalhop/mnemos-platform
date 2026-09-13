@@ -30,10 +30,10 @@ int32_t textWidthPx(const String& value) {
     return w;
 }
 
-constexpr int32_t MARGIN_X = 42;
-constexpr int32_t HEADER_Y = 42;
-constexpr int32_t CONTENT_Y = 92;
-constexpr int32_t FOOTER_Y = 510;
+constexpr int32_t MARGIN_X = 48;
+constexpr int32_t HEADER_Y = 30;
+constexpr int32_t CONTENT_Y = 104;
+constexpr int32_t FOOTER_Y = 512;
 
 
 String truncateText(const String& value, size_t maxChars) {
@@ -138,36 +138,129 @@ int32_t T5Display::drawWrapped(const String& text,
     return y + static_cast<int32_t>(lines) * lineHeight;
 }
 
-void T5Display::drawHeader(const String& title, const String& rightText) {
-    drawText(title, MARGIN_X, HEADER_Y);
+void T5Display::drawHeader(
+    const String& title,
+    const String& rightText) {
 
-    int32_t statusRight = EPD_WIDTH - MARGIN_X;
+    // Assinatura permanente do produto.
+    drawText(
+        "MNEMOS",
+        MARGIN_X,
+        HEADER_Y);
+
+    // Bateria permanece discreta no primeiro nivel.
+    int32_t statusRight =
+        EPD_WIDTH - MARGIN_X;
 
     if (batteryAvailable_) {
-        const String batteryText = String(batteryPercent_) + "%";
-        const int32_t batteryWidth = textWidthPx(batteryText);
-        const int32_t batteryX = statusRight - batteryWidth;
-        drawText(batteryText, batteryX, HEADER_Y);
-        statusRight = batteryX - 24;
+        const String batteryText =
+            String(batteryPercent_) + "%";
+
+        const int32_t batteryWidth =
+            textWidthPx(batteryText);
+
+        const int32_t batteryX =
+            statusRight - batteryWidth;
+
+        drawText(
+            batteryText,
+            batteryX,
+            HEADER_Y);
+
+        statusRight =
+            batteryX - 28;
     }
 
+    // Contexto da tela em segundo nivel.
+    drawText(
+        title,
+        MARGIN_X,
+        62);
+
+    // rightText e reservado a contexto util ou anomalia.
+    // Estado normal do relogio permanece silencioso.
     if (rightText.length() > 0) {
-        const int32_t rightWidth = textWidthPx(rightText);
-        const int32_t rightX = std::max<int32_t>(MARGIN_X + 300, statusRight - rightWidth);
-        drawText(rightText, rightX, HEADER_Y);
+        const int32_t rightWidth =
+            textWidthPx(rightText);
+
+        const int32_t rightX =
+            std::max<int32_t>(
+                MARGIN_X + 320,
+                EPD_WIDTH -
+                    MARGIN_X -
+                    rightWidth);
+
+        drawText(
+            rightText,
+            rightX,
+            62);
     }
 
-    epd_draw_line(36, 70, EPD_WIDTH - 36, 70, DARK_GRAY, framebuffer_);
+    epd_draw_line(
+        MARGIN_X,
+        82,
+        EPD_WIDTH - MARGIN_X,
+        82,
+        DARK_GRAY,
+        framebuffer_);
 }
 
-void T5Display::drawFooter(const String& hint) {
-    epd_draw_line(36, 476, EPD_WIDTH - 36, 476, LIGHT_GRAY, framebuffer_);
-    drawText(hint, MARGIN_X, FOOTER_Y);
+void T5Display::drawFooter(
+    const String& hint) {
+
+    epd_draw_line(
+        MARGIN_X,
+        474,
+        EPD_WIDTH - MARGIN_X,
+        474,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    drawText(
+        hint,
+        MARGIN_X,
+        FOOTER_Y);
 }
 
-void T5Display::drawChoice(uint8_t number, const String& label, int32_t y) {
-    epd_draw_rect(48, y - 27, 840, 48, MID_GRAY, framebuffer_);
-    drawText(String(number) + "  " + truncateText(label, 76), 68, y + 3);
+void T5Display::drawChoice(
+    uint8_t number,
+    const String& label,
+    int32_t y) {
+
+    // Bloco pequeno para a tecla; o restante permanece aberto.
+    epd_fill_rect(
+        56,
+        y - 25,
+        42,
+        42,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    epd_draw_rect(
+        56,
+        y - 25,
+        42,
+        42,
+        MID_GRAY,
+        framebuffer_);
+
+    drawText(
+        String(number),
+        71,
+        y + 3);
+
+    drawText(
+        truncateText(label, 72),
+        122,
+        y + 3);
+
+    epd_draw_line(
+        122,
+        y + 22,
+        EPD_WIDTH - 60,
+        y + 22,
+        LIGHT_GRAY,
+        framebuffer_);
 }
 
 void T5Display::drawQr(const String& payload, int32_t originX, int32_t originY, int scale) {
@@ -195,205 +288,838 @@ void T5Display::drawQr(const String& payload, int32_t originX, int32_t originY, 
     }
 }
 
-void T5Display::showBoot(const String& message) {
+void T5Display::showBoot(
+    const String& message) {
+
     clearBuffer();
-    drawText("MNEMOS", 350, 180);
-    drawText("Terminal dedicado de estudo", 310, 230);
-    drawText(message, 330, 310);
-    drawText(String("v") + Config::APP_VERSION, 390, 390);
+
+    epd_draw_line(
+        250,
+        178,
+        EPD_WIDTH - 250,
+        178,
+        DARK_GRAY,
+        framebuffer_);
+
+    drawText(
+        "MNEMOS",
+        398,
+        230);
+
+    drawText(
+        "estudo sem distracoes",
+        344,
+        278);
+
+    drawText(
+        message,
+        350,
+        350);
+
+    drawText(
+        String("v") +
+            Config::APP_VERSION,
+        412,
+        414);
+
     refreshFull();
 }
 
 void T5Display::showKeyboardMissing() {
+
     clearBuffer();
-    drawHeader("MNEMOS");
-    drawText("CardKB nao encontrado", MARGIN_X, 190);
-    drawWrapped("Conecte o Unit CardKB v1.1 ao barramento I2C: SDA GPIO16, SCL GPIO15. O terminal tentara novamente automaticamente.",
-                MARGIN_X, 250, EPD_WIDTH - 2 * MARGIN_X, 34, 5);
-    drawFooter("Aguardando teclado...");
+
+    drawHeader(
+        "TECLADO",
+        "entrada indisponivel");
+
+    drawText(
+        "CardKB nao encontrado",
+        MARGIN_X,
+        158);
+
+    drawWrapped(
+        "Conecte o Unit CardKB v1.1. "
+        "O terminal continuara procurando o teclado "
+        "automaticamente.",
+        MARGIN_X,
+        218,
+        EPD_WIDTH - 2 * MARGIN_X,
+        34,
+        5);
+
+    drawText(
+        "SDA GPIO16   SCL GPIO15",
+        MARGIN_X,
+        390);
+
+    drawFooter(
+        "Aguardando teclado");
+
     refreshFull();
 }
 
-void T5Display::showHome(uint16_t due, uint16_t newCards, size_t total, bool trustedClock,
-                         bool canResume, const String& nextReview) {
+void T5Display::showHome(
+    uint16_t due,
+    uint16_t newCards,
+    size_t total,
+    bool trustedClock,
+    bool canResume,
+    const String& nextReview) {
+
     clearBuffer();
-    drawHeader("MNEMOS", trustedClock ? "" : "relogio aprox.");
 
-    const String headline = canResume ? "Sessao interrompida" :
-                            (due > 0 ? String(due) + " revisoes" :
-                             (newCards > 0 ? String(newCards) + " novos" : "Nada pendente"));
-    drawText(headline, MARGIN_X, 170);
-    drawText(String(total) + " cards no terminal", MARGIN_X, 220);
+    drawHeader(
+        "ESTUDO",
+        trustedClock
+            ? ""
+            : "hora nao confiavel");
 
-    if (!canResume && due == 0 && nextReview.length() > 0) {
-        drawText("Proxima revisao", MARGIN_X, 300);
-        drawText(nextReview, MARGIN_X, 345);
+    drawText(
+        "HOJE",
+        MARGIN_X,
+        126);
+
+    String headline;
+
+    if (canResume) {
+        headline =
+            "Sessao pausada";
+    } else if (due > 0) {
+        headline =
+            String(due) +
+            (due == 1
+                ? " revisao pendente"
+                : " revisoes pendentes");
+    } else if (newCards > 0) {
+        headline =
+            String(newCards) +
+            (newCards == 1
+                ? " cartao novo"
+                : " cartoes novos");
+    } else {
+        headline =
+            "Tudo em dia";
     }
 
-    const String primary = canResume ? "ENTER continuar" :
-                           ((due > 0 || newCards > 0) ? "ENTER estudar" : "ENTER praticar");
-    drawFooter(primary + "     M menu");
+    drawText(
+        headline,
+        MARGIN_X,
+        174);
+
+    epd_draw_line(
+        MARGIN_X,
+        204,
+        EPD_WIDTH - MARGIN_X,
+        204,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    drawText(
+        "Revisoes",
+        MARGIN_X,
+        255);
+
+    drawText(
+        String(due),
+        MARGIN_X,
+        294);
+
+    drawText(
+        "Novos",
+        310,
+        255);
+
+    drawText(
+        String(newCards),
+        310,
+        294);
+
+    drawText(
+        "Biblioteca",
+        540,
+        255);
+
+    drawText(
+        String(total),
+        540,
+        294);
+
+    if (
+        !canResume &&
+        due == 0 &&
+        nextReview.length() > 0
+    ) {
+        drawText(
+            "Proxima revisao",
+            MARGIN_X,
+            370);
+
+        drawText(
+            nextReview,
+            MARGIN_X,
+            410);
+    } else if (canResume) {
+        drawText(
+            "Seu ponto de estudo foi preservado.",
+            MARGIN_X,
+            382);
+    }
+
+    String primary;
+
+    if (canResume) {
+        primary =
+            "ENTER continuar";
+    } else if (
+        due > 0 ||
+        newCards > 0
+    ) {
+        primary =
+            "ENTER estudar";
+    } else {
+        primary =
+            "ENTER praticar";
+    }
+
+    drawFooter(
+        primary +
+        "     M menu");
+
     refreshFull();
 }
 
 void T5Display::showMainMenu() {
+
     clearBuffer();
-    drawHeader("MENU");
-    drawChoice(1, "Sincronizar", 150);
-    drawChoice(2, "Agenda", 225);
-    drawChoice(3, "Conexao", 300);
-    drawFooter("1-3 selecionar     BACKSPACE voltar");
+
+    drawHeader(
+        "MENU");
+
+    drawText(
+        "Ferramentas do terminal",
+        MARGIN_X,
+        126);
+
+    drawChoice(
+        1,
+        "Sincronizacao",
+        190);
+
+    drawChoice(
+        2,
+        "Agenda de estudo",
+        270);
+
+    drawChoice(
+        3,
+        "Conexao",
+        350);
+
+    drawFooter(
+        "1-3 selecionar     BACKSPACE voltar");
+
     refreshFull();
 }
 
-void T5Display::showAgenda(uint16_t dueNow, uint16_t laterToday, uint16_t tomorrow,
-                           uint16_t next7Days, const String& nextReview) {
+void T5Display::showAgenda(
+    uint16_t dueNow,
+    uint16_t laterToday,
+    uint16_t tomorrow,
+    uint16_t next7Days,
+    const String& nextReview) {
+
     clearBuffer();
-    drawHeader("AGENDA");
-    drawText("Agora", 90, 145);       drawText(String(dueNow), 700, 145);
-    drawText("Ainda hoje", 90, 200);  drawText(String(laterToday), 700, 200);
-    drawText("Amanha", 90, 255);      drawText(String(tomorrow), 700, 255);
-    drawText("Proximos 7 dias", 90, 310); drawText(String(next7Days), 700, 310);
-    drawText("Proxima revisao", 90, 390);
-    drawText(nextReview.length() ? nextReview : "Sem revisao agendada", 360, 390);
-    drawFooter("BACKSPACE voltar");
+
+    drawHeader(
+        "AGENDA");
+
+    const int32_t labelX =
+        MARGIN_X + 20;
+
+    const int32_t valueX =
+        EPD_WIDTH - 160;
+
+    drawText(
+        "Agora",
+        labelX,
+        145);
+
+    drawText(
+        String(dueNow),
+        valueX,
+        145);
+
+    epd_draw_line(
+        labelX,
+        164,
+        EPD_WIDTH - MARGIN_X,
+        164,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    drawText(
+        "Ainda hoje",
+        labelX,
+        205);
+
+    drawText(
+        String(laterToday),
+        valueX,
+        205);
+
+    epd_draw_line(
+        labelX,
+        224,
+        EPD_WIDTH - MARGIN_X,
+        224,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    drawText(
+        "Amanha",
+        labelX,
+        265);
+
+    drawText(
+        String(tomorrow),
+        valueX,
+        265);
+
+    epd_draw_line(
+        labelX,
+        284,
+        EPD_WIDTH - MARGIN_X,
+        284,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    drawText(
+        "Proximos 7 dias",
+        labelX,
+        325);
+
+    drawText(
+        String(next7Days),
+        valueX,
+        325);
+
+    drawText(
+        "Proxima revisao",
+        labelX,
+        395);
+
+    drawText(
+        nextReview.length()
+            ? nextReview
+            : "Sem revisao agendada",
+        335,
+        395);
+
+    drawFooter(
+        "BACKSPACE voltar");
+
     refreshFull();
 }
 
-void T5Display::showSyncMenu(size_t total, uint16_t pendingReviews, bool wifiConnected) {
+void T5Display::showSyncMenu(
+    size_t total,
+    uint16_t pendingReviews,
+    bool wifiConnected) {
+
     clearBuffer();
-    drawHeader("SINCRONIZAR", wifiConnected ? "Wi-Fi" : "offline");
-    drawText(String(total) + " cards no Mnemos", 90, 140);
-    drawText(String(pendingReviews) + " revisoes aguardando envio", 90, 195);
-    drawChoice(1, wifiConnected ? "Sincronizar pela rede" : "Pela rede (indisponivel)", 285);
-    drawChoice(2, "Sincronizar diretamente com o celular", 360);
-    drawFooter("1 rede     2 celular     BACKSPACE voltar");
+
+    drawHeader(
+        "SINCRONIZACAO",
+        wifiConnected
+            ? ""
+            : "sem rede");
+
+    drawText(
+        String(total) +
+            " cartoes disponiveis",
+        MARGIN_X,
+        135);
+
+    drawText(
+        String(pendingReviews) +
+            " revisoes aguardando envio",
+        MARGIN_X,
+        180);
+
+    drawChoice(
+        1,
+        wifiConnected
+            ? "Sincronizar com a conta"
+            : "Sincronizacao pela rede indisponivel",
+        285);
+
+    drawChoice(
+        2,
+        "Sincronizar diretamente com o celular",
+        370);
+
+    drawFooter(
+        "1 conta     2 celular     BACKSPACE voltar");
+
     refreshFull();
 }
 
-void T5Display::showConnectionMenu(bool wifiEnabled, bool wifiConnected,
-                                   const String& ssid, size_t knownNetworks) {
+void T5Display::showConnectionMenu(
+    bool wifiEnabled,
+    bool wifiConnected,
+    const String& ssid,
+    size_t knownNetworks) {
+
     clearBuffer();
-    drawHeader("CONEXAO");
-    const String state = !wifiEnabled ? "Wi-Fi desligado" :
-                         (wifiConnected ? "Conectado" : "Sem conexao");
-    drawText(state, 90, 135);
-    if (wifiConnected && ssid.length()) drawText(ssid, 90, 185);
-    drawText(String(knownNetworks) + " redes conhecidas", 90, 235);
-    drawChoice(1, "Configurar rede", 325);
-    drawChoice(2, wifiEnabled ? "Desligar Wi-Fi" : "Ligar Wi-Fi", 400);
-    drawFooter("1 configurar     2 Wi-Fi     BACKSPACE voltar");
+
+    String warning;
+
+    if (!wifiEnabled) {
+        warning =
+            "Wi-Fi desligado";
+    } else if (!wifiConnected) {
+        warning =
+            "sem conexao";
+    }
+
+    drawHeader(
+        "CONEXAO",
+        warning);
+
+    if (wifiConnected) {
+        drawText(
+            "Rede atual",
+            MARGIN_X,
+            135);
+
+        drawText(
+            ssid.length()
+                ? ssid
+                : "rede conectada",
+            MARGIN_X,
+            178);
+    } else {
+        drawText(
+            "Nenhuma rede ativa",
+            MARGIN_X,
+            158);
+    }
+
+    drawText(
+        String(knownNetworks) +
+            " redes conhecidas",
+        MARGIN_X,
+        235);
+
+    drawChoice(
+        1,
+        "Configurar rede",
+        325);
+
+    drawChoice(
+        2,
+        wifiEnabled
+            ? "Desligar Wi-Fi"
+            : "Ligar Wi-Fi",
+        405);
+
+    drawFooter(
+        "1 configurar     2 Wi-Fi     BACKSPACE voltar");
+
     refreshFull();
 }
 
-void T5Display::showLocalLink(const String& qrPayload,
-                              const String& ssid,
-                              const String& password,
-                              bool provisioning) {
+void T5Display::showLocalLink(
+    const String& qrPayload,
+    const String& ssid,
+    const String& password,
+    bool provisioning) {
+
     clearBuffer();
-    drawHeader(provisioning ? "CONFIGURAR REDE" : "SINCRONIZAR CELULAR", "5 min");
-    drawQr(qrPayload, 70, 105, 5);
-    drawText(provisioning ? "Escaneie no app" : "Conecte o app ao Mnemos", 450, 155);
-    drawText("Rede", 450, 235);
-    drawText(ssid, 450, 270);
-    drawText("Senha", 450, 330);
-    drawText(password, 450, 365);
-    drawFooter("BACKSPACE cancelar");
+
+    drawHeader(
+        provisioning
+            ? "CONFIGURAR TERMINAL"
+            : "SINCRONIZAR CELULAR",
+        "5 min");
+
+    drawQr(
+        qrPayload,
+        68,
+        112,
+        5);
+
+    drawText(
+        provisioning
+            ? "Escaneie pelo aplicativo Mnemos"
+            : "Abra a sincronizacao no aplicativo",
+        448,
+        150);
+
+    drawText(
+        "Rede temporaria",
+        448,
+        235);
+
+    drawText(
+        ssid,
+        448,
+        272);
+
+    drawText(
+        "Senha",
+        448,
+        330);
+
+    drawText(
+        password,
+        448,
+        367);
+
+    drawFooter(
+        "BACKSPACE cancelar");
+
     refreshFull();
 }
 
-void T5Display::showQuestion(const CardDefinition& card,
-                             uint8_t position,
-                             uint8_t total) {
+void T5Display::showQuestion(
+    const CardDefinition& card,
+    uint8_t position,
+    uint8_t total) {
+
     clearBuffer();
-    drawHeader(card.deck, String(position + 1) + "/" + String(total));
-    drawWrapped(card.question, 52, 115, EPD_WIDTH - 104, 32, 5);
+
+    drawHeader(
+        truncateText(card.deck, 48),
+        String(position + 1) +
+            "/" +
+            String(total));
+
+    drawText(
+        "RECUPERE DA MEMORIA",
+        52,
+        116);
+
+    drawWrapped(
+        card.question,
+        52,
+        158,
+        EPD_WIDTH - 104,
+        34,
+        card.isObjective()
+            ? 4
+            : 6);
 
     if (card.isObjective()) {
-        const uint8_t count = std::min<uint8_t>(card.optionCount, 4);
-        int32_t y = 285;
-        for (uint8_t i = 0; i < count; ++i) {
-            drawChoice(i + 1, card.options[i], y);
-            y += 58;
+        const uint8_t count =
+            std::min<uint8_t>(
+                card.optionCount,
+                4);
+
+        int32_t y =
+            292;
+
+        for (
+            uint8_t i = 0;
+            i < count;
+            ++i
+        ) {
+            drawChoice(
+                i + 1,
+                card.options[i],
+                y);
+
+            y += 55;
         }
-        drawFooter("1-4 selecionar alternativa");
+
+        drawFooter(
+            "1-4 selecionar alternativa");
+
     } else {
-        epd_draw_rect(120, 315, EPD_WIDTH - 240, 82, MID_GRAY, framebuffer_);
-        drawText("REVELAR RESPOSTA", 330, 365);
-        drawFooter("ENTER revelar resposta");
+        epd_draw_line(
+            160,
+            365,
+            EPD_WIDTH - 160,
+            365,
+            LIGHT_GRAY,
+            framebuffer_);
+
+        drawText(
+            "ENTER revelar somente depois de tentar",
+            265,
+            414);
+
+        drawFooter(
+            "ENTER revelar resposta");
     }
+
     refreshFull();
 }
 
-void T5Display::showSelfAssessment(const CardDefinition& card,
-                                   uint8_t position,
-                                   uint8_t total) {
+void T5Display::showSelfAssessment(
+    const CardDefinition& card,
+    uint8_t position,
+    uint8_t total) {
+
     clearBuffer();
-    drawHeader("RESPOSTA", String(position + 1) + "/" + String(total));
 
-    drawText("Pergunta", 52, 112);
-    drawWrapped(card.question, 52, 148, EPD_WIDTH - 104, 30, 4);
+    drawHeader(
+        "CONFERIR",
+        String(position + 1) +
+            "/" +
+            String(total));
 
-    drawText("Resposta de referencia", 52, 300);
-    drawWrapped(card.answer, 52, 338, EPD_WIDTH - 104, 30, 4);
+    drawText(
+        "Pergunta",
+        52,
+        120);
 
-    drawFooter("1 errei     2 acertei");
+    drawWrapped(
+        card.question,
+        52,
+        156,
+        EPD_WIDTH - 104,
+        29,
+        4);
+
+    epd_draw_line(
+        52,
+        270,
+        EPD_WIDTH - 52,
+        270,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    drawText(
+        "Resposta de referencia",
+        52,
+        310);
+
+    drawWrapped(
+        card.answer,
+        52,
+        347,
+        EPD_WIDTH - 104,
+        29,
+        4);
+
+    drawFooter(
+        "1 nao recuperei     2 recuperei");
+
     refreshFull();
 }
-void T5Display::showObjectiveFeedback(const CardDefinition& card,
-                                      uint8_t position,
-                                      uint8_t total,
-                                      int8_t selectedOptionIndex,
-                                      Outcome outcome) {
+void T5Display::showObjectiveFeedback(
+    const CardDefinition& card,
+    uint8_t position,
+    uint8_t total,
+    int8_t selectedOptionIndex,
+    Outcome outcome) {
+
     clearBuffer();
-    drawHeader("RESULTADO", String(position + 1) + "/" + String(total));
-    drawText(outcome == Outcome::Correct ? "CORRETO" : "INCORRETO", 390, 135);
-    if (selectedOptionIndex >= 0 && selectedOptionIndex < card.optionCount) {
-        drawText("Voce marcou", 70, 235);
-        drawWrapped(card.options[selectedOptionIndex], 70, 275, 400, 32, 3);
+
+    drawHeader(
+        "RESULTADO",
+        String(position + 1) +
+            "/" +
+            String(total));
+
+    drawText(
+        outcome == Outcome::Correct
+            ? "Resposta correta"
+            : "Resposta incorreta",
+        MARGIN_X,
+        132);
+
+    epd_draw_line(
+        MARGIN_X,
+        162,
+        EPD_WIDTH - MARGIN_X,
+        162,
+        LIGHT_GRAY,
+        framebuffer_);
+
+    if (
+        selectedOptionIndex >= 0 &&
+        selectedOptionIndex <
+            card.optionCount
+    ) {
+        drawText(
+            "Sua escolha",
+            60,
+            225);
+
+        drawWrapped(
+            card.options[
+                selectedOptionIndex],
+            60,
+            265,
+            390,
+            31,
+            4);
     }
-    if (card.correctOptionIndex >= 0 && card.correctOptionIndex < card.optionCount) {
-        drawText("Resposta", 520, 235);
-        drawWrapped(card.options[card.correctOptionIndex], 520, 275, 370, 32, 3);
+
+    if (
+        card.correctOptionIndex >= 0 &&
+        card.correctOptionIndex <
+            card.optionCount
+    ) {
+        drawText(
+            "Referencia",
+            520,
+            225);
+
+        drawWrapped(
+            card.options[
+                card.correctOptionIndex],
+            520,
+            265,
+            380,
+            31,
+            4);
     }
-    drawFooter("ENTER continuar");
+
+    drawFooter(
+        "ENTER continuar");
+
     refreshFull();
 }
 
-void T5Display::showEffort(uint8_t position, uint8_t total) {
+void T5Display::showEffort(
+    uint8_t position,
+    uint8_t total) {
+
     clearBuffer();
-    drawHeader("ESFORCO", String(position + 1) + "/" + String(total));
-    drawText("Como foi lembrar?", 330, 180);
-    drawText("Avalie apenas o esforco de recuperacao.", 250, 230);
-    drawChoice(1, "Dificil", 330);
-    drawChoice(2, "Normal", 390);
-    drawChoice(3, "Facil", 450);
-    drawFooter("1 dificil     2 normal     3 facil");
+
+    drawHeader(
+        "ESFORCO DE RECUPERACAO",
+        String(position + 1) +
+            "/" +
+            String(total));
+
+    drawText(
+        "Quanto esforco foi necessario para lembrar?",
+        MARGIN_X,
+        145);
+
+    drawText(
+        "Avalie o processo de recuperacao, nao a importancia do tema.",
+        MARGIN_X,
+        190);
+
+    drawChoice(
+        1,
+        "Dificil",
+        290);
+
+    drawChoice(
+        2,
+        "Normal",
+        355);
+
+    drawChoice(
+        3,
+        "Facil",
+        420);
+
+    drawFooter(
+        "1 dificil     2 normal     3 facil");
+
     refreshFull();
 }
 
-void T5Display::showSummary(const SessionStats& stats,
-                            uint16_t remainingDue,
-                            uint16_t remainingNew,
-                            const String& nextReview) {
+void T5Display::showSummary(
+    const SessionStats& stats,
+    uint16_t remainingDue,
+    uint16_t remainingNew,
+    const String& nextReview) {
+
     clearBuffer();
-    drawHeader(stats.mode == SessionMode::Practice ? "PRATICA CONCLUIDA" : "SESSAO CONCLUIDA");
-    drawText(String(stats.reviewed) + " cards", 390, 145);
-    drawText(String(stats.correct) + " corretos     " + String(stats.incorrect) + " erros", 300, 200);
-    const uint32_t minutes = stats.durationSeconds() / 60U;
-    const uint32_t seconds = stats.durationSeconds() % 60U;
-    drawText("Tempo: " + String(minutes) + "m " + String(seconds) + "s", 360, 250);
+
+    drawHeader(
+        stats.mode ==
+                SessionMode::Practice
+            ? "PRATICA CONCLUIDA"
+            : "SESSAO CONCLUIDA");
+
+    drawText(
+        String(stats.reviewed) +
+            " cartoes trabalhados",
+        MARGIN_X,
+        140);
+
+    drawText(
+        String(stats.correct) +
+            " recuperados",
+        MARGIN_X,
+        205);
+
+    drawText(
+        String(stats.incorrect) +
+            " para reforcar",
+        360,
+        205);
+
+    const uint32_t minutes =
+        stats.durationSeconds() /
+        60U;
+
+    const uint32_t seconds =
+        stats.durationSeconds() %
+        60U;
+
+    drawText(
+        "Duracao  " +
+            String(minutes) +
+            "m " +
+            String(seconds) +
+            "s",
+        MARGIN_X,
+        260);
+
+    epd_draw_line(
+        MARGIN_X,
+        292,
+        EPD_WIDTH - MARGIN_X,
+        292,
+        LIGHT_GRAY,
+        framebuffer_);
 
     if (remainingDue > 0) {
-        drawText(String(remainingDue) + " revisoes ainda pendentes", 300, 325);
+        drawText(
+            String(remainingDue) +
+                " revisoes ainda pendentes",
+            MARGIN_X,
+            345);
+
     } else if (remainingNew > 0) {
-        drawText(String(remainingNew) + " cards novos disponiveis", 300, 325);
-        if (nextReview.length()) drawText("Proxima revisao: " + nextReview, 270, 375);
+        drawText(
+            String(remainingNew) +
+                " cartoes novos disponiveis",
+            MARGIN_X,
+            345);
+
     } else {
-        drawText("Proxima revisao", 360, 325);
-        drawText(nextReview.length() ? nextReview : "Sem revisao agendada", 330, 375);
+        drawText(
+            "Sessao encerrada por agora",
+            MARGIN_X,
+            345);
     }
 
-    drawFooter("1 estudar novamente     ENTER concluir");
+    if (nextReview.length() > 0) {
+        drawText(
+            "Proxima revisao",
+            MARGIN_X,
+            400);
+
+        drawText(
+            nextReview,
+            300,
+            400);
+    }
+
+    drawFooter(
+        "1 estudar novamente     ENTER concluir");
+
     refreshFull();
 }
