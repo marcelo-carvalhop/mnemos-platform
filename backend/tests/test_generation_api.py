@@ -9,11 +9,11 @@ and whether the flow can actually be walked end to end.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import text, update
+from sqlalchemy import update
 
 from app.auth import service as auth
 from app.db import SessionLocal
@@ -22,7 +22,7 @@ from app.main import app
 from app.models import GenerationJob
 from app.sync import service as sync
 
-NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 DEVICE = "11111111-1111-7111-8111-111111111111"
 
 

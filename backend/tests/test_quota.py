@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import text
@@ -14,7 +14,7 @@ from app.quota import service as quota
 from app.quota.service import QuotaExhausted, TooManyJobsInFlight
 from tests.test_sync import SessionFactory  # same engine and fixtures
 
-NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 
 
 def uid() -> str:
@@ -131,10 +131,10 @@ def test_a_whole_allowance_cannot_be_queued_at_once(db, user):
 
 def test_paid_periods_are_monthly_in_the_users_timezone(db, user):
     """§7.7 — a São Paulo user whose month resets at 21:00 would call that a bug."""
-    last_moment = datetime(2026, 8, 31, 23, 30, tzinfo=timezone.utc)  # 20:30 in SP
+    last_moment = datetime(2026, 8, 31, 23, 30, tzinfo=UTC)  # 20:30 in SP
     assert quota.period_key_for("paid", last_moment, "America/Sao_Paulo") == "2026-08"
 
-    just_after = datetime(2026, 9, 1, 4, 0, tzinfo=timezone.utc)  # 01:00 in SP
+    just_after = datetime(2026, 9, 1, 4, 0, tzinfo=UTC)  # 01:00 in SP
     assert quota.period_key_for("paid", just_after, "America/Sao_Paulo") == "2026-09"
 
 

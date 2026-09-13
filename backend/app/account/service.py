@@ -17,7 +17,7 @@ rather than features. Two consequences the code has to honour:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import delete, select, text, update
@@ -69,7 +69,7 @@ def export(session: Session, user_id: str, *, now: datetime | None = None) -> di
     log is the source of truth and everything else is derived from it, so the
     rows are what makes this an export instead of a souvenir.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     def rows(model) -> list[dict[str, Any]]:
         return [

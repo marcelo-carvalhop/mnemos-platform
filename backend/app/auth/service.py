@@ -15,7 +15,7 @@ import hashlib
 import hmac
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 from sqlalchemy import select
@@ -160,7 +160,7 @@ def register_device(
     require_attestation: bool = True,
 ) -> TokenPair:
     """First launch: a real user with no credentials, plus the device (§8.1)."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     if require_attestation and not attested:
         raise AttestationRequired(
@@ -210,7 +210,7 @@ def attach_credentials(
     Nothing moves: the rows already belong to this `user_id`. The account
     simply gains a way to sign in from somewhere else.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     email = email.strip().lower()
 
     taken = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
@@ -238,7 +238,7 @@ def login(
     device_id: str,
     now: datetime | None = None,
 ) -> TokenPair:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     user = session.execute(
         select(User).where(User.email == email.strip().lower())
     ).scalar_one_or_none()
@@ -261,7 +261,7 @@ def refresh(
     now: datetime | None = None,
 ) -> TokenPair:
     """Rotates the refresh token, detecting reuse (§8.2)."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     token_hash = _hash_token(refresh_token)
 
     record = session.execute(

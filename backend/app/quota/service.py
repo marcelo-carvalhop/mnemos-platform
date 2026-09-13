@@ -8,7 +8,7 @@ run through one code path instead of two.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, text, update
@@ -101,7 +101,7 @@ def reserve(
     both pass the limit. The guard lives in the WHERE clause, so the database
     decides.
     """
-    at = at or datetime.now(timezone.utc)
+    at = at or datetime.now(UTC)
     period_key = period_key_for(plan, at, timezone_name)
     limit_count = FREE_GENERATIONS_LIFETIME if limit_count is None else limit_count
 
@@ -192,7 +192,7 @@ def release(session: Session, reservation_id: str) -> None:
 
 def sweep_expired(session: Session, user_id: str | None = None, at: datetime | None = None) -> int:
     """Releases reservations whose worker died before starting."""
-    at = at or datetime.now(timezone.utc)
+    at = at or datetime.now(UTC)
     query = select(QuotaReservation).where(
         QuotaReservation.committed.is_(False),
         QuotaReservation.expires_at <= at,
@@ -224,7 +224,7 @@ def remaining(
     timezone_name: str = "America/Sao_Paulo",
 ) -> int:
     """What the client's quota indicator mirrors — never the authority (§7.7)."""
-    at = at or datetime.now(timezone.utc)
+    at = at or datetime.now(UTC)
     period_key = period_key_for(plan, at, timezone_name)
     row = session.execute(
         select(QuotaUsage).where(

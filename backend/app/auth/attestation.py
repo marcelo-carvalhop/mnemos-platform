@@ -30,7 +30,7 @@ import base64
 import hashlib
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -56,7 +56,7 @@ class AttestationFailed(Exception):
 
 def issue_challenge(session: Session, device_id: str, *, now: datetime | None = None) -> str:
     """A single-use nonce, bound to the device that will use it."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     # Expired rows are swept here rather than by a cron: the table is only
     # touched on first launch, so it stays small on its own.
@@ -85,7 +85,7 @@ def consume_challenge(
     Deleting rather than flagging is deliberate: there is no state in which a
     challenge has been used and still exists, so a race cannot spend it twice.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     row = session.execute(
         select(AttestationChallenge)

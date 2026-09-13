@@ -10,7 +10,7 @@ string at all bought a fresh anonymous account.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,7 +24,7 @@ from app.main import app
 from app.models import AttestationChallenge
 from tests.test_sync import engine
 
-NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 
 
 def uid() -> str:
@@ -267,7 +267,9 @@ def test_app_attest_refuses_an_unreadable_attestation(db: Session, monkeypatch):
         lambda: Settings(
             require_attestation=True,
             app_attest_app_id="TEAMID.br.com.flashcards",
-            app_attest_root_pem="-----BEGIN CERTIFICATE-----\nnot a cert\n-----END CERTIFICATE-----",
+            app_attest_root_pem=(
+                "-----BEGIN CERTIFICATE-----\nnot a cert\n-----END CERTIFICATE-----"
+            ),
         ),
     )
     with pytest.raises(AttestationFailed, match="not readable"):

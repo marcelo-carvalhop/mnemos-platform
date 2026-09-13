@@ -4,8 +4,8 @@ Revision ID: 0010_terminal_credentials
 Revises: 0009_device_free_grant
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0010_terminal_credentials"
@@ -22,9 +22,19 @@ def upgrade() -> None:
         sa.Column("token_hash", sa.String(length=64), nullable=False, unique=True),
         sa.Column("model", sa.String(length=80), nullable=False),
         sa.Column("firmware", sa.String(length=40), nullable=False),
-        sa.Column("deck_ids", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column(
+            "deck_ids",
+            postgresql.JSONB(),
+            nullable=False,
+            server_default=sa.text("'[]'::jsonb"),
+        ),
         sa.Column("revoked", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=True),
     )
     op.create_index("ix_terminal_credentials_user", "terminal_credentials", ["user_id"])

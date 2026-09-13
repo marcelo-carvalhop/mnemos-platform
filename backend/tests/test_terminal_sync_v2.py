@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy.orm import Session, sessionmaker
@@ -10,7 +10,6 @@ from app.db import engine
 from app.models import User
 from app.sync import service as sync_service
 from app.terminal import service as terminal_service
-
 
 SessionFactory = sessionmaker(
     bind=engine,
@@ -23,7 +22,7 @@ NOW = datetime(
     29,
     12,
     0,
-    tzinfo=timezone.utc,
+    tzinfo=UTC,
 )
 
 PHONE = "11111111-1111-7111-8111-111111111111"

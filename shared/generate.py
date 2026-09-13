@@ -182,7 +182,14 @@ def _python(c: dict) -> str:
     statuses = "\n".join(f'    {s.upper()} = "{s}"' for s in c["card_statuses"])
     errors = "\n".join(f'    {e.upper()} = "{e}"' for e in c["error_codes"])
     milestones = ", ".join(str(d) for d in sched["graduation_milestone_days"])
-    weights = ", ".join(repr(w) for w in sched["fsrs_weights"])
+    # O Ruff do backend recusa linha acima de 100 colunas, e este arquivo é
+    # gerado: consertar a saída à mão seria desfeito na próxima geração. Os
+    # pesos saem em blocos de seis, indentados, o que também os deixa
+    # legíveis — vinte e um números numa linha só não se conferem a olho.
+    py_weights = "\n".join(
+        "    " + ", ".join(repr(w) for w in sched["fsrs_weights"][i : i + 6]) + ","
+        for i in range(0, len(sched["fsrs_weights"]), 6)
+    )
 
     banner = "\n".join(f"# {line}" for line in BANNER_LINES)
     return f'''{banner}
@@ -204,7 +211,9 @@ GRADUATION_MILESTONE_DAYS = ({milestones},)
 
 # §4.1 — the default FSRS vector, declared here because each platform's
 # package ships a DIFFERENT default and two clients must not disagree.
-FSRS_WEIGHTS = ({weights},)
+FSRS_WEIGHTS = (
+{py_weights}
+)
 
 # §5.7 — the day rolls over at 04:00 local, not midnight.
 DEFAULT_DAY_CUTOFF_HOUR = {sched['default_day_cutoff_hour']}

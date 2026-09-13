@@ -4,9 +4,9 @@ from fastapi import APIRouter, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from app.deps import CurrentUser, DbSession
+from app.sync.service import ResyncRequired
 from app.terminal import service
 from app.terminal.service import TerminalAuthError, TerminalCapacityError, TerminalScopeError
-from app.sync.service import ResyncRequired
 
 router = APIRouter(tags=["terminal"])
 

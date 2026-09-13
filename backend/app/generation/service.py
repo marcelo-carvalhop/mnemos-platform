@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.orm import Session
@@ -62,7 +62,7 @@ def enqueue(
     queue in Redis it is a distributed commit, and its failure mode is charging
     a user for a job that never ran.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     if source_type not in SOURCE_TYPES:
         raise ValueError(f"unknown source_type: {source_type}")
@@ -104,7 +104,7 @@ def claim_next(session: Session, *, now: datetime | None = None) -> GenerationJo
     same one, and a crash between claim and completion leaves the row visible
     again once the transaction rolls back.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     job = session.execute(
         select(GenerationJob)
@@ -140,7 +140,7 @@ def complete(
     now: datetime | None = None,
 ) -> list[PendingCard]:
     """Stages the cards and commits the quota (§7.6, §7.7, §7.8)."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
 
     job = session.get(GenerationJob, job_id)
     if job is None:
@@ -206,7 +206,7 @@ def fail(
     job = session.get(GenerationJob, job_id)
     if job is None:
         raise JobNotFound(job_id)
-    _fail(session, job, error_code, detail, now or datetime.now(timezone.utc), refund=refund)
+    _fail(session, job, error_code, detail, now or datetime.now(UTC), refund=refund)
 
 
 def _fail(
@@ -303,7 +303,7 @@ def decide(
     if decision not in (None, "approved", "discarded"):
         raise ValueError(f"unknown decision: {decision}")
 
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     card = session.execute(
         select(PendingCard).where(
             PendingCard.id == pending_id, PendingCard.user_id == user_id
@@ -322,7 +322,7 @@ def approve_remaining(
     session: Session, user_id: str, job_id: str, *, now: datetime | None = None
 ) -> int:
     """§5.7's "aprovar todos os restantes" — one bulk update."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     result = session.execute(
         update(PendingCard)
         .where(
@@ -350,7 +350,7 @@ def materialise(
     Called when the queue is closed. Idempotent because the card reuses the
     pending id, so re-running inserts nothing new.
     """
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     approved = session.execute(
         select(PendingCard).where(
             PendingCard.job_id == job_id,

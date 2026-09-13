@@ -10,7 +10,7 @@ way to mint a second free generation.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,7 +24,7 @@ from app.models import Device, Review, User
 from app.quota import service as quota
 from app.sync import service as sync
 
-NOW = datetime(2026, 8, 9, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 DEVICE = "11111111-1111-7111-8111-111111111111"
 
 

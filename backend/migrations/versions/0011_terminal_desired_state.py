@@ -4,8 +4,8 @@ Revision ID: 0011_terminal_desired_state
 Revises: 0010_terminal_credentials
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0011_terminal_desired_state"
@@ -32,8 +32,14 @@ def upgrade() -> None:
         "terminal_credentials",
         sa.Column("max_cards", sa.Integer(), nullable=False, server_default="0"),
     )
-    op.add_column("terminal_credentials", sa.Column("connectivity", sa.String(length=24), nullable=True))
-    op.add_column("terminal_credentials", sa.Column("wifi_ssid", sa.String(length=32), nullable=True))
+    op.add_column(
+        "terminal_credentials",
+        sa.Column("connectivity", sa.String(length=24), nullable=True),
+    )
+    op.add_column(
+        "terminal_credentials",
+        sa.Column("wifi_ssid", sa.String(length=32), nullable=True),
+    )
     op.add_column(
         "terminal_credentials",
         sa.Column("library_revision", sa.BigInteger(), nullable=False, server_default="0"),

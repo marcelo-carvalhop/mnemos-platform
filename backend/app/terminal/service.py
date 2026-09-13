@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -109,13 +109,13 @@ def authenticate_terminal(session: Session, token: str) -> TerminalCredential:
     ).scalar_one_or_none()
     if row is None:
         raise TerminalAuthError("invalid terminal credential")
-    row.last_seen_at = datetime.now(timezone.utc)
+    row.last_seen_at = datetime.now(UTC)
     session.commit()
     return row
 
 
 def _iso(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) -> dict:
@@ -142,7 +142,7 @@ def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) 
     if not deck_by_id:
         return {
             "schema": "mnemos.sync/v2",
-            "exportedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "exportedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "decks": [],
             "cards": [],
             "states": [],
@@ -211,7 +211,7 @@ def snapshot(session: Session, credential: TerminalCredential, limit: int = 48) 
 
     return {
         "schema": "mnemos.sync/v2",
-        "exportedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "exportedAt": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "decks": decks,
         "cards": cards,
         "states": [],
@@ -766,7 +766,7 @@ def report_status(
     credential.wifi_ssid = wifi_ssid or None
     credential.library_revision = max(0, library_revision)
     if synced:
-        credential.last_sync_at = datetime.now(timezone.utc)
+        credential.last_sync_at = datetime.now(UTC)
     session.commit()
     session.refresh(credential)
     return credential
@@ -786,7 +786,7 @@ def observe_direct_sync(
     row.card_count = max(0, card_count)
     row.max_cards = max(0, max_cards)
     row.connectivity = "ble"
-    row.last_sync_at = datetime.now(timezone.utc)
+    row.last_sync_at = datetime.now(UTC)
     session.commit()
     session.refresh(row)
     return row
