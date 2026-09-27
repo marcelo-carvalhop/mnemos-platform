@@ -4,180 +4,719 @@
 #include <Wire.h>
 #include <time.h>
 #include <sys/time.h>
-#include <cstring>
+
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
-#include <algorithm>
+#include <cstring>
 
 #include "config.h"
 
 namespace {
-int monthFromName(const char* month) {
+
+constexpr uint8_t PCF8563_ADDRESS =
+    0x51;
+
+constexpr uint8_t PCF8563_SECONDS_REGISTER =
+    0x02;
+
+constexpr uint8_t PCF8563_VOLTAGE_LOW_MASK =
+    0x80;
+
+constexpr uint32_t MIN_VALID_EPOCH =
+    1700000000U;
+
+constexpr uint32_t RTC_BUILD_TOLERANCE_SECONDS =
+    6U * 3600U;
+
+constexpr uint32_t NTP_RETRY_INTERVAL_MS =
+    5U * 60U * 1000U;
+
+constexpr uint32_t NTP_WAIT_MS =
+    4000U;
+
+int monthFromName(
+    const char* month) {
+
     static const char* MONTHS[] = {
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        "Jan", "Feb", "Mar", "Apr",
+        "May", "Jun", "Jul", "Aug",
+        "Sep", "Oct", "Nov", "Dec"
     };
+
     for (int i = 0; i < 12; ++i) {
-        if (std::strncmp(month, MONTHS[i], 3) == 0) return i;
+        if (
+            std::strncmp(
+                month,
+                MONTHS[i],
+                3) == 0
+        ) {
+            return i;
+        }
     }
+
     return 0;
 }
-}
+
+}  // namespace
+
 
 uint32_t TimeService::compileEpoch() const {
     char month[4] = {0};
-    int day = 1, year = 2026, hour = 0, minute = 0, second = 0;
-    std::sscanf(__DATE__, "%3s %d %d", month, &day, &year);
-    std::sscanf(__TIME__, "%d:%d:%d", &hour, &minute, &second);
+
+    int day = 1;
+    int year = 2026;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+
+    std::sscanf(
+        __DATE__,
+        "%3s %d %d",
+        month,
+        &day,
+        &year);
+
+    std::sscanf(
+        __TIME__,
+        "%d:%d:%d",
+        &hour,
+        &minute,
+        &second);
 
     tm value{};
-    value.tm_year = year - 1900;
-    value.tm_mon = monthFromName(month);
-    value.tm_mday = day;
-    value.tm_hour = hour;
-    value.tm_min = minute;
-    value.tm_sec = second;
 
+    value.tm_year =
+        year - 1900;
+
+    value.tm_mon =
+        monthFromName(month);
+
+    value.tm_mday =
+        day;
+
+    value.tm_hour =
+        hour;
+
+    value.tm_min =
+        minute;
+
+    value.tm_sec =
+        second;
+
+    // __DATE__/__TIME__ sao gerados no fuso do host de build.
+    // O projeto usa GMT_OFFSET_SECONDS como fuso local do terminal,
+    // portanto convertemos explicitamente esses campos locais para UTC.
     setenv("TZ", "UTC0", 1);
     tzset();
-    const time_t result = mktime(&value);
-    return result > 0 ? static_cast<uint32_t>(result) : 1767225600U;
+
+    const time_t localAsUtc =
+        mktime(&value);
+
+    if (localAsUtc <= 0) {
+        return 1767225600U;
+    }
+
+    const int64_t epoch =
+        static_cast<int64_t>(
+            localAsUtc) -
+        static_cast<int64_t>(
+            Config::GMT_OFFSET_SECONDS) -
+        static_cast<int64_t>(
+            Config::DAYLIGHT_OFFSET_SECONDS);
+
+    return
+        epoch > 0
+            ? static_cast<uint32_t>(epoch)
+            : 1767225600U;
 }
 
-bool TimeService::tryNtp() {
-    if (WiFi.status() != WL_CONNECTED) return false;
 
-    configTime(Config::GMT_OFFSET_SECONDS,
-               Config::DAYLIGHT_OFFSET_SECONDS,
-               "pool.ntp.org", "time.google.com", "time.cloudflare.com");
+bool TimeService::tryNtp(
+    uint32_t waitMs) {
 
-    const uint32_t waitStarted = millis();
+    if (
+        WiFi.status() !=
+        WL_CONNECTED
+    ) {
+        return false;
+    }
+
+    lastNtpAttemptMillis_ =
+        millis();
+
+    // Se o relogio ja foi semeado pelo RTC, simplesmente testar
+    // time(nullptr) daria um falso positivo. Zeramos temporariamente
+    // o clock do sistema, aguardamos uma resposta SNTP real e, em caso
+    // de falha, restauramos a fonte anterior.
+    time_t previous = 0;
+    time(&previous);
+
+    const uint32_t started =
+        millis();
+
+    timeval zero{};
+    settimeofday(
+        &zero,
+        nullptr);
+
+    configTime(
+        0,
+        0,
+        "pool.ntp.org",
+        "time.google.com",
+        "time.cloudflare.com");
+
     time_t current = 0;
-    while (millis() - waitStarted < 6000U) {
+
+    while (
+        millis() -
+            started <
+        waitMs
+    ) {
         time(&current);
-        if (current > 1700000000) {
-            Serial.printf("[clock] NTP sincronizado: %ld\n", static_cast<long>(current));
+
+        if (
+            current >
+            static_cast<time_t>(
+                MIN_VALID_EPOCH)
+        ) {
+            Serial.printf(
+                "[clock] NTP sincronizado: %ld\n",
+                static_cast<long>(
+                    current));
+
             return true;
         }
+
         delay(200);
     }
+
+    if (
+        previous >
+        static_cast<time_t>(
+            MIN_VALID_EPOCH)
+    ) {
+        const uint32_t elapsed =
+            (
+                millis() -
+                started
+            ) /
+            1000U;
+
+        seedSystemClock(
+            static_cast<uint32_t>(
+                previous) +
+            elapsed);
+    }
+
+    Serial.println(
+        "[clock] NTP indisponivel; "
+        "fonte anterior preservada");
+
     return false;
 }
 
+
+bool TimeService::rtcClockIntegrityOk() {
+    if (!rtcOnline_) {
+        return false;
+    }
+
+    Wire.beginTransmission(
+        PCF8563_ADDRESS);
+
+    Wire.write(
+        PCF8563_SECONDS_REGISTER);
+
+    if (
+        Wire.endTransmission(false) !=
+        0
+    ) {
+        return false;
+    }
+
+    if (
+        Wire.requestFrom(
+            static_cast<int>(
+                PCF8563_ADDRESS),
+            1) != 1
+    ) {
+        return false;
+    }
+
+    const uint8_t seconds =
+        Wire.read();
+
+    const bool voltageLow =
+        (
+            seconds &
+            PCF8563_VOLTAGE_LOW_MASK
+        ) != 0;
+
+    if (voltageLow) {
+        Serial.println(
+            "[clock] PCF8563 sinaliza "
+            "voltage-low; data RTC ignorada");
+    }
+
+    return !voltageLow;
+}
+
+
 uint32_t TimeService::rtcEpoch() {
-    if (!rtcOnline_) return 0;
+    if (!rtcOnline_) {
+        return 0;
+    }
 
     tm value{};
-    rtc_.getDateTime(&value);
-    const int year = value.tm_year + 1900;
-    if (year < 2024 || year > 2099) return 0;
 
-    // O RTC armazena hora local. Convertemos como se fosse UTC e removemos o
-    // deslocamento local para recuperar o epoch UTC usado por todo o motor.
+    rtc_.getDateTime(
+        &value);
+
+    const int year =
+        value.tm_year +
+        1900;
+
+    if (
+        year < 2024 ||
+        year > 2099
+    ) {
+        return 0;
+    }
+
+    // O RTC armazena hora local. Interpretamos os campos como UTC
+    // temporariamente e removemos o offset local para obter epoch UTC.
     setenv("TZ", "UTC0", 1);
     tzset();
-    const time_t localAsUtc = mktime(&value);
-    if (localAsUtc <= 0) return 0;
-    const int64_t epoch = static_cast<int64_t>(localAsUtc) -
-                          static_cast<int64_t>(Config::GMT_OFFSET_SECONDS) -
-                          static_cast<int64_t>(Config::DAYLIGHT_OFFSET_SECONDS);
-    return epoch > 1700000000LL ? static_cast<uint32_t>(epoch) : 0U;
+
+    const time_t localAsUtc =
+        mktime(&value);
+
+    if (localAsUtc <= 0) {
+        return 0;
+    }
+
+    const int64_t epoch =
+        static_cast<int64_t>(
+            localAsUtc) -
+        static_cast<int64_t>(
+            Config::GMT_OFFSET_SECONDS) -
+        static_cast<int64_t>(
+            Config::DAYLIGHT_OFFSET_SECONDS);
+
+    return
+        epoch >
+            static_cast<int64_t>(
+                MIN_VALID_EPOCH)
+            ? static_cast<uint32_t>(
+                  epoch)
+            : 0U;
 }
 
-void TimeService::writeRtc(uint32_t epochSeconds) {
-    if (!rtcOnline_ || epochSeconds < 1700000000U) return;
 
-    time_t shifted = static_cast<time_t>(epochSeconds) +
-                     Config::GMT_OFFSET_SECONDS + Config::DAYLIGHT_OFFSET_SECONDS;
+bool TimeService::rtcCandidatePlausible(
+    uint32_t candidate,
+    uint32_t buildEpoch,
+    uint32_t savedEpoch) const {
+
+    if (
+        candidate <
+        MIN_VALID_EPOCH
+    ) {
+        return false;
+    }
+
+    if (
+        buildEpoch >
+            RTC_BUILD_TOLERANCE_SECONDS &&
+        candidate +
+            RTC_BUILD_TOLERANCE_SECONDS <
+            buildEpoch
+    ) {
+        return false;
+    }
+
+    if (
+        savedEpoch >
+            MIN_VALID_EPOCH &&
+        candidate +
+            RTC_BUILD_TOLERANCE_SECONDS <
+            savedEpoch
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+
+void TimeService::writeRtc(
+    uint32_t epochSeconds) {
+
+    if (
+        !rtcOnline_ ||
+        epochSeconds <
+            MIN_VALID_EPOCH
+    ) {
+        return;
+    }
+
+    time_t shifted =
+        static_cast<time_t>(
+            epochSeconds) +
+        Config::GMT_OFFSET_SECONDS +
+        Config::DAYLIGHT_OFFSET_SECONDS;
+
     tm value{};
-    gmtime_r(&shifted, &value);
-    rtc_.setDateTime(static_cast<uint16_t>(value.tm_year + 1900),
-                     static_cast<uint8_t>(value.tm_mon + 1),
-                     static_cast<uint8_t>(value.tm_mday),
-                     static_cast<uint8_t>(value.tm_hour),
-                     static_cast<uint8_t>(value.tm_min),
-                     static_cast<uint8_t>(value.tm_sec));
+
+    gmtime_r(
+        &shifted,
+        &value);
+
+    rtc_.setDateTime(
+        static_cast<uint16_t>(
+            value.tm_year +
+            1900),
+        static_cast<uint8_t>(
+            value.tm_mon +
+            1),
+        static_cast<uint8_t>(
+            value.tm_mday),
+        static_cast<uint8_t>(
+            value.tm_hour),
+        static_cast<uint8_t>(
+            value.tm_min),
+        static_cast<uint8_t>(
+            value.tm_sec));
 }
 
-void TimeService::seedSystemClock(uint32_t epochSeconds) {
+
+void TimeService::seedSystemClock(
+    uint32_t epochSeconds) {
+
     timeval tv{};
-    tv.tv_sec = static_cast<time_t>(epochSeconds);
+
+    tv.tv_sec =
+        static_cast<time_t>(
+            epochSeconds);
+
     tv.tv_usec = 0;
-    settimeofday(&tv, nullptr);
+
+    settimeofday(
+        &tv,
+        nullptr);
 }
+
+
+void TimeService::logLocalTime(
+    const char* source,
+    uint32_t epochSeconds) const {
+
+    time_t shifted =
+        static_cast<time_t>(
+            epochSeconds) +
+        Config::GMT_OFFSET_SECONDS +
+        Config::DAYLIGHT_OFFSET_SECONDS;
+
+    tm value{};
+
+    gmtime_r(
+        &shifted,
+        &value);
+
+    char buffer[40];
+
+    std::snprintf(
+        buffer,
+        sizeof(buffer),
+        "%04d-%02d-%02d %02d:%02d:%02d",
+        value.tm_year + 1900,
+        value.tm_mon + 1,
+        value.tm_mday,
+        value.tm_hour,
+        value.tm_min,
+        value.tm_sec);
+
+    Serial.printf(
+        "[clock] fonte=%s local=%s epoch=%lu\n",
+        source,
+        buffer,
+        static_cast<unsigned long>(
+            epochSeconds));
+}
+
 
 void TimeService::begin() {
-    preferences_.begin("mnemos-clock", false);
+    preferences_.begin(
+        "mnemos-clock",
+        false);
 
-    Wire.begin(Config::SYSTEM_I2C_SDA, Config::SYSTEM_I2C_SCL);
+    Wire.begin(
+        Config::SYSTEM_I2C_SDA,
+        Config::SYSTEM_I2C_SCL);
+
     rtc_.begin(Wire);
-    Wire.beginTransmission(0x51);
-    rtcOnline_ = Wire.endTransmission() == 0;
-    Serial.printf("[clock] RTC PCF8563 %s em SDA=%d SCL=%d\n",
-                  rtcOnline_ ? "online" : "indisponivel",
-                  Config::SYSTEM_I2C_SDA,
-                  Config::SYSTEM_I2C_SCL);
 
-    trusted_ = tryNtp();
-    if (trusted_) {
-        const uint32_t current = static_cast<uint32_t>(time(nullptr));
+    Wire.beginTransmission(
+        PCF8563_ADDRESS);
+
+    rtcOnline_ =
+        Wire.endTransmission() ==
+        0;
+
+    Serial.printf(
+        "[clock] RTC PCF8563 %s "
+        "em SDA=%d SCL=%d\n",
+        rtcOnline_
+            ? "online"
+            : "indisponivel",
+        Config::SYSTEM_I2C_SDA,
+        Config::SYSTEM_I2C_SCL);
+
+    const uint32_t build =
+        compileEpoch();
+
+    const uint32_t saved =
+        preferences_.getULong(
+            "lastEpoch",
+            0U);
+
+    if (tryNtp(NTP_WAIT_MS)) {
+        ntpSynchronized_ = true;
+        trusted_ = true;
+
+        const uint32_t current =
+            static_cast<uint32_t>(
+                time(nullptr));
+
         writeRtc(current);
         checkpoint();
+        logLocalTime(
+            "NTP",
+            current);
+
         return;
     }
 
-    const uint32_t fromRtc = rtcEpoch();
-    if (fromRtc > 0) {
-        seedSystemClock(fromRtc);
+    const bool rtcIntegrity =
+        rtcClockIntegrityOk();
+
+    const uint32_t fromRtc =
+        rtcIntegrity
+            ? rtcEpoch()
+            : 0U;
+
+    if (
+        rtcCandidatePlausible(
+            fromRtc,
+            build,
+            saved)
+    ) {
+        seedSystemClock(
+            fromRtc);
+
         trusted_ = true;
-        preferences_.putULong("lastEpoch", fromRtc);
-        lastCheckpointMillis_ = millis();
-        Serial.printf("[clock] restaurado do RTC: %lu\n", static_cast<unsigned long>(fromRtc));
+        ntpSynchronized_ = false;
+
+        preferences_.putULong(
+            "lastEpoch",
+            fromRtc);
+
+        lastCheckpointMillis_ =
+            millis();
+
+        logLocalTime(
+            "RTC",
+            fromRtc);
+
         return;
     }
 
-    const uint32_t saved = preferences_.getULong("lastEpoch", 0U);
-    fallbackBaseEpoch_ = std::max(compileEpoch(), saved > 0 ? saved + 60U : 0U);
-    fallbackBaseMillis_ = millis();
-    lastCheckpointMillis_ = millis();
-    Serial.printf("[clock] modo aproximado iniciado em %lu\n",
-                  static_cast<unsigned long>(fallbackBaseEpoch_));
+    if (fromRtc > 0) {
+        Serial.printf(
+            "[clock] RTC rejeitado "
+            "por regressao temporal: "
+            "rtc=%lu build=%lu saved=%lu\n",
+            static_cast<unsigned long>(
+                fromRtc),
+            static_cast<unsigned long>(
+                build),
+            static_cast<unsigned long>(
+                saved));
+    }
+
+    fallbackBaseEpoch_ =
+        std::max(
+            build,
+            saved > 0
+                ? saved + 60U
+                : 0U);
+
+    fallbackBaseMillis_ =
+        millis();
+
+    lastCheckpointMillis_ =
+        millis();
+
+    trusted_ = false;
+    ntpSynchronized_ = false;
+
+    seedSystemClock(
+        fallbackBaseEpoch_);
+
+    logLocalTime(
+        "BUILD/FALLBACK",
+        fallbackBaseEpoch_);
 }
+
 
 uint32_t TimeService::now() {
     uint32_t value = 0;
+
     if (trusted_) {
         time_t current = 0;
         time(&current);
-        value = static_cast<uint32_t>(current);
+
+        value =
+            static_cast<uint32_t>(
+                current);
     } else {
-        value = fallbackBaseEpoch_ + (millis() - fallbackBaseMillis_) / 1000U;
+        value =
+            fallbackBaseEpoch_ +
+            (
+                millis() -
+                fallbackBaseMillis_
+            ) /
+                1000U;
     }
 
-    if (millis() - lastCheckpointMillis_ > 60000U) checkpoint();
+    if (
+        millis() -
+            lastCheckpointMillis_ >
+        60000U
+    ) {
+        checkpoint();
+    }
+
     return value;
 }
 
-void TimeService::setFromEpoch(uint32_t epochSeconds) {
-    if (epochSeconds < 1700000000U) return;
 
-    fallbackBaseEpoch_ = epochSeconds;
-    fallbackBaseMillis_ = millis();
+bool TimeService::maintain() {
+    if (ntpSynchronized_) {
+        return false;
+    }
+
+    if (
+        WiFi.status() !=
+        WL_CONNECTED
+    ) {
+        return false;
+    }
+
+    const uint32_t currentMillis =
+        millis();
+
+    if (
+        lastNtpAttemptMillis_ != 0 &&
+        currentMillis -
+            lastNtpAttemptMillis_ <
+            NTP_RETRY_INTERVAL_MS
+    ) {
+        return false;
+    }
+
+    if (!tryNtp(NTP_WAIT_MS)) {
+        return false;
+    }
+
+    ntpSynchronized_ = true;
     trusted_ = true;
-    seedSystemClock(epochSeconds);
-    writeRtc(epochSeconds);
 
-    preferences_.putULong("lastEpoch", epochSeconds);
-    lastCheckpointMillis_ = millis();
-    Serial.printf("[clock] sincronizado pelo celular: %lu\n",
-                  static_cast<unsigned long>(epochSeconds));
+    const uint32_t current =
+        static_cast<uint32_t>(
+            time(nullptr));
+
+    fallbackBaseEpoch_ =
+        current;
+
+    fallbackBaseMillis_ =
+        millis();
+
+    writeRtc(
+        current);
+
+    preferences_.putULong(
+        "lastEpoch",
+        current);
+
+    lastCheckpointMillis_ =
+        millis();
+
+    logLocalTime(
+        "NTP-LATE",
+        current);
+
+    return true;
 }
 
-void TimeService::checkpoint() {
-    const uint32_t value = trusted_
-        ? static_cast<uint32_t>(time(nullptr))
-        : fallbackBaseEpoch_ + (millis() - fallbackBaseMillis_) / 1000U;
 
-    if (value > 0) preferences_.putULong("lastEpoch", value);
-    lastCheckpointMillis_ = millis();
+void TimeService::setFromEpoch(
+    uint32_t epochSeconds) {
+
+    if (
+        epochSeconds <
+        MIN_VALID_EPOCH
+    ) {
+        return;
+    }
+
+    fallbackBaseEpoch_ =
+        epochSeconds;
+
+    fallbackBaseMillis_ =
+        millis();
+
+    trusted_ = true;
+
+    seedSystemClock(
+        epochSeconds);
+
+    writeRtc(
+        epochSeconds);
+
+    preferences_.putULong(
+        "lastEpoch",
+        epochSeconds);
+
+    lastCheckpointMillis_ =
+        millis();
+
+    logLocalTime(
+        "PHONE",
+        epochSeconds);
+}
+
+
+void TimeService::checkpoint() {
+    const uint32_t value =
+        trusted_
+            ? static_cast<uint32_t>(
+                  time(nullptr))
+            : fallbackBaseEpoch_ +
+                  (
+                      millis() -
+                      fallbackBaseMillis_
+                  ) /
+                      1000U;
+
+    if (value > 0) {
+        preferences_.putULong(
+            "lastEpoch",
+            value);
+    }
+
+    lastCheckpointMillis_ =
+        millis();
 }

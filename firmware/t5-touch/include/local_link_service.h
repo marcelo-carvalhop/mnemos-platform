@@ -54,6 +54,8 @@ private:
     bool routesConfigured_ = false;
     bool completeRequested_ = false;
     bool libraryUpdated_ = false;
+    bool lanTransport_ = false;
+    bool radioPrepared_ = false;
     uint32_t startedAtMs_ = 0;
 
     String deviceId_;

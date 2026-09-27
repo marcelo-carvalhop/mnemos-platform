@@ -1,5 +1,38 @@
 # Changelog — firmware/t5
 
+## 0.6.0-preview.6-touch
+
+- consolida a HMI touch-first;
+- retrato passa a ser a orientação inicial;
+- adiciona layouts independentes retrato/paisagem;
+- adiciona confirmação de interrupção de sessão;
+- adiciona filtro de decks para composição de sessão;
+- adiciona zonas nomeadas de touch e diagnóstico serial detalhado;
+- adiciona debounce de 400 ms;
+- adiciona Noto Sans CJK SC em 14/18/22 px;
+- mantém pinyin tonal e Hanzi no mesmo renderer Unicode.
+
+
+## 0.6.0-preview.4-touch
+
+- Home redesenhada como agenda semanal;
+- log serial associa coordenada touch a UiAction;
+- adiciona botao de abortar sessao com retomada segura;
+- aumenta biblioteca local para 128 cartoes;
+- adiciona deck de treinamento com 100 caracteres de mandarim;
+- adiciona subconjunto grafico CJK especifico para os 100 ideogramas.
+
+
+## 0.6.0-preview.3-touch
+
+- variante dedicada ao T5-4.7-S3 capacitive touch;
+- GT911 substitui CardKB como entrada;
+- RTC e GT911 compartilham GPIO18/17;
+- GT911 sondado em 0x5D e 0x14;
+- HMI convertida para áreas de toque;
+- StudyEngine, FSRS, sincronização e bateria permanecem desacoplados do input.
+
+
 ## 0.6.0-preview.2
 
 - substituição do scheduler próprio pelo FSRS determinístico compartilhado;

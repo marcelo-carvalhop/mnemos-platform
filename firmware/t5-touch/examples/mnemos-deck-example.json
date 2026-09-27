@@ -1,0 +1,27 @@
+{
+  "schema": "mnemos.local-library/v2",
+  "cards": [
+    {
+      "id": "sd-demo-001",
+      "deckId": "sd-demo",
+      "deck": "Deck do microSD",
+      "type": "open_recall",
+      "format": "plain",
+      "question": "Qual é a capital de Minas Gerais?",
+      "answer": "Belo Horizonte",
+      "revision": 1
+    },
+    {
+      "id": "sd-demo-002",
+      "deckId": "sd-demo",
+      "deck": "Deck do microSD",
+      "type": "multiple_choice",
+      "format": "plain",
+      "question": "Qual opção contém pinyin tonal?",
+      "answer": "nǐ hǎo",
+      "revision": 1,
+      "options": ["ni3 hao3", "nǐ hǎo", "ní hào", "nī hāo"],
+      "correctOptionIndex": 1
+    }
+  ]
+}

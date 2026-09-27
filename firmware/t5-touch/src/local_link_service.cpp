@@ -37,74 +37,304 @@ String LocalLinkService::makeHex(uint32_t value, uint8_t digits) const {
 }
 
 bool LocalLinkService::start(LocalLinkMode mode) {
-    if (active_) return mode_ == mode;
-
-    mode_ = mode;
-    const uint64_t mac = ESP.getEfuseMac();
-    const String suffix = makeHex(static_cast<uint32_t>(mac & 0xFFFFFFU), 6);
-    deviceId_ = "T5S3-" + suffix;
-    ssid_ = "MNEMOS-" + suffix;
-    password_ = "MN" + makeHex(esp_random(), 10);
-    token_ = makeHex(esp_random(), 8) + makeHex(esp_random(), 8);
-
-    network_.prepareProvisioning();
-    const IPAddress localIp(192, 168, 4, 1);
-    const IPAddress gateway(192, 168, 4, 1);
-    const IPAddress subnet(255, 255, 255, 0);
-    if (!WiFi.softAPConfig(localIp, gateway, subnet) ||
-        !WiFi.softAP(ssid_.c_str(), password_.c_str(), 6, 0, 1)) {
-        Serial.println("[local-link] falha ao iniciar SoftAP");
-        network_.finishProvisioning();
-        return false;
+    if (active_) {
+        return mode_ == mode;
     }
 
-    const String modeText = mode_ == LocalLinkMode::Provisioning ? "provision" : "sync";
-    qrPayload_ = "mnemos://local?v=" + String(Config::DEVICE_PROTOCOL_VERSION) +
-                 "&mode=" + modeText +
-                 "&id=" + deviceId_ +
-                 "&ssid=" + ssid_ +
-                 "&pwd=" + password_ +
-                 "&host=192.168.4.1" +
-                 "&token=" + token_ +
-                 "&model=" + String(Config::DEVICE_MODEL) +
-                 "&fw=" + String(Config::APP_VERSION);
+    mode_ = mode;
+
+    const uint64_t mac =
+        ESP.getEfuseMac();
+
+    const String suffix =
+        makeHex(
+            static_cast<uint32_t>(
+                mac & 0xFFFFFFU),
+            6);
+
+    deviceId_ =
+        "T5S3-" + suffix;
+
+    token_ =
+        makeHex(
+            esp_random(),
+            8) +
+        makeHex(
+            esp_random(),
+            8);
+
+    lanTransport_ =
+        network_.connected() &&
+        WiFi.localIP() !=
+            IPAddress(
+                0,
+                0,
+                0,
+                0);
+
+    radioPrepared_ = false;
+
+    String localHost;
+    String transport;
+
+    if (lanTransport_) {
+        transport = "lan";
+
+        ssid_ =
+            network_.ssid();
+
+        password_ = "";
+
+        localHost =
+            WiFi.localIP().
+                toString();
+
+        Serial.printf(
+            "[local-link] LAN provisioning: ssid=%s host=%s mode=%d status=%d heap=%u\n",
+            ssid_.c_str(),
+            localHost.c_str(),
+            static_cast<int>(
+                WiFi.getMode()),
+            static_cast<int>(
+                WiFi.status()),
+            static_cast<unsigned>(
+                ESP.getFreeHeap()));
+
+        // Intentionally do not call WiFi.mode(), WiFi.disconnect(),
+        // prepareProvisioning() or softAP() here.
+    } else {
+        transport = "ap";
+
+        ssid_ =
+            "MNEMOS-" + suffix;
+
+        password_ =
+            "MN" +
+            makeHex(
+                esp_random(),
+                10);
+
+        Serial.printf(
+            "[local-link] AP provisioning fallback: mode=%d status=%d heap=%u\n",
+            static_cast<int>(
+                WiFi.getMode()),
+            static_cast<int>(
+                WiFi.status()),
+            static_cast<unsigned>(
+                ESP.getFreeHeap()));
+
+        network_.prepareProvisioning();
+
+        if (
+            network_.lastError().
+                length() >
+            0
+        ) {
+            Serial.printf(
+                "[local-link] preparacao de radio falhou: %s\n",
+                network_.
+                    lastError().
+                    c_str());
+
+            network_.
+                finishProvisioning();
+
+            return false;
+        }
+
+        radioPrepared_ = true;
+
+        Serial.printf(
+            "[local-link] iniciando SoftAP fallback: %s\n",
+            ssid_.c_str());
+
+        if (
+            !WiFi.softAP(
+                ssid_.c_str(),
+                password_.c_str(),
+                6,
+                0,
+                1)
+        ) {
+            Serial.println(
+                "[local-link] falha ao iniciar SoftAP fallback");
+
+            network_.
+                finishProvisioning();
+
+            radioPrepared_ = false;
+            return false;
+        }
+
+        delay(80);
+
+        localHost =
+            WiFi.softAPIP().
+                toString();
+
+        if (
+            localHost.length() ==
+                0 ||
+            localHost ==
+                "0.0.0.0"
+        ) {
+            Serial.println(
+                "[local-link] SoftAP sem endereco IP valido");
+
+            network_.
+                finishProvisioning();
+
+            radioPrepared_ = false;
+            return false;
+        }
+
+        Serial.printf(
+            "[local-link] SoftAP fallback ativo IP=%s\n",
+            localHost.c_str());
+    }
+
+    const String modeText =
+        mode_ ==
+                LocalLinkMode::Provisioning
+            ? "provision"
+            : "sync";
+
+    qrPayload_ =
+        "mnemos://local?v=" +
+        String(
+            Config::
+                DEVICE_PROTOCOL_VERSION) +
+        "&mode=" +
+        modeText +
+        "&transport=" +
+        transport +
+        "&id=" +
+        deviceId_ +
+        "&ssid=" +
+        ssid_ +
+        "&pwd=" +
+        password_ +
+        "&host=" +
+        localHost +
+        "&token=" +
+        token_ +
+        "&model=" +
+        String(
+            Config::DEVICE_MODEL) +
+        "&fw=" +
+        String(
+            Config::APP_VERSION);
 
     if (!routesConfigured_) {
         configureRoutes();
         routesConfigured_ = true;
     }
+
     server_.begin();
+
     active_ = true;
     completeRequested_ = false;
     libraryUpdated_ = false;
     startedAtMs_ = millis();
 
-    Serial.printf("[local-link] %s iniciado: %s em %s\n",
-                  modeText.c_str(), ssid_.c_str(), WiFi.softAPIP().toString().c_str());
+    Serial.printf(
+        "[local-link] %s iniciado via %s: host=%s heap=%u\n",
+        modeText.c_str(),
+        transport.c_str(),
+        localHost.c_str(),
+        static_cast<unsigned>(
+            ESP.getFreeHeap()));
+
     return true;
 }
 
+
+
+
 void LocalLinkService::stop() {
-    if (!active_) return;
+    if (!active_) {
+        return;
+    }
+
     server_.stop();
-    network_.finishProvisioning();
+
+    if (radioPrepared_) {
+        network_.
+            finishProvisioning();
+    }
+
     active_ = false;
     completeRequested_ = false;
-    Serial.println("[local-link] encerrado");
+    radioPrepared_ = false;
+    lanTransport_ = false;
+
+    Serial.println(
+        "[local-link] encerrado");
 }
 
+
 void LocalLinkService::loop() {
-    if (!active_) return;
-    server_.handleClient();
+    if (!active_) {
+        return;
+    }
+
+    static uint32_t lastHeartbeatMs =
+        0;
+
+    const uint32_t now =
+        millis();
+
+    if (lanTransport_) {
+        // Existing STA is already connected. WebServer listens on the
+        // current LAN interface and no radio transition is necessary.
+        server_.handleClient();
+    } else {
+        const uint8_t stations =
+            WiFi.softAPgetStationNum();
+
+        if (stations > 0) {
+            server_.handleClient();
+        }
+    }
+
+    if (
+        now -
+            lastHeartbeatMs >=
+        2000U
+    ) {
+        lastHeartbeatMs =
+            now;
+
+        Serial.printf(
+            "[local-link] heartbeat transport=%s status=%d heap=%u\n",
+            lanTransport_
+                ? "lan"
+                : "ap",
+            static_cast<int>(
+                WiFi.status()),
+            static_cast<unsigned>(
+                ESP.getFreeHeap()));
+    }
+
     if (completeRequested_) {
         delay(40);
         stop();
         return;
     }
-    if (millis() - startedAtMs_ > static_cast<uint32_t>(Config::LOCAL_LINK_TIMEOUT_SECONDS) * 1000U) {
+
+    if (
+        now -
+            startedAtMs_ >
+        static_cast<uint32_t>(
+            Config::
+                LOCAL_LINK_TIMEOUT_SECONDS) *
+            1000U
+    ) {
         stop();
     }
 }
+
+
 
 bool LocalLinkService::consumeLibraryUpdated() {
     const bool value = libraryUpdated_;
@@ -182,9 +412,10 @@ void LocalLinkService::sendInfo() {
     doc["capabilities"]["display"]["technology"] = "epaper";
     doc["capabilities"]["display"]["width"] = 960;
     doc["capabilities"]["display"]["height"] = 540;
-    doc["capabilities"]["input"]["primary"] = "cardkb";
-    doc["capabilities"]["input"]["typedRecall"] = true;
+    doc["capabilities"]["input"]["primary"] = "touch";
+    doc["capabilities"]["input"]["typedRecall"] = false;
     doc["capabilities"]["input"]["touch"] = Config::TOUCH_ENABLED;
+    doc["capabilities"]["storage"]["microSD"] = true;
     String body;
     serializeJson(doc, body);
     server_.send(200, "application/json", body);

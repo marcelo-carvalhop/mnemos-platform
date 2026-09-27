@@ -3,6 +3,7 @@
 #include <ArduinoJson.h>
 #include <algorithm>
 #include "config.h"
+#include "mnemos_contract_generated.h"
 #include "storage.h"
 #include "time_service.h"
 

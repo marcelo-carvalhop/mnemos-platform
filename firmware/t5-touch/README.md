@@ -1,190 +1,121 @@
-# Mnemos T5 — v0.6.0-preview.2
+# Mnemos T5 Touch — v0.6.0-preview.3-touch
 
-Firmware de referência do terminal físico Mnemos para o LILYGO T5-4.7-S3, com display e-paper 960×540 sem touchscreen e Unit CardKB v1.1 como dispositivo principal de entrada.
+Firmware do terminal físico Mnemos para o LILYGO T5-4.7-S3 com
+touchscreen capacitivo. Esta variante será utilizada até a chegada do
+T5S3 Pro.
 
-Esta versão consolida o T5 como cliente completo da plataforma Mnemos. Web, aplicativo móvel e terminal físico seguem a mesma metodologia de estudo e o mesmo modelo determinístico de agendamento. O diferencial do T5 não é possuir uma metodologia separada, mas oferecer uma superfície dedicada de estudo, com baixa distração, e-paper e interação física simples.
+O firmware do T5 sem touchscreen permanece preservado em `firmware/t5`.
+Esta pasta (`firmware/t5-touch`) é independente.
 
 ## Hardware
 
-Configuração atualmente validada:
+- ESP32-S3;
+- e-paper 4,7" 960×540;
+- GT911 como entrada principal;
+- RTC PCF8563 e GT911 em SDA GPIO18 / SCL GPIO17;
+- IRQ do GT911 em GPIO47;
+- GT911 sondado em `0x5D` e `0x14`;
+- Battery ADC em GPIO14;
+- botão físico GPIO21 preservado para wake/fallback;
+- microSD desabilitado.
 
-- LILYGO T5-4.7-S3 com ESP32-S3;
-- display e-paper 960×540;
-- Unit CardKB v1.1 em I2C, endereço `0x5F`;
-- CardKB: `SDA = GPIO16`, `SCL = GPIO15`;
-- RTC PCF8563: `SDA = GPIO18`, `SCL = GPIO17`;
-- futuro touch reservado ao barramento do sistema, ainda desabilitado;
-- SD desabilitado porque GPIO16/15 são utilizados pelo teclado;
-- monitoramento de bateria integrado ao firmware.
+A transformação segue o exemplo oficial LILYGO:
 
-O hardware utilizado apresentou inversão física de SDA/SCL no barramento associado ao RTC em relação às primeiras hipóteses de ligação. A configuração acima corresponde à ligação validada em bancada e deve ser considerada a referência do projeto.
+```cpp
+touch.setMaxCoordinates(960, 540);
+touch.setSwapXY(true);
+touch.setMirrorXY(false, true);
+```
 
-## Filosofia de interação
+## Arquitetura de entrada
 
-O terminal não simula touchscreen.
+```text
+GT911
+  ↓
+TouchInput
+  ↓
+MnemosTouchPoint
+  ↓
+UiAction
+  ↓
+processAction()
+  ↓
+StudyEngine
+```
 
-A entrada é convertida para `UiAction`, mantendo separação entre dispositivo físico e lógica de aplicação. O CardKB é atualmente a implementação principal; uma futura versão com touchscreen poderá produzir as mesmas ações sem alterar o `StudyEngine`.
-
-A HMI foi projetada para privilegiar:
-
-- recuperação ativa;
-- baixa carga visual;
-- ausência de elementos técnicos desnecessários;
-- separação entre pergunta e resposta;
-- foco na tarefa atual;
-- indicação de problemas apenas quando requerem atenção.
-
-O estado normal do relógio não é exibido. A interface mostra aviso somente quando o horário não é considerado confiável.
-
-## Metodologia e scheduler
-
-O T5 utiliza o mesmo contrato pedagógico compartilhado pelos demais clientes.
-
-O agendamento é baseado em FSRS determinístico com:
-
-- vetor compartilhado de 21 pesos;
-- passos de aprendizagem definidos pelo contrato;
-- passos de reaprendizagem definidos pelo contrato;
-- intervalo máximo compartilhado;
-- fuzz desabilitado;
-- retenção desejada padrão definida em `shared/contract.yaml`.
-
-O firmware não mantém um algoritmo D/S/R próprio.
-
-O histórico de eventos é a fonte canônica do estado pedagógico. O estado FSRS persistido é tratado como dado derivado e pode ser reconstruído por replay.
-
-Para cada cartão, as revisões são ordenadas deterministicamente por:
-
-`(reviewedAtMs, id)`
-
-O último `progress_reset` funciona como corte temporal: revisões anteriores ou no mesmo instante do reset permanecem no histórico, mas não participam do estado FSRS reconstruído após o reset.
-
-A configuração `desired_retention` pode ser sincronizada pela conta. Quando ausente, o terminal utiliza o valor padrão do contrato compartilhado.
-
-## Histórico e persistência
-
-Arquivos principais no LittleFS:
-
-- `review_history.ndjson`: histórico local e remoto de revisões;
-- `review_outbox.ndjson`: revisões originadas no T5 que ainda precisam ser enviadas;
-- `progress_resets.ndjson`: eventos de reinicialização de progresso;
-- `state.json`: cache derivado do estado dos cartões;
-- `sync_meta.json`: cursores e parâmetros sincronizados;
-- arquivos de sessão para retomada de estudo interrompido.
-
-Reviews recebidas de outros clientes entram no histórico, mas nunca no outbox.
-
-Isso evita ciclos de sincronização do tipo:
-
-Web → backend → T5 → backend.
-
-## Sincronização multicliente
-
-O T5 participa do mesmo histórico de estudo utilizado pelo Web e pelo aplicativo móvel.
-
-O fluxo de backend utiliza:
-
-- snapshot de biblioteca;
-- push de reviews originadas no terminal;
-- pull incremental de reviews;
-- pull incremental de `progress_resets`;
-- pull de configurações pedagógicas;
-- cursores baseados em `server_seq`.
-
-O relógio do dispositivo não é utilizado como watermark de sincronização.
-
-Os cursores são persistidos separadamente para cada classe de dado.
-
-## Protocolo local
-
-O protocolo local atual do terminal é versão 4.
-
-O T5 pode criar um ponto de acesso temporário para:
-
-- provisionamento inicial;
-- sincronização direta com o aplicativo móvel.
-
-O QR utiliza o formato:
-
-`mnemos://local?v=4&mode=...`
-
-Principais rotas locais:
-
-- `/v4/info`
-- `/v4/time`
-- `/v4/provision`
-- `/v4/complete`
-- `/v4/network/status`
-- `/v4/sync/library`
-- `/v4/sync/reviews`
-- `/v4/sync/reviews/ack`
-
-O aplicativo móvel mantém compatibilidade com versões anteriores do protocolo.
-
-## Credenciais
-
-O terminal não recebe o token normal da conta do usuário.
-
-Durante o provisionamento, o backend cria uma credencial própria do dispositivo, restrita e revogável independentemente.
-
-Essa credencial é armazenada pelo terminal e utilizada nas sincronizações posteriores.
-
-## Relógio
-
-O `TimeService` utiliza, em ordem de preferência:
-
-1. NTP quando disponível;
-2. RTC PCF8563 em operação offline;
-3. fallback persistido quando nenhuma fonte confiável estiver disponível.
-
-Quando ocorre sincronização válida por NTP ou por dispositivo externo, o RTC é atualizado.
-
-A HMI não apresenta indicadores positivos para o estado do relógio. Apenas um horário não confiável produz aviso visual.
-
-Durante os testes da preview.2 foi observado que o RTC de bancada precisava de uma correção inicial de horário. A validação temporal definitiva deve ser executada antes dos testes finais de agenda.
-
-## HMI
-
-A interface v0.6 utiliza `MNEMOS` como assinatura constante e uma hierarquia visual simples adequada ao e-paper.
-
-Telas principais:
-
-- Estudo;
-- Menu;
-- Agenda;
-- Sincronização;
-- Conexão;
-- Configuração/sincronização com celular;
-- Pergunta;
-- Conferência de resposta;
-- Feedback objetivo;
-- Esforço de recuperação;
-- Resumo da sessão.
-
-A resposta de referência nunca é apresentada juntamente com a pergunta antes da tentativa do usuário.
-
-## Entrada pelo CardKB
-
-Atalhos principais:
-
-| Tela | Ação |
-|---|---|
-| Home | `Enter` estudar/praticar/continuar |
-| Home | `M` abrir menu |
-| Menu | `1` sincronização |
-| Menu | `2` agenda |
-| Menu | `3` conexão |
-| Voltar | `Backspace` |
-| Múltipla escolha | `1`–`4` |
-| Verdadeiro/falso | `1`–`2` |
-| Autoavaliação | `1` não recuperei, `2` recuperei |
-| Esforço | `1` difícil, `2` normal, `3` fácil |
-| Feedback | `Enter` continuar |
-
-O CardKB é lido continuamente. Atualizações de texto são agrupadas para evitar refresh completo do e-paper a cada tecla.
+O CardKB não participa desta variante.
 
 ## Build
 
 ```bash
-cd firmware/t5
+cd firmware/t5-touch
 pio run
+```
+
+Upload:
+
+```bash
+pio run --target upload
+```
+
+Monitor:
+
+```bash
+pio device monitor -b 115200
+```
+
+Log esperado:
+
+```text
+[touch] GT911 online addr=0x5D SDA=18 SCL=17 IRQ=47
+```
+
+O endereço também pode ser `0x14`.
+
+
+## Agenda semanal e diagnostico touch
+
+A Home apresenta os proximos sete dias. Cada linha mostra a quantidade
+de cartoes e os decks previstos pelo estado FSRS. Cartoes vencidos e
+cartoes novos aparecem em hoje.
+
+Cada toque resolvido produz uma linha serial como:
+
+```text
+[touch][action] screen=Question x=481 y=503 -> Revelar resposta
+```
+
+Uma area `Abortar` aparece nas telas de estudo. Ao usa-la, o cartao atual
+nao gera evento de revisao; a sessao permanece disponivel para retomada.
+
+## Deck de treinamento de mandarim
+
+A preview.4 inclui um deck local de 100 caracteres essenciais para
+iniciante. Os ideogramas usam um subconjunto bitmap CJK de 100 glifos.
+A resposta usa pinyin com numero de tom, por exemplo `ni3 - voce`.
+
+
+## Rotacao por software - preview.5.3
+
+A versao da LilyGo-EPD47 usada pelo projeto nao expoe a API moderna de
+rotacao. O Mnemos usa um canvas logico 8-bit em PSRAM e um framebuffer
+fisico separado, fazendo a rotacao no refresh.
+
+O GT911 usa TouchDrv.hpp e getTouchPoints().
+
+
+## Preview 0.6.0-preview.6-touch — HMI touch-first
+
+A variante touch passa a seguir `docs/HMI_T5_TOUCH_GUIDELINES_v0.1.md`.
+
+- retrato 540x960 como padrão de primeira execução;
+- paisagem 960x540 com layout próprio em duas colunas quando aplicável;
+- barra de sistema com Menu, Girar e Abortar contextual;
+- aborto confirmado em dois passos;
+- tela Decks apenas como filtro de sessão;
+- zonas nomeadas de touch convertidas para `UiAction`;
+- log `raw/logical/zone/action`;
+- debounce de 400 ms entre ações aceitas;
+- Noto Sans CJK SC rasterizada em 14, 18 e 22 px;
+- português, pinyin tonal e Hanzi no mesmo renderer;
+- full refresh mantido nesta etapa; refresh parcial fica para spike posterior.

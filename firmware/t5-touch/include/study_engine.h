@@ -21,6 +21,15 @@ public:
     bool resumeSession();
     bool hasResumableSession() const { return resumableSession_; }
 
+    void setCardFilter(const bool* allowed, size_t count);
+    void clearCardFilter();
+    bool abortSession();
+    uint8_t remainingCount() const {
+        return currentPosition_ < sessionCount_
+            ? static_cast<uint8_t>(sessionCount_ - currentPosition_)
+            : 0;
+    }
+
     const CardDefinition& currentCard() const;
     const CardState& currentState() const;
     uint8_t currentPosition() const { return currentPosition_; }
@@ -66,6 +75,13 @@ private:
     uint32_t responseTimeMs_ = 0;
     SessionStats stats_{};
     bool resumableSession_ = false;
+    bool cardFilterEnabled_ = false;
+    bool cardAllowed_[Config::MAX_DEVICE_CARDS] = {false};
+
+    bool cardAllowed(size_t index) const {
+        return !cardFilterEnabled_ ||
+               (index < Config::MAX_DEVICE_CARDS && cardAllowed_[index]);
+    }
 
     void resetCardInteraction();
     void persistSession();

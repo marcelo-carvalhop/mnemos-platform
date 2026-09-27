@@ -1,59 +1,52 @@
-# Checklist físico — T5 v0.6.0-preview.2
+# Checklist — T5-4.7-S3 Touch
 
 ## Bring-up
 
-- [ ] `pio run` finaliza com SUCCESS.
-- [ ] Flash reporta 16 MB e PSRAM está habilitada.
-- [ ] Upload via USB funciona.
-- [ ] Serial mostra inicialização do display.
-- [ ] Serial mostra RTC PCF8563 online ou uma falha explícita.
-- [ ] Serial mostra CardKB `0x5F` online em GPIO16/15.
+- [ ] compila em `lilygo-t5-47-s3-touch`;
+- [ ] e-paper limpa corretamente;
+- [ ] LittleFS monta;
+- [ ] RTC responde em GPIO18/17;
+- [ ] GT911 responde em 0x5D ou 0x14;
+- [ ] log mostra coordenadas;
+- [ ] quatro cantos correspondem à orientação da HMI.
 
-## E-paper
+## HMI
 
-- [ ] Home ocupa orientação paisagem 960×540 corretamente.
-- [ ] Não há texto cortado nas bordas.
-- [ ] Trocas de tela não deixam artefatos impeditivos.
-- [ ] Digitação atualiza apenas a área de resposta após pequena pausa.
-- [ ] Digitação rápida não perde caracteres por causa do refresh.
+- [ ] Home: ação principal;
+- [ ] Home: Menu;
+- [ ] Menu: Sincronização / Agenda / Conexão;
+- [ ] Voltar / Cancelar;
+- [ ] alternativas objetivas;
+- [ ] Revelar resposta;
+- [ ] Não recuperei / Recuperei;
+- [ ] Difícil / Normal / Fácil;
+- [ ] Estudar novamente / Concluir;
+- [ ] nenhuma tela exige teclado.
 
-## CardKB
+## Energia
 
-- [ ] letras minúsculas funcionam.
-- [ ] Shift produz maiúsculas.
-- [ ] espaço funciona.
-- [ ] Backspace remove o último caractere.
-- [ ] Enter confirma resposta.
-- [ ] números 1–4 selecionam alternativas corretamente.
-- [ ] Menu responde a 1/2/3 e Backspace.
+- [ ] bateria preservada;
+- [ ] touch continua ativo após refresh do EPD;
+- [ ] GPIO21 disponível para wake.
 
-## Sessão
 
-- [ ] open_recall aceita texto antes da confiança.
-- [ ] cloze aceita texto antes da confiança.
-- [ ] application aceita texto antes da confiança.
-- [ ] multiple_choice corrige automaticamente.
-- [ ] true_false corrige automaticamente.
-- [ ] confiança é sempre coletada antes da resposta correta aparecer.
-- [ ] erro não pergunta esforço.
-- [ ] acerto pergunta difícil/normal/fácil.
-- [ ] prática não altera dueAt.
-- [ ] nova prática pode começar imediatamente após uma sessão concluída.
-- [ ] não existe feedback de reagendamento por cartão.
-- [ ] Home/Resumo/Agenda mostram somente a próxima revisão agregada.
+## HMI touch-first — preview.6
 
-## RTC e persistência
-
-- [ ] sincronizar relógio via Wi-Fi ou DirectSync.
-- [ ] desligar totalmente o terminal por alguns minutos.
-- [ ] religar sem Wi-Fi.
-- [ ] serial informa restauração pelo RTC.
-- [ ] próxima revisão permanece coerente com o tempo realmente decorrido.
-
-## Rede
-
-- [ ] configuração SoftAP funciona.
-- [ ] DirectSync SoftAP funciona.
-- [ ] `/v4/info` anuncia `keyboard=true`, `touch=false`, `typedRecall=true`.
-- [ ] reviews saem da outbox somente após ACK.
-- [ ] review_history permanece depois do ACK.
+- [ ] instalação sem preferência salva inicia em retrato;
+- [ ] Girar preserva tela, card e posição da sessão;
+- [ ] orientação é persistida entre boots;
+- [ ] log informa raw, logical, zone, action e arg;
+- [ ] ações aceitas respeitam debounce mínimo de 400 ms;
+- [ ] Abortar existe apenas durante sessão ativa;
+- [ ] primeiro toque em Abortar apenas abre confirmação;
+- [ ] CancelAbort volta ao mesmo card/etapa;
+- [ ] ConfirmAbort preserva revisões já confirmadas e descarta a fila restante;
+- [ ] Decks apenas filtra sessão; não edita biblioteca;
+- [ ] open recall não revela resposta antes da tentativa;
+- [ ] múltipla escolha não exige confirmação extra;
+- [ ] autoavaliação mantém Não recuperei / Recuperei;
+- [ ] esforço mantém Difícil / Normal / Fácil;
+- [ ] resumo não exibe Abortar;
+- [ ] agenda imprime valor numérico junto da barra;
+- [ ] `你` / `nǐ` / `você` renderizam corretamente;
+- [ ] `学` / `xué` / `estudar` renderizam corretamente.

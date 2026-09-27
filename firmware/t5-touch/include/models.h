@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include "config.h"
+#include "mnemos_contract_generated.h"
 
 struct CardDefinition {
     String id;

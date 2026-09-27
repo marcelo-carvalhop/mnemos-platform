@@ -97,6 +97,46 @@ int NetworkService::findProfile(const String& id) const {
     return -1;
 }
 
+
+int NetworkService::findProfileBySsid(
+    const String& ssid) const {
+
+    for (
+        size_t i = 0;
+        i < profileCount_;
+        ++i
+    ) {
+        if (profiles_[i].ssid == ssid) {
+            return static_cast<int>(i);
+        }
+    }
+
+    return -1;
+}
+
+
+String NetworkService::profileIdForSsid(
+    const String& ssid) const {
+
+    uint32_t hash = 2166136261UL;
+
+    for (
+        size_t i = 0;
+        i < ssid.length();
+        ++i
+    ) {
+        hash ^=
+            static_cast<uint8_t>(
+                ssid[i]);
+
+        hash *= 16777619UL;
+    }
+
+    return
+        "touch-" +
+        String(hash, HEX);
+}
+
 void NetworkService::begin() {
     preferences_.begin("mnemos-net", false);
     load();
@@ -111,29 +151,108 @@ void NetworkService::begin() {
 
 void NetworkService::prepareProvisioning() {
     provisioning_ = true;
-    connectedSsid_ = "";
-    WiFi.disconnect(false, false);
-    delay(80);
-    WiFi.mode(WIFI_OFF);
-    delay(80);
-    WiFi.mode(WIFI_AP);
     lastError_ = "";
+
+    WiFi.setAutoReconnect(false);
+
+    const bool staConnected =
+        WiFi.status() == WL_CONNECTED;
+
+    const int32_t staChannel =
+        WiFi.channel();
+
+    Serial.printf(
+        "[wifi] provisioning entry: mode=%d status=%d channel=%ld connected=%d\n",
+        static_cast<int>(WiFi.getMode()),
+        static_cast<int>(WiFi.status()),
+        static_cast<long>(staChannel),
+        staConnected ? 1 : 0);
+
+    if (staConnected) {
+        // Keep the existing association alive. AP and STA share the same
+        // 2.4 GHz radio, so provisioning is opened as AP+STA.
+        connectedSsid_ =
+            WiFi.SSID();
+
+        if (!WiFi.mode(WIFI_AP_STA)) {
+            lastError_ =
+                "apsta_mode_failed";
+
+            Serial.println(
+                "[wifi] falha ao entrar em WIFI_AP_STA");
+            return;
+        }
+    } else {
+        connectedSsid_ = "";
+
+        // No active association needs to be preserved.
+        if (!WiFi.mode(WIFI_AP)) {
+            lastError_ =
+                "ap_mode_failed";
+
+            Serial.println(
+                "[wifi] falha ao entrar em WIFI_AP");
+            return;
+        }
+    }
+
+    delay(40);
+
+    Serial.printf(
+        "[wifi] provisioning mode ready: mode=%d status=%d channel=%ld\n",
+        static_cast<int>(WiFi.getMode()),
+        static_cast<int>(WiFi.status()),
+        static_cast<long>(WiFi.channel()));
 }
 
+
+
 void NetworkService::finishProvisioning() {
-    WiFi.softAPdisconnect(true);
+    Serial.printf(
+        "[wifi] provisioning finish: mode=%d status=%d\n",
+        static_cast<int>(WiFi.getMode()),
+        static_cast<int>(WiFi.status()));
+
+    WiFi.softAPdisconnect(false);
+    delay(20);
+
     provisioning_ = false;
-    connectedSsid_ = "";
+
     if (!enabled_) {
+        connectedSsid_ = "";
+        WiFi.disconnect(
+            false,
+            false);
         WiFi.mode(WIFI_OFF);
         return;
     }
-    if (hasCredentials()) {
-        reconnect(10000U);
-    } else {
-        WiFi.mode(WIFI_OFF);
+
+    // If STA survived provisioning, simply remove the AP side and keep
+    // the current connection. This avoids another radio transition.
+    if (WiFi.status() == WL_CONNECTED) {
+        WiFi.mode(WIFI_STA);
+        connectedSsid_ =
+            WiFi.SSID();
+
+        Serial.printf(
+            "[wifi] STA preservado apos provisioning: %s\n",
+            connectedSsid_.c_str());
+        return;
     }
+
+    connectedSsid_ = "";
+
+    if (hasCredentials()) {
+        WiFi.mode(WIFI_STA);
+        lastReconnectAttemptMs_ = 0;
+        reconnectBackoffMs_ = 0;
+        return;
+    }
+
+    WiFi.mode(WIFI_OFF);
 }
+
+
 
 bool NetworkService::storeProfile(const NetworkProfile& profile,
                                   const String& backendUrl,
@@ -307,6 +426,258 @@ bool NetworkService::reconnect(uint32_t timeoutMs) {
     }
     return ok;
 }
+
+
+size_t NetworkService::scanVisible(
+    NetworkScanResult* results,
+    size_t maxResults) {
+
+    if (!results || maxResults == 0) {
+        return 0;
+    }
+
+    if (provisioning_) {
+        lastError_ =
+            "scan_unavailable_during_provisioning";
+        return 0;
+    }
+
+    enabled_ = true;
+    save();
+
+    WiFi.mode(WIFI_STA);
+
+    const int found =
+        WiFi.scanNetworks(
+            false,
+            true,
+            false,
+            160,
+            0);
+
+    if (found <= 0) {
+        WiFi.scanDelete();
+        lastError_ =
+            "no_networks_found";
+        return 0;
+    }
+
+    size_t count = 0;
+
+    for (
+        int i = 0;
+        i < found;
+        ++i
+    ) {
+        const String ssid =
+            WiFi.SSID(i);
+
+        if (ssid.length() == 0) {
+            continue;
+        }
+
+        const int32_t rssi =
+            WiFi.RSSI(i);
+
+        const wifi_auth_mode_t auth =
+            WiFi.encryptionType(i);
+
+        bool duplicate = false;
+
+        for (
+            size_t j = 0;
+            j < count;
+            ++j
+        ) {
+            if (results[j].ssid != ssid) {
+                continue;
+            }
+
+            duplicate = true;
+
+            if (rssi > results[j].rssi) {
+                results[j].rssi = rssi;
+            }
+
+            break;
+        }
+
+        if (duplicate) {
+            continue;
+        }
+
+        if (count >= maxResults) {
+            continue;
+        }
+
+        NetworkScanResult result;
+        result.ssid = ssid;
+        result.rssi = rssi;
+        result.open =
+            auth == WIFI_AUTH_OPEN;
+        result.enterprise =
+            auth == WIFI_AUTH_WPA2_ENTERPRISE;
+        result.known =
+            findProfileBySsid(ssid) >= 0;
+
+        results[count++] =
+            result;
+    }
+
+    WiFi.scanDelete();
+
+    // Strongest networks first. A saved network wins ties.
+    for (
+        size_t i = 0;
+        i < count;
+        ++i
+    ) {
+        for (
+            size_t j = i + 1;
+            j < count;
+            ++j
+        ) {
+            const bool swap =
+                results[j].rssi >
+                    results[i].rssi ||
+                (
+                    results[j].rssi ==
+                        results[i].rssi &&
+                    results[j].known &&
+                    !results[i].known
+                );
+
+            if (swap) {
+                const NetworkScanResult tmp =
+                    results[i];
+
+                results[i] =
+                    results[j];
+
+                results[j] =
+                    tmp;
+            }
+        }
+    }
+
+    lastError_ = "";
+
+    Serial.printf(
+        "[wifi] scan: %u redes visiveis\n",
+        static_cast<unsigned>(count));
+
+    return count;
+}
+
+
+bool NetworkService::connectSavedSsid(
+    const String& ssid,
+    uint32_t timeoutMs) {
+
+    const int index =
+        findProfileBySsid(ssid);
+
+    if (index < 0) {
+        lastError_ =
+            "unknown_network";
+        return false;
+    }
+
+    enabled_ = true;
+    save();
+
+    return connectProfile(
+        profiles_[index],
+        timeoutMs);
+}
+
+
+bool NetworkService::connectAndStore(
+    const String& ssid,
+    const String& password,
+    bool openNetwork,
+    uint32_t timeoutMs) {
+
+    if (
+        ssid.length() == 0 ||
+        ssid.length() > 32
+    ) {
+        lastError_ =
+            "invalid_ssid";
+        return false;
+    }
+
+    NetworkProfile profile;
+
+    const int existing =
+        findProfileBySsid(ssid);
+
+    if (existing >= 0) {
+        profile =
+            profiles_[existing];
+    } else {
+        profile.id =
+            profileIdForSsid(ssid);
+        profile.ssid =
+            ssid;
+        profile.priority = 80;
+        profile.enabled = true;
+        profile.autoConnect = true;
+    }
+
+    profile.security =
+        openNetwork
+            ? "open"
+            : "personal";
+
+    profile.password =
+        openNetwork
+            ? String()
+            : password;
+
+    profile.identity = "";
+    profile.username = "";
+
+    if (!validProfile(profile)) {
+        lastError_ =
+            "invalid_network_profile";
+        return false;
+    }
+
+    if (existing >= 0) {
+        profiles_[existing] =
+            profile;
+    } else {
+        if (
+            profileCount_ >=
+            MAX_PROFILES
+        ) {
+            lastError_ =
+                "network_profile_capacity";
+            return false;
+        }
+
+        profiles_[profileCount_++] =
+            profile;
+    }
+
+    enabled_ = true;
+    save();
+
+    const int index =
+        findProfileBySsid(ssid);
+
+    if (index < 0) {
+        lastError_ =
+            "profile_persist_failed";
+        return false;
+    }
+
+    return connectProfile(
+        profiles_[index],
+        timeoutMs);
+}
+
 
 void NetworkService::disable() {
     enabled_ = false;

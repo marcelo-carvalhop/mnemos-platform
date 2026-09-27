@@ -3,6 +3,14 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+struct NetworkScanResult {
+    String ssid;
+    int32_t rssi = -127;
+    bool open = false;
+    bool enterprise = false;
+    bool known = false;
+};
+
 struct NetworkProfile {
     String id;
     String ssid;
@@ -19,6 +27,7 @@ struct NetworkProfile {
 class NetworkService {
 public:
     static constexpr size_t MAX_PROFILES = 8;
+    static constexpr size_t MAX_SCAN_RESULTS = 12;
 
     void begin();
 
@@ -39,6 +48,21 @@ public:
     void prepareProvisioning();
     void finishProvisioning();
     bool reconnect(uint32_t timeoutMs = 12000U);
+
+    size_t scanVisible(
+        NetworkScanResult* results,
+        size_t maxResults);
+
+    bool connectSavedSsid(
+        const String& ssid,
+        uint32_t timeoutMs = 12000U);
+
+    bool connectAndStore(
+        const String& ssid,
+        const String& password,
+        bool openNetwork,
+        uint32_t timeoutMs = 12000U);
+
     void disable();
     bool enable();
     void loop();
@@ -76,6 +100,8 @@ private:
     void load();
     void save();
     int findProfile(const String& id) const;
+    int findProfileBySsid(const String& ssid) const;
+    String profileIdForSsid(const String& ssid) const;
     int chooseVisibleProfile();
     bool connectProfile(NetworkProfile& profile, uint32_t timeoutMs);
     bool validProfile(const NetworkProfile& profile) const;

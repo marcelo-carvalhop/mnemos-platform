@@ -301,6 +301,7 @@ void StudyEngine::buildReviewQueue() {
         allowedNewCards(nowMs);
 
     for (size_t i = 0; i < count_; ++i) {
+        if (!cardAllowed(i)) continue;
         const bool isNew =
             !states_[i].fsrsInitialized;
 
@@ -356,9 +357,17 @@ bool StudyEngine::startPracticeSession() {
     stats_ = SessionStats{};
     stats_.mode = mode_;
     stats_.startedAtMs = millis();
+    for (
+        size_t i = 0;
+        i < count_ &&
+        sessionCount_ < Config::PRACTICE_CARD_LIMIT;
+        ++i
+    ) {
+        if (!cardAllowed(i)) continue;
 
-    const size_t limit = std::min<size_t>(count_, Config::PRACTICE_CARD_LIMIT);
-    for (size_t i = 0; i < limit; ++i) queue_[sessionCount_++] = static_cast<uint8_t>(i);
+        queue_[sessionCount_++] =
+            static_cast<uint8_t>(i);
+    }
 
     resumableSession_ = sessionCount_ > 0;
     resetCardInteraction();
@@ -373,6 +382,63 @@ bool StudyEngine::resumeSession() {
     resetCardInteraction();
     return true;
 }
+
+void StudyEngine::setCardFilter(
+    const bool* allowed,
+    size_t count) {
+
+    cardFilterEnabled_ = false;
+
+    for (size_t i = 0;
+         i < Config::MAX_DEVICE_CARDS;
+         ++i) {
+        cardAllowed_[i] = false;
+    }
+
+    if (!allowed) return;
+
+    const size_t limit =
+        std::min<size_t>(
+            count,
+            Config::MAX_DEVICE_CARDS);
+
+    for (size_t i = 0;
+         i < limit;
+         ++i) {
+        cardAllowed_[i] = allowed[i];
+
+        if (allowed[i]) {
+            cardFilterEnabled_ = true;
+        }
+    }
+}
+
+void StudyEngine::clearCardFilter() {
+    cardFilterEnabled_ = false;
+
+    for (size_t i = 0;
+         i < Config::MAX_DEVICE_CARDS;
+         ++i) {
+        cardAllowed_[i] = false;
+    }
+}
+
+bool StudyEngine::abortSession() {
+    const bool hadSession =
+        resumableSession_ ||
+        sessionCount_ > 0;
+
+    resumableSession_ = false;
+    sessionCount_ = 0;
+    currentPosition_ = 0;
+    stats_.endedAtMs = millis();
+
+    resetCardInteraction();
+    storage_.clearSession();
+
+    return hadSession;
+}
+
 
 void StudyEngine::resetCardInteraction() {
     confidence_ = Confidence::None;
