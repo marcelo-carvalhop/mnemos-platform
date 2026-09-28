@@ -22,7 +22,9 @@ struct CardDefinition {
     }
 
     bool isSelfAssessed() const {
-        return !isObjective();
+        // T5 Touch is a retrieval-practice terminal. Even objective cards
+        // are answered mentally, then revealed and self-assessed.
+        return true;
     }
 };
 

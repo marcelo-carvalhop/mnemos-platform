@@ -20,6 +20,8 @@ public:
 
     bool begin();
     bool remount();
+    void suspend();
+    bool resume();
     bool mounted() const { return mounted_; }
 
     uint64_t cardSizeBytes() const;
@@ -38,6 +40,30 @@ public:
         size_t maxCards,
         size_t& count);
 
+    // Biblioteca SD-first.
+    bool canonicalLibraryAvailable() const;
+
+    bool saveCanonicalLibrary(
+        const CardDefinition* cards,
+        size_t count);
+
+    bool loadCatalog(
+        CardDefinition* cards,
+        CardState* states,
+        size_t maxCards,
+        size_t& count);
+
+    bool hydrateCard(
+        const String& id,
+        CardDefinition& card);
+
+    void compactCatalog(
+        CardDefinition* cards,
+        size_t count);
+
+    SdImportResult importDeckFileToCanonical(
+        const String& path,
+        size_t maxCards);
     bool exportLibrary(
         const CardDefinition* cards,
         size_t count,

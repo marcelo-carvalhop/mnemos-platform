@@ -10,21 +10,40 @@ constexpr int DAYLIGHT_OFFSET_SECONDS = 0;
 constexpr uint8_t DAY_CUTOFF_HOUR = MnemosContract::DEFAULT_DAY_CUTOFF_HOUR;
 
 // Bancada: intervalos comprimidos para validar agenda/sessões sem esperar dias.
+#if defined(MNEMOS_DEMO_INTERVALS)
 constexpr bool DEMO_INTERVALS = true;
+#else
+constexpr bool DEMO_INTERVALS = false;
+#endif
 
 constexpr uint8_t SESSION_MAX_CARDS = 10;
 constexpr uint8_t PRACTICE_CARD_LIMIT = 5;
 constexpr uint8_t MAX_DEVICE_CARDS = 128;
+
+// O array em RAM e catalogo leve. Conteudo textual completo fica no SD.
+constexpr bool SD_FIRST_LIBRARY = true;
 constexpr uint8_t MAX_CARD_OPTIONS = 4;
 constexpr uint8_t MAX_CONSECUTIVE_SAME_DECK = 2;
 constexpr uint8_t BASE_NEW_CARDS_PER_SESSION = 4;
 constexpr uint8_t FORECAST_LOAD_THRESHOLD_7D = 20;
-constexpr bool SEED_MANDARIN_TRAINING_DECK = true;
+constexpr bool SEED_MANDARIN_TRAINING_DECK = false;
 
-constexpr char APP_VERSION[] = "0.6.0-preview.6.4.4.8-touch";
+#if defined(MNEMOS_OTA_TEST_SOURCE)
+constexpr char APP_VERSION[] = "0.7.0-preview.4.1.2-ota-source-touch";
+constexpr uint32_t OTA_GENERATION = 70402U;
+#else
+constexpr char APP_VERSION[] = "0.7.0-preview.4.2-touch";
+constexpr uint32_t OTA_GENERATION = 70403U;
+#endif
 constexpr uint8_t DEVICE_PROTOCOL_VERSION = 4;
 constexpr uint16_t LOCAL_LINK_TIMEOUT_SECONDS = 300;
 constexpr char DEVICE_MODEL[] = "LILYGO-T5-4.7-S3-TOUCH";
+
+constexpr uint32_t OTA_MAX_IMAGE_BYTES = 0x300000U;
+constexpr uint8_t OTA_MIN_BATTERY_PERCENT = 20;
+constexpr char OTA_LOCAL_MANIFEST_PATH[] = "/mnemos/update/manifest.json";
+constexpr char OTA_APPLIED_MANIFEST_PATH[] = "/mnemos/update/manifest.applied.json";
+constexpr char OTA_LOCAL_IMAGE_PATH[] = "/mnemos/update/firmware.bin";
 
 constexpr float RETENTION_TARGET = 0.90f;
 constexpr float MIN_DIFFICULTY = 1.0f;
@@ -53,6 +72,18 @@ constexpr uint16_t TOUCH_IRQ_FALLBACK_MS = 80;
 constexpr uint16_t TOUCH_ACTION_DEBOUNCE_MS = 400;
 constexpr uint16_t TOUCH_RETRY_MS = 3000;
 
+// Rede cooperativa: descoberta/conexão não bloqueiam a HMI.
+constexpr uint32_t WIFI_CONNECT_TIMEOUT_MS = 12000U;
+constexpr uint32_t WIFI_RECONNECT_TIMEOUT_MS = 8000U;
+constexpr uint32_t WIFI_RECONNECT_INITIAL_BACKOFF_MS = 30000U;
+constexpr uint32_t WIFI_RECONNECT_MAX_BACKOFF_MS = 300000U;
+
+// SNTP é observado sem espera bloqueante.
+constexpr uint32_t NTP_SYNC_TIMEOUT_MS = 10000U;
+
+// CA HTTPS opcional no LittleFS.
+constexpr char BACKEND_CA_FILE[] = "/backend_ca.pem";
+
 // T5-4.7-S3: slot microSD/TF onboard via SPI.
 constexpr int SD_MISO_PIN = 16;
 constexpr int SD_MOSI_PIN = 15;
@@ -68,6 +99,40 @@ constexpr float BATTERY_PRESENT_MIN_V = 2.80f;
 constexpr float BATTERY_MAX_V = 4.20f;
 constexpr uint32_t BATTERY_SAMPLE_INTERVAL_MS = 60000U;
 constexpr uint8_t BATTERY_DISPLAY_STEP_PERCENT = 5;
+
+constexpr uint8_t BATTERY_LOW_PERCENT = 15;
+constexpr uint8_t BATTERY_CRITICAL_PERCENT = 5;
+
+// Política de energia da T5 Touch atual.
+#if defined(MNEMOS_BENCH_BUILD)
+constexpr bool BENCH_BUILD = true;
+#if defined(MNEMOS_OTA_TEST_SOURCE)
+constexpr char BUILD_FLAVOR[] = "bench-ota-source";
+constexpr bool OTA_AUTO_APPLY_ENABLED = true;
+#elif defined(MNEMOS_OTA_TEST_TARGET)
+constexpr char BUILD_FLAVOR[] = "bench-ota-target";
+constexpr bool OTA_AUTO_APPLY_ENABLED = false;
+#else
+constexpr char BUILD_FLAVOR[] = "bench";
+constexpr bool OTA_AUTO_APPLY_ENABLED = false;
+#endif
+constexpr bool LIGHT_SLEEP_ENABLED = false;
+constexpr bool DEEP_SLEEP_ENABLED = false;
+#else
+constexpr bool BENCH_BUILD = false;
+constexpr char BUILD_FLAVOR[] = "product";
+constexpr bool LIGHT_SLEEP_ENABLED = true;
+constexpr bool DEEP_SLEEP_ENABLED = true;
+constexpr bool OTA_AUTO_APPLY_ENABLED = true;
+#endif
+constexpr uint32_t LIGHT_SLEEP_IDLE_MS =
+    2U * 60U * 1000U;
+constexpr uint32_t DEEP_SLEEP_IDLE_MS =
+    20U * 60U * 1000U;
+constexpr uint32_t LIGHT_SLEEP_MAX_TIMER_MS =
+    20U * 60U * 1000U;
+constexpr uint32_t DEEP_SLEEP_MAINTENANCE_SECONDS =
+    6U * 60U * 60U;
 
 // RTC PCF8563 e GT911 compartilham o barramento I2C nativo.
 constexpr int SYSTEM_I2C_SDA = 18;

@@ -448,6 +448,17 @@ void StudyEngine::resetCardInteraction() {
     questionShownAtMs_ = millis();
 }
 
+void StudyEngine::prepareForSleep() {
+    storage_.saveStates(
+        states_,
+        count_);
+
+    if (resumableSession_) {
+        persistSession();
+    }
+}
+
+
 void StudyEngine::persistSession() {
     if (!resumableSession_) return;
     storage_.saveSession(cards_, queue_, sessionCount_, currentPosition_, mode_, stats_);

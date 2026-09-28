@@ -3153,9 +3153,6 @@ void T5Display::showQuestion(
                 510,
                 4);
         } else {
-            // Landscape é um layout próprio em duas colunas.
-            // A instrução fica à esquerda e o Hanzi ocupa a direita,
-            // evitando a colisão entre deck, pergunta e caractere.
             drawLine(
                 468,
                 150,
@@ -3199,7 +3196,7 @@ void T5Display::showQuestion(
             drawWrapped(
                 card.question,
                 MARGIN,
-                210,
+                205,
                 logicalWidth() -
                     2 * MARGIN,
                 31,
@@ -3221,17 +3218,17 @@ void T5Display::showQuestion(
                     i + 1,
                     card.options[i],
                     MARGIN,
-                    390 +
-                        i * 98,
+                    375 +
+                        i * 96,
                     logicalWidth() -
                         2 * MARGIN,
-                    90);
+                    86);
             }
         } else {
             drawWrapped(
                 card.question,
                 MARGIN,
-                188,
+                180,
                 390,
                 31,
                 6,
@@ -3277,13 +3274,14 @@ void T5Display::showQuestion(
                 : 6,
             MnemosFontRole::Body18,
             BLACK);
-
-        drawPrimaryButton(
-            "Ver resposta");
     }
+
+    drawPrimaryButton(
+        "Ver resposta");
 
     refreshFull();
 }
+
 
 
 void T5Display::showSelfAssessment(

@@ -138,16 +138,38 @@ String NetworkService::profileIdForSsid(
 }
 
 void NetworkService::begin() {
-    preferences_.begin("mnemos-net", false);
+    preferences_.begin(
+        "mnemos-net",
+        false);
+
     load();
+
     connectedSsid_ = "";
     WiFi.setAutoReconnect(false);
-    if (enabled_ && hasCredentials()) {
-        reconnect(8000U);
-    } else if (!enabled_) {
+
+    asyncState_ =
+        NetworkAsyncState::Idle;
+
+    scanResultReady_ = false;
+    connectionResultReady_ = false;
+
+    reconnectBackoffMs_ =
+        Config::
+            WIFI_RECONNECT_INITIAL_BACKOFF_MS;
+
+    lastReconnectAttemptMs_ = 0;
+
+    if (!enabled_) {
         WiFi.mode(WIFI_OFF);
+        return;
+    }
+
+    if (hasCredentials()) {
+        // loop() performs connection attempts cooperatively.
+        WiFi.mode(WIFI_STA);
     }
 }
+
 
 void NetworkService::prepareProvisioning() {
     provisioning_ = true;
@@ -679,6 +701,634 @@ bool NetworkService::connectAndStore(
 }
 
 
+
+int NetworkService::bestEnabledProfile() const {
+    int best = -1;
+    int16_t priority = -32768;
+
+    for (
+        size_t i = 0;
+        i < profileCount_;
+        ++i
+    ) {
+        if (
+            !profiles_[i].enabled ||
+            !profiles_[i].autoConnect
+        ) {
+            continue;
+        }
+
+        if (
+            best < 0 ||
+            profiles_[i].priority >
+                priority
+        ) {
+            best =
+                static_cast<int>(i);
+
+            priority =
+                profiles_[i].priority;
+        }
+    }
+
+    return best;
+}
+
+
+bool NetworkService::startScan() {
+    if (
+        provisioning_ ||
+        asyncState_ !=
+            NetworkAsyncState::Idle
+    ) {
+        lastError_ =
+            "network_busy";
+        return false;
+    }
+
+    enabled_ = true;
+    save();
+
+    if (
+        WiFi.getMode() ==
+        WIFI_OFF
+    ) {
+        WiFi.mode(WIFI_STA);
+    }
+
+    WiFi.scanDelete();
+
+    const int started =
+        WiFi.scanNetworks(
+            true,
+            true,
+            false,
+            160,
+            0);
+
+    if (
+        started ==
+        WIFI_SCAN_FAILED
+    ) {
+        lastError_ =
+            "scan_start_failed";
+        return false;
+    }
+
+    asyncState_ =
+        NetworkAsyncState::Scanning;
+
+    asyncStartedMs_ =
+        millis();
+
+    asyncScanCount_ = 0;
+    scanResultReady_ = false;
+    lastError_ = "";
+
+    Serial.println(
+        "[wifi] scan assincrono iniciado");
+
+    return true;
+}
+
+
+void NetworkService::finishAsyncScan(
+    int found) {
+
+    asyncScanCount_ = 0;
+
+    if (found > 0) {
+        for (
+            int i = 0;
+            i < found;
+            ++i
+        ) {
+            const String ssid =
+                WiFi.SSID(i);
+
+            if (ssid.length() == 0) {
+                continue;
+            }
+
+            const int32_t rssi =
+                WiFi.RSSI(i);
+
+            const wifi_auth_mode_t auth =
+                WiFi.encryptionType(i);
+
+            bool duplicate = false;
+
+            for (
+                size_t j = 0;
+                j < asyncScanCount_;
+                ++j
+            ) {
+                if (
+                    asyncScanResults_[j].
+                        ssid !=
+                    ssid
+                ) {
+                    continue;
+                }
+
+                duplicate = true;
+
+                if (
+                    rssi >
+                    asyncScanResults_[j].
+                        rssi
+                ) {
+                    asyncScanResults_[j].
+                        rssi =
+                        rssi;
+                }
+
+                break;
+            }
+
+            if (
+                duplicate ||
+                asyncScanCount_ >=
+                    MAX_SCAN_RESULTS
+            ) {
+                continue;
+            }
+
+            NetworkScanResult result;
+            result.ssid = ssid;
+            result.rssi = rssi;
+            result.open =
+                auth ==
+                WIFI_AUTH_OPEN;
+            result.enterprise =
+                auth ==
+                WIFI_AUTH_WPA2_ENTERPRISE;
+            result.known =
+                findProfileBySsid(
+                    ssid) >= 0;
+
+            asyncScanResults_[
+                asyncScanCount_++] =
+                result;
+        }
+    }
+
+    WiFi.scanDelete();
+
+    for (
+        size_t i = 0;
+        i < asyncScanCount_;
+        ++i
+    ) {
+        for (
+            size_t j = i + 1;
+            j < asyncScanCount_;
+            ++j
+        ) {
+            const bool swap =
+                asyncScanResults_[j].
+                    rssi >
+                    asyncScanResults_[i].
+                        rssi ||
+                (
+                    asyncScanResults_[j].
+                        rssi ==
+                        asyncScanResults_[i].
+                            rssi &&
+                    asyncScanResults_[j].
+                        known &&
+                    !asyncScanResults_[i].
+                        known
+                );
+
+            if (swap) {
+                const NetworkScanResult tmp =
+                    asyncScanResults_[i];
+
+                asyncScanResults_[i] =
+                    asyncScanResults_[j];
+
+                asyncScanResults_[j] =
+                    tmp;
+            }
+        }
+    }
+
+    asyncState_ =
+        NetworkAsyncState::Idle;
+
+    scanResultReady_ = true;
+
+    lastError_ =
+        asyncScanCount_ == 0
+            ? "no_networks_found"
+            : "";
+
+    Serial.printf(
+        "[wifi] scan assincrono concluido: %u redes\n",
+        static_cast<unsigned>(
+            asyncScanCount_));
+}
+
+
+bool NetworkService::consumeScanResults(
+    NetworkScanResult* results,
+    size_t maxResults,
+    size_t& count) {
+
+    if (!scanResultReady_) {
+        return false;
+    }
+
+    scanResultReady_ = false;
+
+    count =
+        std::min<size_t>(
+            asyncScanCount_,
+            maxResults);
+
+    for (
+        size_t i = 0;
+        i < count;
+        ++i
+    ) {
+        results[i] =
+            asyncScanResults_[i];
+    }
+
+    return true;
+}
+
+
+bool NetworkService::beginAsyncConnection(
+    int profileIndex,
+    bool notify,
+    uint32_t timeoutMs) {
+
+    if (
+        provisioning_ ||
+        asyncState_ !=
+            NetworkAsyncState::Idle ||
+        profileIndex < 0 ||
+        static_cast<size_t>(
+            profileIndex) >=
+            profileCount_
+    ) {
+        lastError_ =
+            "network_busy";
+        return false;
+    }
+
+    NetworkProfile& profile =
+        profiles_[profileIndex];
+
+    if (
+        profile.security ==
+        "enterprise-password"
+    ) {
+        lastError_ =
+            "enterprise_requires_external_provisioning";
+
+        if (notify) {
+            connectionResultReady_ = true;
+            connectionResultSuccess_ = false;
+            connectionResultSsid_ =
+                profile.ssid;
+            connectionResultError_ =
+                lastError_;
+        }
+
+        return false;
+    }
+
+    WiFi.disconnect(
+        false,
+        false);
+
+    if (
+        WiFi.getMode() ==
+        WIFI_OFF
+    ) {
+        WiFi.mode(WIFI_STA);
+    }
+
+    if (
+        profile.security ==
+        "open"
+    ) {
+        WiFi.begin(
+            profile.ssid.c_str(),
+            nullptr);
+    } else {
+        WiFi.begin(
+            profile.ssid.c_str(),
+            profile.password.c_str());
+    }
+
+    asyncProfileIndex_ =
+        profileIndex;
+
+    asyncNotify_ =
+        notify;
+
+    asyncStartedMs_ =
+        millis();
+
+    asyncTimeoutMs_ =
+        timeoutMs;
+
+    asyncState_ =
+        NetworkAsyncState::Connecting;
+
+    lastReconnectAttemptMs_ =
+        asyncStartedMs_;
+
+    connectedSsid_ = "";
+    lastError_ = "";
+
+    Serial.printf(
+        "[wifi] conexao assincrona iniciada: %s\n",
+        profile.ssid.c_str());
+
+    return true;
+}
+
+
+bool NetworkService::startConnectSavedSsidAsync(
+    const String& ssid,
+    uint32_t timeoutMs) {
+
+    const int index =
+        findProfileBySsid(
+            ssid);
+
+    if (index < 0) {
+        lastError_ =
+            "unknown_network";
+        return false;
+    }
+
+    enabled_ = true;
+    save();
+
+    return
+        beginAsyncConnection(
+            index,
+            true,
+            timeoutMs);
+}
+
+
+bool NetworkService::startConnectAndStoreAsync(
+    const String& ssid,
+    const String& password,
+    bool openNetwork,
+    uint32_t timeoutMs) {
+
+    if (
+        ssid.length() == 0 ||
+        ssid.length() > 32
+    ) {
+        lastError_ =
+            "invalid_ssid";
+        return false;
+    }
+
+    NetworkProfile profile;
+
+    const int existing =
+        findProfileBySsid(
+            ssid);
+
+    if (existing >= 0) {
+        profile =
+            profiles_[existing];
+    } else {
+        profile.id =
+            profileIdForSsid(
+                ssid);
+
+        profile.ssid =
+            ssid;
+
+        profile.priority = 80;
+        profile.enabled = true;
+        profile.autoConnect = true;
+    }
+
+    profile.security =
+        openNetwork
+            ? "open"
+            : "personal";
+
+    profile.password =
+        openNetwork
+            ? String()
+            : password;
+
+    profile.identity = "";
+    profile.username = "";
+
+    if (!validProfile(profile)) {
+        lastError_ =
+            "invalid_network_profile";
+        return false;
+    }
+
+    if (existing >= 0) {
+        profiles_[existing] =
+            profile;
+    } else {
+        if (
+            profileCount_ >=
+            MAX_PROFILES
+        ) {
+            lastError_ =
+                "network_profile_capacity";
+            return false;
+        }
+
+        profiles_[profileCount_++] =
+            profile;
+    }
+
+    enabled_ = true;
+    save();
+
+    const int index =
+        findProfileBySsid(
+            ssid);
+
+    if (index < 0) {
+        lastError_ =
+            "profile_persist_failed";
+        return false;
+    }
+
+    return
+        beginAsyncConnection(
+            index,
+            true,
+            timeoutMs);
+}
+
+
+void NetworkService::finishAsyncConnection(
+    bool success,
+    const String& error) {
+
+    const int index =
+        asyncProfileIndex_;
+
+    String ssid;
+
+    if (
+        index >= 0 &&
+        static_cast<size_t>(index) <
+            profileCount_
+    ) {
+        NetworkProfile& profile =
+            profiles_[index];
+
+        ssid =
+            profile.ssid;
+
+        if (success) {
+            profile.failureCount = 0;
+        } else {
+            ++profile.failureCount;
+        }
+
+        save();
+    }
+
+    if (success) {
+        connectedSsid_ =
+            WiFi.SSID().length() > 0
+                ? WiFi.SSID()
+                : ssid;
+
+        lastError_ = "";
+
+        reconnectBackoffMs_ =
+            Config::
+                WIFI_RECONNECT_INITIAL_BACKOFF_MS;
+
+        Serial.printf(
+            "[wifi] conectado a %s, IP=%s\n",
+            connectedSsid_.c_str(),
+            WiFi.localIP().
+                toString().
+                c_str());
+    } else {
+        connectedSsid_ = "";
+        lastError_ = error;
+
+        const uint32_t doubled =
+            reconnectBackoffMs_ >
+                Config::
+                    WIFI_RECONNECT_MAX_BACKOFF_MS /
+                    2U
+                ? Config::
+                      WIFI_RECONNECT_MAX_BACKOFF_MS
+                : reconnectBackoffMs_ *
+                      2U;
+
+        reconnectBackoffMs_ =
+            std::min<uint32_t>(
+                doubled,
+                Config::
+                    WIFI_RECONNECT_MAX_BACKOFF_MS);
+
+        Serial.printf(
+            "[wifi] conexao falhou: %s\n",
+            error.c_str());
+    }
+
+    if (asyncNotify_) {
+        connectionResultReady_ = true;
+        connectionResultSuccess_ =
+            success;
+        connectionResultSsid_ =
+            ssid;
+        connectionResultError_ =
+            error;
+    }
+
+    asyncState_ =
+        NetworkAsyncState::Idle;
+
+    asyncProfileIndex_ = -1;
+    asyncNotify_ = false;
+}
+
+
+bool NetworkService::consumeConnectionResult(
+    bool& success,
+    String& ssid,
+    String& error) {
+
+    if (!connectionResultReady_) {
+        return false;
+    }
+
+    connectionResultReady_ = false;
+
+    success =
+        connectionResultSuccess_;
+
+    ssid =
+        connectionResultSsid_;
+
+    error =
+        connectionResultError_;
+
+    return true;
+}
+
+
+
+void NetworkService::suspendForSleep() {
+    if (
+        asyncState_ !=
+        NetworkAsyncState::Idle
+    ) {
+        return;
+    }
+
+    WiFi.disconnect(
+        false,
+        false);
+
+    WiFi.mode(
+        WIFI_OFF);
+
+    connectedSsid_ = "";
+
+    Serial.println(
+        "[wifi] radio suspenso");
+}
+
+
+void NetworkService::resumeAfterSleep() {
+    if (
+        !enabled_ ||
+        !hasCredentials()
+    ) {
+        return;
+    }
+
+    WiFi.mode(
+        WIFI_STA);
+
+    lastReconnectAttemptMs_ = 0;
+    reconnectBackoffMs_ = 0;
+
+    Serial.println(
+        "[wifi] radio retomado");
+}
+
+
 void NetworkService::disable() {
     enabled_ = false;
     provisioning_ = false;
@@ -693,23 +1343,131 @@ void NetworkService::disable() {
 bool NetworkService::enable() {
     enabled_ = true;
     save();
+
     if (!hasCredentials()) {
-        lastError_ = "not_provisioned";
+        lastError_ =
+            "not_provisioned";
         return false;
     }
-    return reconnect();
+
+    lastError_ = "";
+
+    if (
+        WiFi.getMode() ==
+        WIFI_OFF
+    ) {
+        WiFi.mode(WIFI_STA);
+    }
+
+    lastReconnectAttemptMs_ = 0;
+    reconnectBackoffMs_ = 0;
+
+    return true;
 }
 
+
 void NetworkService::loop() {
-    if (!enabled_ || provisioning_ || !hasCredentials()) return;
-    if (connected()) {
-        if (connectedSsid_.length() == 0) connectedSsid_ = WiFi.SSID();
+    if (provisioning_) {
         return;
     }
+
+    const uint32_t now =
+        millis();
+
+    if (
+        asyncState_ ==
+        NetworkAsyncState::Scanning
+    ) {
+        const int found =
+            WiFi.scanComplete();
+
+        if (
+            found !=
+            WIFI_SCAN_RUNNING
+        ) {
+            finishAsyncScan(
+                found < 0
+                    ? 0
+                    : found);
+        }
+
+        return;
+    }
+
+    if (
+        asyncState_ ==
+        NetworkAsyncState::Connecting
+    ) {
+        if (
+            WiFi.status() ==
+            WL_CONNECTED
+        ) {
+            finishAsyncConnection(
+                true,
+                "");
+            return;
+        }
+
+        if (
+            now -
+                asyncStartedMs_ >=
+            asyncTimeoutMs_
+        ) {
+            finishAsyncConnection(
+                false,
+                "connection_failed");
+        }
+
+        return;
+    }
+
+    if (
+        !enabled_ ||
+        !hasCredentials()
+    ) {
+        return;
+    }
+
+    if (connected()) {
+        if (
+            connectedSsid_.
+                length() == 0
+        ) {
+            connectedSsid_ =
+                WiFi.SSID();
+        }
+
+        return;
+    }
+
     connectedSsid_ = "";
-    if (millis() - lastReconnectAttemptMs_ < reconnectBackoffMs_) return;
-    reconnect(1800U);
+
+    if (
+        now -
+            lastReconnectAttemptMs_ <
+        reconnectBackoffMs_
+    ) {
+        return;
+    }
+
+    const int index =
+        bestEnabledProfile();
+
+    if (index < 0) {
+        lastError_ =
+            "no_known_network";
+        lastReconnectAttemptMs_ =
+            now;
+        return;
+    }
+
+    beginAsyncConnection(
+        index,
+        false,
+        Config::
+            WIFI_RECONNECT_TIMEOUT_MS);
 }
+
 
 bool NetworkService::connected() const {
     return enabled_ && !provisioning_ && WiFi.status() == WL_CONNECTED;

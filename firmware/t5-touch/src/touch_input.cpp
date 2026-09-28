@@ -7,6 +7,7 @@
 namespace {
 
 volatile bool gTouchIrqPending = true;
+bool gTouchInterruptAttached = false;
 
 void IRAM_ATTR onGt911Interrupt() {
     gTouchIrqPending = true;
@@ -45,9 +46,14 @@ bool TouchInput::begin() {
     address_ = 0;
     gTouchIrqPending = true;
 
-    detachInterrupt(
-        digitalPinToInterrupt(
-            Config::TOUCH_IRQ_PIN));
+    if (gTouchInterruptAttached) {
+        detachInterrupt(
+            digitalPinToInterrupt(
+                Config::TOUCH_IRQ_PIN));
+
+        gTouchInterruptAttached =
+            false;
+    }
 
     // Mantem o comportamento de inicializacao ja validado
     // nessa placa antes de devolver GPIO47 ao GT911.
@@ -123,6 +129,9 @@ bool TouchInput::begin() {
                 Config::TOUCH_IRQ_PIN),
             onGt911Interrupt,
             FALLING);
+
+        gTouchInterruptAttached =
+            true;
 
         irqEnabled_ = true;
     }

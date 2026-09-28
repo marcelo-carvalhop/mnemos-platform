@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "config.h"
 
 class BatteryService {
 public:
@@ -13,6 +14,20 @@ public:
     bool available() const { return available_; }
     uint8_t percent() const { return displayPercent_; }
     float voltage() const { return voltage_; }
+
+    bool low() const {
+        return
+            available_ &&
+            displayPercent_ <=
+                Config::BATTERY_LOW_PERCENT;
+    }
+
+    bool critical() const {
+        return
+            available_ &&
+            displayPercent_ <=
+                Config::BATTERY_CRITICAL_PERCENT;
+    }
 
 private:
     bool sample(bool force);

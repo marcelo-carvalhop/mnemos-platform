@@ -50,6 +50,8 @@ public:
 
     bool commitCurrent(Outcome outcome, Effort effort);
 
+    void prepareForSleep();
+
 private:
     struct Candidate {
         uint8_t index = 0;

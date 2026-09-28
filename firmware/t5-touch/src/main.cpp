@@ -11,6 +11,8 @@
 #include "local_link_service.h"
 #include "metrics_service.h"
 #include "network_service.h"
+#include "ota_service.h"
+#include "power_service.h"
 #include "schedule_service.h"
 #include "sd_card_service.h"
 #include "storage.h"
@@ -69,6 +71,8 @@ Storage storage;
 NetworkService networkService;
 SdCardService sdCardService;
 TimeService clockService;
+PowerService powerService;
+OtaService otaService;
 T5Display display;
 TouchInput touchInput;
 
@@ -137,12 +141,16 @@ String wifiHint;
 String wifiMessageTitle;
 String wifiMessageText;
 String wifiMessagePrimary = "Voltar à conexão";
+bool wifiConnectRetryPassword = false;
+bool wifiUserConnectionPending = false;
 
 String sdPaths[SdCardService::MAX_VISIBLE_FILES];
 String sdNames[SdCardService::MAX_VISIBLE_FILES];
 uint32_t sdSizes[SdCardService::MAX_VISIBLE_FILES] = {0};
 size_t sdFileCount = 0;
 String sdStatus;
+
+CardDefinition displayCardBuffer;
 
 void rebuildEngine() {
     if (engine != nullptr) {
@@ -167,9 +175,9 @@ uint32_t academicDayStart(
     const int64_t local =
         static_cast<int64_t>(epoch) +
         static_cast<int64_t>(
-            Config::GMT_OFFSET_SECONDS) +
+            clockService.utcOffsetSeconds()) +
         static_cast<int64_t>(
-            Config::DAYLIGHT_OFFSET_SECONDS);
+            clockService.daylightOffsetSeconds());
 
     const int64_t cutoff =
         static_cast<int64_t>(
@@ -191,9 +199,9 @@ uint32_t academicDayStart(
     const int64_t utc =
         startLocal -
         static_cast<int64_t>(
-            Config::GMT_OFFSET_SECONDS) -
+            clockService.utcOffsetSeconds()) -
         static_cast<int64_t>(
-            Config::DAYLIGHT_OFFSET_SECONDS);
+            clockService.daylightOffsetSeconds());
 
     return
         utc > 0
@@ -217,8 +225,8 @@ String weeklyDayLabel(
 
     time_t shifted =
         static_cast<time_t>(epoch) +
-        Config::GMT_OFFSET_SECONDS +
-        Config::DAYLIGHT_OFFSET_SECONDS;
+        clockService.utcOffsetSeconds() +
+        clockService.daylightOffsetSeconds();
 
     tm value{};
     gmtime_r(
@@ -759,19 +767,34 @@ void renderWifiNetworks() {
         wifiScanCount);
 }
 
+String friendlyWifiError();
+void renderWifiMessage();
+
 void scanWifiNetworks() {
-    screen = AppScreen::WifiNetworks;
-    display.showWifiScanning();
+    screen =
+        AppScreen::WifiNetworks;
 
-    wifiScanCount = networkService.scanVisible(
-        wifiScan,
-        NetworkService::MAX_SCAN_RESULTS);
-
+    wifiScanCount = 0;
     wifiSelectedIndex = -1;
     wifiPassword = "";
     wifiHint = "";
-    renderWifiNetworks();
+
+    display.showWifiScanning();
+
+    if (!networkService.startScan()) {
+        wifiMessageTitle =
+            "Wi-Fi ocupado";
+
+        wifiMessageText =
+            friendlyWifiError();
+
+        wifiMessagePrimary =
+            "Voltar à conexão";
+
+        renderWifiMessage();
+    }
 }
+
 
 void renderWifiPassword() {
     screen = AppScreen::WifiPassword;
@@ -826,65 +849,207 @@ void showWifiConnecting(const String& ssid) {
         "");
 }
 
-void selectWifiNetwork(int8_t index) {
+void selectWifiNetwork(
+    int8_t index) {
+
     if (
         index < 0 ||
-        static_cast<size_t>(index) >= wifiScanCount
+        static_cast<size_t>(
+            index) >=
+            wifiScanCount
     ) {
         return;
     }
 
-    wifiSelectedIndex = index;
-    NetworkScanResult& selected = wifiScan[index];
+    wifiSelectedIndex =
+        index;
+
+    NetworkScanResult& selected =
+        wifiScan[index];
 
     if (selected.enterprise) {
-        wifiMessageTitle = "Rede corporativa";
+        wifiMessageTitle =
+            "Rede corporativa";
+
         wifiMessageText =
-            "Esta rede exige identidade/usuário. Use Configurar pelo celular para informar as credenciais corporativas.";
-        wifiMessagePrimary = "Voltar à conexão";
+            "Esta rede exige identidade/usuário. "
+            "Use Configurar pelo celular para informar "
+            "as credenciais corporativas.";
+
+        wifiMessagePrimary =
+            "Voltar à conexão";
+
         renderWifiMessage();
         return;
     }
 
     if (selected.known) {
-        showWifiConnecting(selected.ssid);
-        if (networkService.connectSavedSsid(selected.ssid)) {
-            renderConnection();
-        } else {
-            if (!selected.open) {
+        wifiConnectRetryPassword =
+            !selected.open;
+
+        wifiUserConnectionPending =
+            networkService.
+                startConnectSavedSsidAsync(
+                    selected.ssid);
+
+        if (!wifiUserConnectionPending) {
+            wifiHint =
+                friendlyWifiError();
+
+            if (
+                wifiConnectRetryPassword
+            ) {
                 selected.known = false;
                 wifiPassword = "";
-                wifiKeyboardPage = WifiKeyboardPage::Lower;
-                wifiHint = "A credencial salva falhou. Digite a senha novamente.";
+                wifiKeyboardPage =
+                    WifiKeyboardPage::Lower;
                 renderWifiPassword();
             } else {
-                wifiMessageTitle = "Falha ao conectar";
-                wifiMessageText = friendlyWifiError();
-                wifiMessagePrimary = "Voltar à conexão";
+                wifiMessageTitle =
+                    "Falha ao conectar";
+                wifiMessageText =
+                    friendlyWifiError();
+                wifiMessagePrimary =
+                    "Voltar à conexão";
                 renderWifiMessage();
             }
+
+            return;
         }
+
+        showWifiConnecting(
+            selected.ssid);
         return;
     }
 
     if (selected.open) {
-        showWifiConnecting(selected.ssid);
-        if (networkService.connectAndStore(selected.ssid, "", true)) {
-            renderConnection();
-        } else {
-            wifiMessageTitle = "Falha ao conectar";
-            wifiMessageText = friendlyWifiError();
-            wifiMessagePrimary = "Voltar à conexão";
+        wifiConnectRetryPassword =
+            false;
+
+        wifiUserConnectionPending =
+            networkService.
+                startConnectAndStoreAsync(
+                    selected.ssid,
+                    "",
+                    true);
+
+        if (!wifiUserConnectionPending) {
+            wifiMessageTitle =
+                "Falha ao conectar";
+            wifiMessageText =
+                friendlyWifiError();
+            wifiMessagePrimary =
+                "Voltar à conexão";
             renderWifiMessage();
+            return;
         }
+
+        showWifiConnecting(
+            selected.ssid);
         return;
     }
 
     wifiPassword = "";
-    wifiKeyboardPage = WifiKeyboardPage::Lower;
+    wifiKeyboardPage =
+        WifiKeyboardPage::Lower;
     wifiHint = "";
+
     renderWifiPassword();
 }
+
+
+
+void handleNetworkEvents() {
+    size_t count = 0;
+
+    if (
+        networkService.
+            consumeScanResults(
+                wifiScan,
+                NetworkService::
+                    MAX_SCAN_RESULTS,
+                count)
+    ) {
+        wifiScanCount =
+            count;
+
+        wifiSelectedIndex =
+            -1;
+
+        if (
+            screen ==
+            AppScreen::WifiNetworks
+        ) {
+            renderWifiNetworks();
+        }
+    }
+
+    bool success = false;
+    String ssid;
+    String error;
+
+    if (
+        networkService.
+            consumeConnectionResult(
+                success,
+                ssid,
+                error)
+    ) {
+        wifiUserConnectionPending =
+            false;
+
+        if (success) {
+            wifiPassword = "";
+            wifiHint = "";
+
+            if (
+                screen ==
+                    AppScreen::WifiMessage ||
+                screen ==
+                    AppScreen::WifiPassword
+            ) {
+                renderConnection();
+            }
+
+            return;
+        }
+
+        if (
+            wifiConnectRetryPassword &&
+            wifiSelectedIndex >= 0 &&
+            static_cast<size_t>(
+                wifiSelectedIndex) <
+                wifiScanCount
+        ) {
+            wifiScan[
+                wifiSelectedIndex].
+                known = false;
+
+            wifiPassword = "";
+
+            wifiKeyboardPage =
+                WifiKeyboardPage::Lower;
+
+            wifiHint =
+                "A credencial salva falhou. Digite a senha novamente.";
+
+            renderWifiPassword();
+            return;
+        }
+
+        wifiMessageTitle =
+            "Falha ao conectar";
+
+        wifiMessageText =
+            friendlyWifiError();
+
+        wifiMessagePrimary =
+            "Voltar à conexão";
+
+        renderWifiMessage();
+    }
+}
+
 
 void refreshSdView(bool remount) {
     if (remount || !sdCardService.mounted()) {
@@ -921,12 +1086,46 @@ void renderStorage() {
         sdStatus);
 }
 
+const CardDefinition& cardForDisplay() {
+    const CardDefinition& source =
+        engine->currentCard();
+
+    if (
+        source.question.length() > 0
+    ) {
+        return source;
+    }
+
+    if (
+        sdCardService.mounted() &&
+        sdCardService.
+            hydrateCard(
+                source.id,
+                displayCardBuffer)
+    ) {
+        return
+            displayCardBuffer;
+    }
+
+    displayCardBuffer =
+        source;
+
+    displayCardBuffer.question =
+        "Conteudo indisponivel. Insira o microSD da biblioteca.";
+
+    displayCardBuffer.answer =
+        "O conteudo completo deste cartao esta armazenado no microSD.";
+
+    return
+        displayCardBuffer;
+}
+
 void renderQuestion() {
     screen =
         AppScreen::Question;
 
     display.showQuestion(
-        engine->currentCard(),
+        cardForDisplay(),
         engine->currentPosition(),
         engine->sessionCount());
 }
@@ -936,7 +1135,7 @@ void renderSelfAssessment() {
         AppScreen::SelfAssessment;
 
     display.showSelfAssessment(
-        engine->currentCard(),
+        cardForDisplay(),
         engine->currentPosition(),
         engine->sessionCount());
 }
@@ -948,7 +1147,7 @@ void renderObjectiveFeedback() {
 
     display.
         showObjectiveFeedback(
-            engine->currentCard(),
+            cardForDisplay(),
             engine->
                 currentPosition(),
             engine->
@@ -1690,60 +1889,18 @@ size_t buildTouchZones(
                 break;
             }
 
-            if (
-                !engine->
-                    currentIsObjective()
-            ) {
-                addZone(
-                    zones,
-                    count,
-                    "question_reveal",
-                    48,
-                    actionTop,
-                    width - 96,
-                    portrait
-                        ? 136
-                        : 72,
-                    UiAction::
-                        AnswerReady);
+            addZone(
+                zones,
+                count,
+                "question_reveal",
+                48,
+                actionTop,
+                width - 96,
+                portrait
+                    ? 136
+                    : 72,
+                UiAction::AnswerReady);
 
-                break;
-            }
-
-            for (
-                uint8_t i = 0;
-                i <
-                    engine->
-                        currentCard().
-                        optionCount &&
-                i < 4;
-                ++i
-            ) {
-                addZone(
-                    zones,
-                    count,
-                    "question_choice",
-                    portrait
-                        ? 48
-                        : 504,
-                    portrait
-                        ? 390 +
-                              i * 98
-                        : 112 +
-                              i * 84,
-                    portrait
-                        ? width - 96
-                        : 408,
-                    portrait
-                        ? 90
-                        : 74,
-                    static_cast<UiAction>(
-                        static_cast<uint8_t>(
-                            UiAction::Choice0) +
-                        i),
-                    static_cast<int8_t>(
-                        i));
-            }
             break;
 
         case AppScreen::SelfAssessment: {
@@ -2236,54 +2393,130 @@ void processAction(
             break;
 
         case AppScreen::WifiPassword:
-            if (action == UiAction::WifiKey) {
-                if (wifiPassword.length() < 63) {
-                    wifiPassword += static_cast<char>(static_cast<uint8_t>(argument));
+            if (
+                action ==
+                UiAction::WifiKey
+            ) {
+                if (
+                    wifiPassword.length() <
+                    63
+                ) {
+                    wifiPassword +=
+                        static_cast<char>(
+                            static_cast<uint8_t>(
+                                argument));
+
                     wifiHint = "";
                     renderWifiPassword();
                 }
-            } else if (action == UiAction::WifiSpace) {
-                if (wifiPassword.length() < 63) {
+            } else if (
+                action ==
+                UiAction::WifiSpace
+            ) {
+                if (
+                    wifiPassword.length() <
+                    63
+                ) {
                     wifiPassword += ' ';
                     wifiHint = "";
                     renderWifiPassword();
                 }
-            } else if (action == UiAction::WifiBackspace) {
-                if (wifiPassword.length() > 0) wifiPassword.remove(wifiPassword.length() - 1);
+            } else if (
+                action ==
+                UiAction::WifiBackspace
+            ) {
+                if (
+                    wifiPassword.length() >
+                    0
+                ) {
+                    wifiPassword.remove(
+                        wifiPassword.length() -
+                        1);
+                }
+
                 wifiHint = "";
                 renderWifiPassword();
-            } else if (action == UiAction::WifiShift) {
-                wifiKeyboardPage = wifiKeyboardPage == WifiKeyboardPage::Upper
-                    ? WifiKeyboardPage::Lower
-                    : WifiKeyboardPage::Upper;
+            } else if (
+                action ==
+                UiAction::WifiShift
+            ) {
+                wifiKeyboardPage =
+                    wifiKeyboardPage ==
+                            WifiKeyboardPage::Upper
+                        ? WifiKeyboardPage::Lower
+                        : WifiKeyboardPage::Upper;
+
                 renderWifiPassword();
-            } else if (action == UiAction::WifiSymbols) {
-                wifiKeyboardPage = wifiKeyboardPage == WifiKeyboardPage::Symbols
-                    ? WifiKeyboardPage::Lower
-                    : WifiKeyboardPage::Symbols;
+            } else if (
+                action ==
+                UiAction::WifiSymbols
+            ) {
+                wifiKeyboardPage =
+                    wifiKeyboardPage ==
+                            WifiKeyboardPage::Symbols
+                        ? WifiKeyboardPage::Lower
+                        : WifiKeyboardPage::Symbols;
+
                 renderWifiPassword();
-            } else if (action == UiAction::WifiCancel) {
+            } else if (
+                action ==
+                UiAction::WifiCancel
+            ) {
                 renderWifiNetworks();
-            } else if (action == UiAction::WifiConnect) {
-                if (wifiPassword.length() < 8 || wifiPassword.length() > 63) {
-                    wifiHint = "A senha deve ter entre 8 e 63 caracteres.";
+            } else if (
+                action ==
+                UiAction::WifiConnect
+            ) {
+                if (
+                    wifiPassword.length() <
+                        8 ||
+                    wifiPassword.length() >
+                        63
+                ) {
+                    wifiHint =
+                        "A senha deve ter entre 8 e 63 caracteres.";
+
                     renderWifiPassword();
                     break;
                 }
-                if (wifiSelectedIndex < 0 || static_cast<size_t>(wifiSelectedIndex) >= wifiScanCount) {
+
+                if (
+                    wifiSelectedIndex < 0 ||
+                    static_cast<size_t>(
+                        wifiSelectedIndex) >=
+                        wifiScanCount
+                ) {
                     renderConnection();
                     break;
                 }
-                const String ssid = wifiScan[wifiSelectedIndex].ssid;
-                showWifiConnecting(ssid);
-                if (networkService.connectAndStore(ssid, wifiPassword, false)) {
-                    wifiPassword = "";
-                    renderConnection();
-                } else {
-                    wifiHint = friendlyWifiError();
+
+                const String ssid =
+                    wifiScan[
+                        wifiSelectedIndex].
+                        ssid;
+
+                wifiConnectRetryPassword =
+                    true;
+
+                wifiUserConnectionPending =
+                    networkService.
+                        startConnectAndStoreAsync(
+                            ssid,
+                            wifiPassword,
+                            false);
+
+                if (!wifiUserConnectionPending) {
+                    wifiHint =
+                        friendlyWifiError();
+
                     renderWifiPassword();
+                    break;
                 }
+
+                showWifiConnecting(
+                    ssid);
             }
+
             break;
 
         case AppScreen::WifiMessage:
@@ -2299,17 +2532,49 @@ void processAction(
                 renderStorage();
             } else if (action == UiAction::ImportSdFile) {
                 if (argument >= 0 && static_cast<size_t>(argument) < sdFileCount) {
-                    const SdImportResult result = sdCardService.importDeckFile(
-                        sdPaths[argument], cards, states, Config::MAX_DEVICE_CARDS, cardCount);
+                    const SdImportResult result =
+                        sdCardService.
+                            importDeckFileToCanonical(
+                                sdPaths[argument],
+                                Config::
+                                    MAX_DEVICE_CARDS);
+
                     if (result.ok) {
-                        storage.saveLibrary(cards, states, cardCount);
-                        rebuildEngine();
-                        sdStatus = "Importados " + String(result.added) +
-                            ", atualizados " + String(result.updated) +
-                            ", ignorados " + String(result.skipped);
+                        size_t loaded = 0;
+
+                        if (
+                            sdCardService.
+                                loadCatalog(
+                                    cards,
+                                    states,
+                                    Config::
+                                        MAX_DEVICE_CARDS,
+                                    loaded)
+                        ) {
+                            cardCount =
+                                loaded;
+
+                            rebuildEngine();
+
+                            sdStatus =
+                                "SD-first: +" +
+                                String(
+                                    result.added) +
+                                ", atualizados " +
+                                String(
+                                    result.updated) +
+                                ", ignorados " +
+                                String(
+                                    result.skipped);
+                        } else {
+                            sdStatus =
+                                "Importado, mas catalogo nao pode ser recarregado";
+                        }
                     } else {
-                        sdStatus = result.error;
+                        sdStatus =
+                            result.error;
                     }
+
                     renderStorage();
                 }
             } else if (action == UiAction::ExportLibraryToSd) {
@@ -2335,66 +2600,22 @@ void processAction(
             }
             break;
 
-        case AppScreen::Question: {
+        case AppScreen::Question:
             if (!engine) {
                 break;
             }
 
             if (
-                !engine->
-                    currentIsObjective() &&
                 action ==
-                    UiAction::
-                        AnswerReady
+                UiAction::AnswerReady
             ) {
                 engine->
                     markResponseReady();
 
                 renderSelfAssessment();
-                break;
-            }
-
-            int option =
-                -1;
-
-            if (
-                action ==
-                UiAction::Choice0
-            ) {
-                option = 0;
-            } else if (
-                action ==
-                UiAction::Choice1
-            ) {
-                option = 1;
-            } else if (
-                action ==
-                UiAction::Choice2
-            ) {
-                option = 2;
-            } else if (
-                action ==
-                UiAction::Choice3
-            ) {
-                option = 3;
-            }
-
-            if (
-                option >= 0 &&
-                engine->
-                    selectOption(
-                        static_cast<uint8_t>(
-                            option))
-            ) {
-                pendingOutcome =
-                    engine->
-                        evaluateAutomatic();
-
-                renderObjectiveFeedback();
             }
 
             break;
-        }
 
         case AppScreen::SelfAssessment:
             if (
@@ -2506,9 +2727,142 @@ void processAction(
     }
 }
 
+bool powerSleepAllowed() {
+    if (
+        localLink.active() ||
+        networkService.busy()
+    ) {
+        return false;
+    }
+
+    switch (screen) {
+        case AppScreen::WifiNetworks:
+        case AppScreen::WifiPassword:
+        case AppScreen::WifiMessage:
+        case AppScreen::LocalLink:
+            return false;
+
+        default:
+            return true;
+    }
+}
+
+
+void prepareForSleep() {
+    clockService.checkpoint();
+
+    if (engine) {
+        engine->prepareForSleep();
+    } else {
+        storage.saveStates(
+            states,
+            cardCount);
+    }
+}
+
+
+void performLightSleep() {
+    prepareForSleep();
+
+    const bool resumeSd =
+        sdCardService.mounted();
+
+    sdCardService.suspend();
+    networkService.suspendForSleep();
+
+    const PowerWakeReason wake =
+        powerService.enterLightSleep();
+
+    touchInput.begin();
+
+    touchInput.setPortrait(
+        display.portrait());
+
+    if (resumeSd) {
+        sdCardService.resume();
+    }
+
+    networkService.resumeAfterSleep();
+
+    if (
+        wake ==
+        PowerWakeReason::TouchOrButton
+    ) {
+        powerService.noteActivity();
+    }
+}
+
+
+void performDeepSleep() {
+    prepareForSleep();
+
+    sdCardService.suspend();
+    networkService.suspendForSleep();
+
+    Serial.println(
+        "[app] entrando em deep sleep; acorde pelo botao GPIO21");
+
+    delay(20);
+
+    powerService.enterDeepSleep();
+}
+
+
+void canonicalizeActiveLibraryIfPossible() {
+    if (
+        !Config::SD_FIRST_LIBRARY ||
+        !sdCardService.mounted()
+    ) {
+        return;
+    }
+
+    bool hasFullContent = true;
+
+    for (
+        size_t i = 0;
+        i < cardCount;
+        ++i
+    ) {
+        if (
+            cards[i].
+                question.length() ==
+            0
+        ) {
+            hasFullContent = false;
+            break;
+        }
+    }
+
+    if (!hasFullContent) {
+        return;
+    }
+
+    if (
+        sdCardService.
+            saveCanonicalLibrary(
+                cards,
+                cardCount)
+    ) {
+        sdCardService.
+            compactCatalog(
+                cards,
+                cardCount);
+    }
+}
+
 void setup() {
     Serial.begin(
         115200);
+
+    Serial.printf(
+        "[build] flavor=%s bench=%d demo=%d light-sleep=%d deep-sleep=%d ota-auto=%d\n",
+        Config::BUILD_FLAVOR,
+        Config::BENCH_BUILD ? 1 : 0,
+        Config::DEMO_INTERVALS ? 1 : 0,
+        Config::LIGHT_SLEEP_ENABLED ? 1 : 0,
+        Config::DEEP_SLEEP_ENABLED ? 1 : 0,
+        Config::OTA_AUTO_APPLY_ENABLED ? 1 : 0);
+
 
     delay(500);
 
@@ -2543,6 +2897,7 @@ void setup() {
                   Landscape);
 
     batteryService.begin();
+    powerService.begin();
 
     display.setBatteryStatus(
         batteryService.available(),
@@ -2556,48 +2911,109 @@ void setup() {
     clockService.begin();
     touchInput.begin();
     sdCardService.begin();
+    otaService.begin();
+
+    if (
+        Config::OTA_AUTO_APPLY_ENABLED &&
+        sdCardService.mounted()
+    ) {
+        otaService.applyLocalUpdateIfRequested(
+            batteryService.available(),
+            batteryService.percent());
+    }
 
     touchInput.setPortrait(
         startPortrait);
 
+    bool libraryLoaded = false;
+
     if (
-        !storage.loadLibrary(
-            cards,
-            states,
-            Config::MAX_DEVICE_CARDS,
-            cardCount)
+        Config::SD_FIRST_LIBRARY &&
+        sdCardService.mounted() &&
+        sdCardService.
+            canonicalLibraryAvailable()
     ) {
-        cardCount =
-            loadDefaultCards(
+        libraryLoaded =
+            sdCardService.
+                loadCatalog(
+                    cards,
+                    states,
+                    Config::
+                        MAX_DEVICE_CARDS,
+                    cardCount);
+
+        if (libraryLoaded) {
+            Serial.printf(
+                "[app] biblioteca SD-first: %u entradas de catalogo\n",
+                static_cast<unsigned>(
+                    cardCount));
+        }
+    }
+
+    if (!libraryLoaded) {
+        libraryLoaded =
+            storage.loadLibrary(
                 cards,
+                states,
                 Config::
-                    MAX_DEVICE_CARDS);
+                    MAX_DEVICE_CARDS,
+                cardCount);
 
-        for (
-            size_t i = 0;
-            i < cardCount;
-            ++i
-        ) {
-            states[i] =
-                CardState{};
+        if (!libraryLoaded) {
+            cardCount =
+                loadDefaultCards(
+                    cards,
+                    Config::
+                        MAX_DEVICE_CARDS);
 
-            states[i].id =
-                cards[i].id;
+            for (
+                size_t i = 0;
+                i < cardCount;
+                ++i
+            ) {
+                states[i] =
+                    CardState{};
+
+                states[i].id =
+                    cards[i].id;
+            }
+
+            storage.saveLibrary(
+                cards,
+                states,
+                cardCount);
+
+            storage.saveStates(
+                states,
+                cardCount);
+
+            libraryLoaded =
+                cardCount > 0;
         }
 
-        storage.saveLibrary(
-            cards,
-            states,
-            cardCount);
-
-        storage.saveStates(
-            states,
-            cardCount);
+        if (
+            libraryLoaded &&
+            Config::SD_FIRST_LIBRARY &&
+            sdCardService.mounted()
+        ) {
+            if (
+                sdCardService.
+                    saveCanonicalLibrary(
+                        cards,
+                        cardCount)
+            ) {
+                sdCardService.
+                    compactCatalog(
+                        cards,
+                        cardCount);
+            }
+        }
     }
 
     if (
         Config::
-            SEED_MANDARIN_TRAINING_DECK
+            SEED_MANDARIN_TRAINING_DECK &&
+        !Config::SD_FIRST_LIBRARY
     ) {
         const size_t previousCount =
             cardCount;
@@ -2606,7 +3022,8 @@ void setup() {
             appendMandarinTrainingDeck(
                 cards,
                 states,
-                Config::MAX_DEVICE_CARDS,
+                Config::
+                    MAX_DEVICE_CARDS,
                 cardCount);
 
         if (
@@ -2622,17 +3039,17 @@ void setup() {
                 states,
                 cardCount);
         }
-    }
 
-    if (
-        refreshMandarinTrainingDeck(
-            cards,
-            cardCount)
-    ) {
-        storage.saveLibrary(
-            cards,
-            states,
-            cardCount);
+        if (
+            refreshMandarinTrainingDeck(
+                cards,
+                cardCount)
+        ) {
+            storage.saveLibrary(
+                cards,
+                states,
+                cardCount);
+        }
     }
 
     backendSync.begin();
@@ -2648,11 +3065,41 @@ void setup() {
 
     rebuildEngine();
 
+    Serial.printf(
+        "[sd-first] enabled=%d mounted=%d canonical=%d cards=%u heap=%u\n",
+        Config::SD_FIRST_LIBRARY
+            ? 1
+            : 0,
+        sdCardService.mounted()
+            ? 1
+            : 0,
+        sdCardService.canonicalLibraryAvailable()
+            ? 1
+            : 0,
+        static_cast<unsigned>(
+            cardCount),
+        static_cast<unsigned>(
+            ESP.getFreeHeap()));
+
+    if (
+        Config::SD_FIRST_LIBRARY &&
+        sdCardService.mounted() &&
+        !sdCardService.canonicalLibraryAvailable()
+    ) {
+        Serial.printf(
+            "[sd-first] fallback=LittleFS reason=%s\n",
+            sdCardService.lastError().
+                c_str());
+    }
+
     if (touchInput.online()) {
         renderHome();
     } else {
         display.showTouchMissing();
     }
+
+    otaService.confirmRunningImage();
+    otaService.logStatus("setup-ready");
 }
 
 void loop() {
@@ -2664,8 +3111,29 @@ void loop() {
             batteryService.percent());
     }
 
+    const PowerDecision powerDecision =
+        powerService.evaluate(
+            powerSleepAllowed(),
+            batteryService.critical());
+
+    if (
+        powerDecision ==
+        PowerDecision::DeepSleep
+    ) {
+        performDeepSleep();
+        return;
+    }
+
+    if (
+        powerDecision ==
+        PowerDecision::LightSleep
+    ) {
+        performLightSleep();
+    }
+
     localLink.loop();
     networkService.loop();
+    handleNetworkEvents();
 
     if (clockService.maintain()) {
         if (screen == AppScreen::Home) {
@@ -2698,6 +3166,7 @@ void loop() {
         localLink.
             consumeLibraryUpdated()
     ) {
+        canonicalizeActiveLibraryIfPossible();
         rebuildEngine();
 
         Serial.printf(
@@ -2739,6 +3208,7 @@ void loop() {
             backendSync.
                 consumeLibraryUpdated()
         ) {
+            canonicalizeActiveLibraryIfPossible();
             rebuildEngine();
 
             if (
@@ -2826,6 +3296,8 @@ void loop() {
 
     lastAcceptedTouchMs =
         now;
+
+    powerService.noteActivity();
 
     display.showTouchFeedback(
         routed.x,

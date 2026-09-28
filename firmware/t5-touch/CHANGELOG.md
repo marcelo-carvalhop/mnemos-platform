@@ -1,4 +1,94 @@
-# Changelog — firmware/t5
+# Changelog — firmware/t5-touch
+
+## 0.7.0-preview.4.2-touch
+
+- prepara o primeiro ensaio OTA A/B real;
+- adiciona ambiente `bench-ota-source` em generation 70402;
+- adiciona ambiente `bench-ota-target` em generation 70403;
+- mantem sleep desabilitado nos dois lados do ensaio;
+- habilita OTA automatica apenas na imagem fonte;
+- gera o alvo via `tools/build-ota-target.sh`;
+- nao altera HMI, FSRS ou biblioteca SD-first.
+
+## 0.7.0-preview.4.1.2-touch
+
+- separa build de produto e builds de bancada;
+- define `bench` como ambiente padrão;
+- desabilita light/deep sleep e OTA automática na bancada;
+- adiciona `bench-demo`;
+- reduz upload de bancada para 460800;
+- adiciona uploader que rejeita fallback para `/dev/ttyS0`;
+- adiciona diagnóstico do perfil de build;
+- avança `OTA_GENERATION` para `70402`.
+
+## 0.7.0-preview.4.1.1-touch
+
+- garante explicitamente `OtaService::begin()` no boot;
+- garante verificacao do manifesto local depois da montagem do SD;
+- adiciona `[ota-summary]` ao final de `setup()`;
+- mantem `OTA_GENERATION=70401` para este hotfix via USB.
+
+## 0.7.0-preview.4.1-touch
+
+- corrige conflito entre a tabela hexadecimal da OTA e a macro `HEX` do Arduino;
+- renomeia a tabela interna para `HEX_DIGITS`;
+- define geração OTA `70401`;
+- não altera o fluxo de verificação ou instalação OTA.
+
+## 0.7.0-preview.4-touch
+
+- adiciona `OtaService`;
+- instala firmware no slot OTA inativo a partir do microSD;
+- valida manifesto `mnemos.ota/v1`;
+- exige modelo e protocolo compatíveis;
+- usa geração monotônica para bloquear downgrade;
+- valida tamanho e SHA-256 antes de gravar a flash;
+- exige `apply=true`;
+- bloqueia OTA com bateria detectada abaixo de 20%;
+- move manifesto aplicado para `manifest.applied.json`;
+- detecta e documenta disponibilidade real de rollback do bootloader;
+- adiciona ferramenta de geração de bundle OTA;
+- não altera HMI.
+
+
+## 0.7.0-preview.3-touch
+
+- microSD passa a ser armazenamento canônico das definições de cartões;
+- cria `/mnemos/library/cards.ndjson`;
+- RAM mantém catálogo leve de cards;
+- pergunta/resposta/opções são hidratadas sob demanda;
+- migra biblioteca LittleFS existente para o SD;
+- importação atualiza a biblioteca canônica;
+- exportação reconstrói JSON completo a partir do SD;
+- LittleFS permanece com FSRS, sessão, reviews e fallback;
+- anuncia `sdFirstLibrary=true` e `lazyCardContent=true`;
+- não altera HMI, FSRS ou rede.
+
+## 0.7.0-preview.2-touch
+
+- adiciona `PowerService`;
+- light sleep com wake por touch GPIO47 e botão GPIO21;
+- deep sleep com wake por botão GPIO21 e timer de manutenção;
+- deep sleep automático em bateria crítica;
+- persiste sessão/FSRS e checkpoint do relógio antes do sleep;
+- suspende/retoma Wi-Fi e microSD em light sleep;
+- corrige `BoardConfig::USE_SD=true`;
+- timezone passa a ser persistido em Preferences e usado pela agenda;
+- anuncia `deepSleepTouchWake=false`;
+- mantém a HMI congelada.
+
+## 0.7.0-preview.1-touch
+
+- congela a arquitetura atual da HMI touch-first;
+- desativa `DEMO_INTERVALS` no padrão normal;
+- desativa seed automático de mandarim em instalações novas;
+- corrige capabilities do T5 Touch;
+- torna scan/conexão/reconexão Wi-Fi cooperativos;
+- torna NTP não bloqueante;
+- unifica todos os cartões em revelar + autoavaliação;
+- aceita CA HTTPS compilada ou em `/backend_ca.pem`;
+- tenta recuperar cursores HTTP 410 a partir de zero;
+- atualiza documentação e TODO de integração externa.
 
 ## 0.6.0-preview.6-touch
 

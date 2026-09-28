@@ -2,6 +2,7 @@
 
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <LittleFS.h>
 #include <WiFiClient.h>
 #include <WiFiClientSecure.h>
 
@@ -56,18 +57,46 @@ bool BackendSyncService::request(const String& method,
     WiFiClientSecure secure;
 
     if (url.startsWith("https://")) {
-        if (String(Config::BACKEND_ROOT_CA).length() == 0) {
-            Serial.println("[backend] HTTPS exige BACKEND_ROOT_CA configurado");
+        String rootCa =
+            Config::BACKEND_ROOT_CA;
+
+        if (
+            rootCa.length() == 0 &&
+            LittleFS.exists(
+                Config::BACKEND_CA_FILE)
+        ) {
+            File caFile =
+                LittleFS.open(
+                    Config::BACKEND_CA_FILE,
+                    "r");
+
+            if (caFile) {
+                rootCa =
+                    caFile.readString();
+                caFile.close();
+            }
+        }
+
+        if (rootCa.length() == 0) {
+            Serial.println(
+                "[backend] HTTPS bloqueado: CA ausente "
+                "(compile BACKEND_ROOT_CA ou grave /backend_ca.pem)");
             return false;
         }
-        secure.setCACert(Config::BACKEND_ROOT_CA);
-        begun = http.begin(secure, url);
+
+        secure.setCACert(
+            rootCa.c_str());
+
+        begun =
+            http.begin(
+                secure,
+                url);
     } else if (url.startsWith("http://")) {
         begun = http.begin(plain, url);
     }
     if (!begun) return false;
 
-    http.setTimeout(12000);
+    http.setTimeout(6000);
     http.addHeader("Authorization", "Bearer " + network_.deviceToken());
     http.addHeader("Content-Type", "application/json");
     if (method == "GET") status = http.GET();
@@ -133,10 +162,21 @@ bool BackendSyncService::pullReviews() {
         }
 
         if (status == 410) {
+            if (cursor == 0) {
+                Serial.println(
+                    "[backend] review cursor 0 rejeitado pelo servidor");
+                return false;
+            }
+
             Serial.println(
-                "[backend] review cursor expirado; "
-                "resync completo necessario");
-            return false;
+                "[backend] review cursor expirado; reiniciando em 0");
+
+            if (!storage_.saveReviewCursor(0)) {
+                return false;
+            }
+
+            cursor = 0;
+            continue;
         }
 
         if (
@@ -243,9 +283,21 @@ bool BackendSyncService::pullProgressResets() {
         }
 
         if (status == 410) {
+            if (cursor == 0) {
+                Serial.println(
+                    "[backend] cursor de resets 0 rejeitado pelo servidor");
+                return false;
+            }
+
             Serial.println(
-                "[backend] cursor de resets expirado");
-            return false;
+                "[backend] cursor de resets expirado; reiniciando em 0");
+
+            if (!storage_.saveProgressResetCursor(0)) {
+                return false;
+            }
+
+            cursor = 0;
+            continue;
         }
 
         if (
@@ -351,9 +403,21 @@ bool BackendSyncService::pullSettings() {
         }
 
         if (status == 410) {
+            if (cursor == 0) {
+                Serial.println(
+                    "[backend] cursor de settings 0 rejeitado pelo servidor");
+                return false;
+            }
+
             Serial.println(
-                "[backend] cursor de settings expirado");
-            return false;
+                "[backend] cursor de settings expirado; reiniciando em 0");
+
+            if (!storage_.saveSettingsCursor(0)) {
+                return false;
+            }
+
+            cursor = 0;
+            continue;
         }
 
         if (
@@ -462,10 +526,17 @@ bool BackendSyncService::reportStatus(bool synced) {
     doc["synced"] = synced;
     doc["capabilities"]["directWifiSync"] = true;
     doc["capabilities"]["bleSync"] = false;
-    doc["capabilities"]["keyboard"] = true;
+    doc["capabilities"]["keyboard"] = false;
     doc["capabilities"]["touch"] = Config::TOUCH_ENABLED;
-    doc["capabilities"]["typedRecall"] = true;
+    doc["capabilities"]["typedRecall"] = false;
     doc["capabilities"]["display"] = "epaper-960x540";
+    doc["capabilities"]["microSD"] = true;
+    doc["capabilities"]["sdFirstLibrary"] = true;
+    doc["capabilities"]["lazyCardContent"] = true;
+    doc["capabilities"]["lightSleep"] = true;
+    doc["capabilities"]["deepSleep"] = true;
+    doc["capabilities"]["deepSleepTouchWake"] = false;
+
     String body;
     serializeJson(doc, body);
     int status = 0;

@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 #include <SensorPCF8563.hpp>
+#include "config.h"
 
 class TimeService {
 public:
@@ -12,6 +13,18 @@ public:
     bool trusted() const { return trusted_; }
     bool rtcOnline() const { return rtcOnline_; }
     bool ntpSynchronized() const { return ntpSynchronized_; }
+
+    int32_t utcOffsetSeconds() const {
+        return utcOffsetSeconds_;
+    }
+
+    int32_t daylightOffsetSeconds() const {
+        return daylightOffsetSeconds_;
+    }
+
+    bool setTimezoneOffsetSeconds(
+        int32_t utcOffsetSeconds,
+        int32_t daylightOffsetSeconds = 0);
 
     void setFromEpoch(uint32_t epochSeconds);
     void checkpoint();
@@ -32,8 +45,16 @@ private:
     uint32_t fallbackBaseMillis_ = 0;
     uint32_t lastCheckpointMillis_ = 0;
     uint32_t lastNtpAttemptMillis_ = 0;
+    uint32_t ntpAttemptStartedMillis_ = 0;
+    bool ntpPending_ = false;
 
-    bool tryNtp(uint32_t waitMs);
+    int32_t utcOffsetSeconds_ =
+        Config::GMT_OFFSET_SECONDS;
+
+    int32_t daylightOffsetSeconds_ =
+        Config::DAYLIGHT_OFFSET_SECONDS;
+
+    bool tryNtp(uint32_t waitMs);  // legado; fora do fluxo normal
     uint32_t compileEpoch() const;
     uint32_t rtcEpoch();
     bool rtcClockIntegrityOk();

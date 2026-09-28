@@ -1,0 +1,12 @@
+{
+  "schema": "mnemos.ota/v1",
+  "version": "0.7.0-preview.4.1-touch",
+  "generation": 70401,
+  "model": "LILYGO-T5-4.7-S3-TOUCH",
+  "protocolMin": 4,
+  "protocolMax": 4,
+  "size": 1234567,
+  "sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "file": "/mnemos/update/firmware.bin",
+  "apply": false
+}

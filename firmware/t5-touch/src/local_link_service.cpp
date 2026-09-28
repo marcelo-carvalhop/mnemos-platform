@@ -390,10 +390,16 @@ void LocalLinkService::sendInfo() {
     doc["features"]["backendSync"] = true;
     doc["features"]["metrics"] = true;
     doc["features"]["bleSync"] = false;
-    doc["features"]["keyboard"] = true;
+    doc["features"]["keyboard"] = false;
     doc["features"]["touch"] = Config::TOUCH_ENABLED;
     doc["features"]["rtc"] = true;
-    doc["features"]["sdStorage"] = false;
+    doc["features"]["sdStorage"] = true;
+        doc["features"]["sdFirstLibrary"] = true;
+        doc["features"]["lazyCardContent"] = true;
+        doc["features"]["lightSleep"] = true;
+        doc["features"]["deepSleep"] = true;
+        doc["features"]["deepSleepTouchWake"] = false;
+
 #ifdef CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT
     doc["features"]["enterprisePassword"] = true;
 #else
