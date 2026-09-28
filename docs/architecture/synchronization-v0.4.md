@@ -1,5 +1,7 @@
 # Synchronization Architecture — v0.4
 
+> **Histórico v0.4.** Para a ramificação T5 Touch, consulte [synchronization.md](synchronization.md) e [o diagnóstico de integração](../integration/t5-touch.md).
+
 Mnemos is offline-capable and eventually synchronized. Content, learning events and transport are separate layers.
 
 ## Authority model

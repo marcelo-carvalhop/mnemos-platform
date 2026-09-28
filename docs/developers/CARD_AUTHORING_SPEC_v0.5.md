@@ -1,5 +1,7 @@
 # Especificação de autoria de cartões v0.5
 
+> **Histórico v0.5.** A autoria e a avaliação de tipos objetivos descritas abaixo não estão preservadas nos snapshots atuais para o T5 Touch. Consulte [a integração de conteúdo](../integration/t5-touch.md#conteúdo-e-tipos-de-cartão) antes de declarar suporte ponta a ponta.
+
 O editor deve privilegiar uma peça de informação por card e usar avisos não bloqueantes quando uma resposta parece conter enumerações extensas. O objetivo é melhorar a qualidade do sinal do scheduler, não policiar o texto do usuário.
 
 `open_recall` exige prompt e resposta de referência. `cloze` exige uma frase/contexto e a resposta da lacuna. `application` exige um problema curto e resposta de referência; problemas longos devem ser decompostos. `multiple_choice` exige de duas a quatro opções no CYD e exatamente uma resposta correta. `true_false` usa duas alternativas fixas e um índice correto.

@@ -1,3 +1,9 @@
-# Backend
+# Backend e processamento
 
-O backend de referência fica em `backend/`. A implementação oficial não é o contrato de interoperabilidade: terceiros podem implementar outro backend desde que respeitem os schemas e a API documentada em `spec/` e `docs/developers/`.
+O backend de referência em `backend/` usa FastAPI, SQLAlchemy, Alembic e PostgreSQL. `backend/app/main.py` compõe os roteadores de autenticação, sincronização, cota, geração, conta e terminal; também expõe `/healthz`, `/readyz` e `/v1/contract`. O código gerado de `shared/contract.yaml` fornece constantes e enums internos. `compose.yaml` executa API e worker com a mesma base de imagem, mas comandos distintos, além de PostgreSQL e MinIO para desenvolvimento local.
+
+A sincronização de móvel/web usa `/v1/sync/push` e `/v1/sync/pull`, com `server_seq` por usuário e histórico de revisões append-only. O banco também mantém credenciais de terminal, seleção desejada de baralhos, status reportado e tarefas de geração. O worker consome a fila na própria tabela `generation_jobs`, evitando a necessidade de um broker adicional no protótipo. Uploads são temporários em armazenamento compatível com objetos; a geração depende de API externa e suas sugestões ficam pendentes até decisão humana.
+
+A API de terminal separa credencial de conta e credencial física. Registro, listagem, atribuição e revogação são operações da conta; snapshot, revisões e status usam token exclusivo do terminal. `backend/app/terminal/service.py` verifica escopo de baralhos e capacidade antes de entregar conteúdo ou aceitar revisões. O endpoint `POST /v1/terminal/reviews` exige um dialeto de `mnemos.review/v2` que diverge do NDJSON emitido pelo T5 Touch; essa integração permanece bloqueada, com análise precisa em [../integration/t5-touch.md](../integration/t5-touch.md).
+
+A implantação exige segredos e CAs fora do repositório, HTTPS validado, backup, observabilidade e política de retenção. O Compose é uma topologia de desenvolvimento; sua existência não comprova essas garantias em produção. Consulte [data-model.md](data-model.md), [backend/README.md](../../backend/README.md) e os testes em `backend/tests/`.

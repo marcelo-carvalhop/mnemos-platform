@@ -1,5 +1,7 @@
 # Connectivity Architecture — v0.4
 
+> **Histórico v0.4.** Descreve o perfil anterior e não as capacidades do T5 Touch. A conectividade atual está em [connectivity.md](connectivity.md) e o protocolo local em [Device Protocol v4](../../spec/protocol/device-protocol-v4.md).
+
 Connectivity is managed independently from study and content selection.
 
 ## Modes

@@ -1,5 +1,7 @@
 # Guia do primeiro commit e configuração do GitHub
 
+> **Arquivo histórico.** Este procedimento descreve a criação inicial do repositório a partir de um pacote ZIP. A ramificação de desenvolvimento já está sob Git; use [docs/developers/getting-started.md](docs/developers/getting-started.md) para preparar o ambiente atual. O script legado `tools/repository/first-commit-helper.sh` ainda aponta para este arquivo, por isso seu caminho foi mantido.
+
 Este guia parte de Linux Mint e de um pacote recém-extraído chamado `mnemos-platform`. A estratégia recomendada usa SSH para autenticação e mantém `main` como branch estável.
 
 ## 1. Instalar e conferir as ferramentas
