@@ -1,5 +1,7 @@
 # Contrato App/Web <-> Firmware v0.5
 
+> **Histórico v0.5.** Este texto foi concebido para o firmware anterior. Na ramificação T5 Touch, os cinco tipos usam revelação e autoavaliação na HMI; os produtores atuais de snapshot transmitem `open_recall`. Consulte [Device Protocol v4](../../spec/protocol/device-protocol-v4.md) e [a lacuna de conteúdo](../integration/t5-touch.md#conteúdo-e-tipos-de-cartão).
+
 O app e a web não devem reproduzir a lógica interna do terminal. Devem produzir/consumir os contratos públicos em `spec/schemas` e respeitar as capabilities retornadas por `/v4/info`.
 
 A criação de conteúdo pertence ao app/web. O estudo pertence ao terminal. Para sincronização de conteúdo, app/backend enviam um snapshot `mnemos.sync/v2`. Para um card já existente, o firmware preserva o `CardState` local pelo `cardId`; atualização de conteúdo não deve zerar o histórico de aprendizagem. Remover um card remove o conteúdo na próxima reconciliação, mas reviews já produzidos continuam na outbox/histórico até ACK.

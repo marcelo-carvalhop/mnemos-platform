@@ -1,5 +1,7 @@
 # Arquitetura do firmware Mnemos v0.5
 
+> **Histórico do CYD v0.5.** Para o terminal por toque, consulte [firmware/t5-touch/README.md](../../firmware/t5-touch/README.md) e [a arquitetura atual](../architecture/terminal.md).
+
 A v0.5 reorganiza o firmware em camadas com responsabilidades exclusivas. `main.cpp` é apenas o coordenador da máquina de estados da HMI. `CydDisplay` desenha e transforma toque em `UiAction`; não calcula aprendizagem nem persiste dados. `StudyEngine` monta e conduz sessões; não implementa fórmulas de memória. `LearningModel` é a única camada autorizada a calcular Recuperabilidade, Dificuldade, Estabilidade e `dueAt`. `Storage` é a fronteira de persistência. `ScheduleService` agrega `dueAt` diretamente dos estados e produz a visão curta da agenda. `MetricsService` reconstrói indicadores a partir de `review_history.ndjson` e dos estados atuais. `SyncCodec` é a fronteira de serialização do snapshot e dos lotes de review. `LocalLinkService` implementa o protocolo local HTTP sobre SoftAP. `NetworkService` administra perfis conhecidos e associação à infraestrutura. `BackendSyncService` usa o mesmo contrato de conteúdo/reviews através do backend.
 
 O fluxo de dependências é deliberadamente unidirecional: HMI -> StudyEngine -> LearningModel/Storage; HMI -> ScheduleService -> CardState/TimeService; conectividade -> SyncCodec/Storage; métricas -> histórico/estado. Nenhum módulo de transporte decide como um card é agendado.

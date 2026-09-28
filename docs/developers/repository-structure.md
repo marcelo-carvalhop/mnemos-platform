@@ -1,20 +1,15 @@
 # Estrutura do monorepositório
 
-```text
-mnemos-platform/
-├── app/
-│   ├── mobile/        Flutter Android/iOS
-│   └── web/           futuro cliente web
-├── backend/           backend oficial/de referência
-├── firmware/
-│   ├── cyd/           protótipo ESP32-2432S028
-│   └── t5/            port futuro LILYGO T5
-├── spec/              contratos normativos
-├── docs/              documentação explicativa
-├── shared/            contrato interno gerado Dart/Python
-├── packages/          reservado para pacotes realmente cross-app
-├── tools/             validação, scripts e experimentos
-└── .github/           CI, PR e templates
-```
+| Diretório | Responsabilidade atual |
+| --- | --- |
+| `app/mobile/` | Flutter, domínio local, banco Drift, estudo e integração física do terminal. |
+| `app/web/` | Angular 22, estudo e demais rotas de produto por meio da API. |
+| `backend/` | API FastAPI, modelos, migrações, worker e testes de serviço. |
+| `firmware/cyd/`, `firmware/t5/`, `firmware/t5-touch/` | Protótipo anterior, T5 sem touch e T5 Touch nesta ramificação; builds independentes. |
+| `shared/` | Contrato interno `contract.yaml` e geração de código para implementações oficiais. |
+| `spec/` | JSON Schemas, protocolos públicos versionados, exemplos e validação de interoperabilidade. |
+| `docs/` | Arquitetura corrente, integração, status, documentação de desenvolvimento e histórico de releases/decisões. |
+| `tools/` e `.github/workflows/` | Validação, utilitários, experimentos preservados e automação por componente. |
+| `packages/` | Reserva para pacotes que venham a ser compartilhados entre aplicações; os pacotes Dart atuais ficam em `app/mobile/packages/`. |
 
-A regra central é separar contrato de implementação. `spec/` define interoperabilidade; `app/`, `backend/` e `firmware/` são consumidores desses contratos. `docs/` explica decisões, enquanto `shared/` contém um contrato interno específico das implementações oficiais.
+Uma alteração do formato de revisão atravessa `spec/schemas/`, serialização no firmware, parser móvel, validador do backend e testes. Uma mudança do contrato interno atravessa `shared/contract.yaml` e todos os arquivos gerados. Não duplicar uma regra de domínio em documentos com nomes de release diferentes sem explicar sua versão e sua autoridade. Para a topologia completa, veja [../architecture/overview.md](../architecture/overview.md).

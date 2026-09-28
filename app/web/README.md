@@ -1,9 +1,19 @@
-# Mnemos Web
+# Aplicação web Mnemos
 
-Reserved official web client.
+Cliente Angular 22 da plataforma. Estudo, biblioteca, criação e aprovação de cartões, progresso, conta e gestão de dispositivo são rotas implementadas em `src/app/app.routes.ts`. A experiência de estudo na web utiliza o mesmo histórico de revisões e o mesmo domínio de agendamento de móvel e servidor. Não depende de estruturas internas do Flutter.
 
-The web interface will follow the same distraction-minimizing HMI rules as the device and mobile application. It is intended for content creation, bulk organization, device/account administration, dedicated statistics — and studying.
+## Desenvolvimento
 
-Studying on the web is a first-class use: someone at a desk should be able to answer their due cards without reaching for the terminal or the phone. What the rule forbids is not a second study surface but a worse one. A review session here obeys the same discipline it obeys everywhere else — one card at a time, no dashboards, no engagement widgets, nothing on the screen that is not the card and the four grades — and it writes to the same review log, so the schedule does not fork per device.
+Usar a versão de Node em `.nvmrc` e instalar dependências a partir deste diretório:
 
-No web framework is selected yet. The web client will consume the public backend API and Mnemos schemas rather than the mobile application's internal database.
+```bash
+npm ci
+npm start
+npm run lint:format
+npm run test:ci
+npm run build
+```
+
+O `Store` em `src/app/core/store.ts` é um espelho reativo em memória; o `Sync` envia a outbox e puxa deltas da API. Ao recarregar a página, o espelho precisa ser reconstruído. O armazenamento do navegador usado pela sessão não constitui persistência offline durável da biblioteca. Consulte [a arquitetura web](../../docs/architecture/web.md) e [o estado de integração](../../docs/status.md).
+
+A web gerencia dados do terminal por meio da conta e da API. A ligação temporária à LAN/SoftAP e o envio local de biblioteca são responsabilidades do aplicativo móvel; a presença de uma página de dispositivo na web não significa acesso direto ao firmware.

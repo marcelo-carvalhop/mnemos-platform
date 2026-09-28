@@ -1,10 +1,10 @@
-# Mnemos Backend
+# Backend Mnemos
 
-Implementação de referência do backend Mnemos, baseada em Python/FastAPI. Este código oferece contas, sincronização, registro de terminais, ingestão idempotente de reviews, geração e serviços auxiliares.
+Implementação de referência em FastAPI, SQLAlchemy e PostgreSQL. A API contém módulos de autenticação, sincronização, cotas, geração assistida, conta e terminal. O worker consome a fila de `generation_jobs` no banco; o Compose inclui MinIO como armazenamento de objetos para desenvolvimento. O código da API não define sozinho a interoperabilidade: consulte [os contratos públicos](../spec/README.md), [o modelo de dados](../docs/architecture/data-model.md) e [a integração T5 Touch](../docs/integration/t5-touch.md).
 
-O backend oficial não define sozinho a compatibilidade Mnemos. Implementadores externos devem usar os contratos normativos de `../spec/` e a documentação de `../docs/developers/backend-implementation.md`.
+## Desenvolvimento local
 
-Para desenvolvimento local, o fluxo recomendado parte da raiz do monorepositório:
+Na raiz do repositório:
 
 ```bash
 cp backend/.env.example .env
@@ -13,7 +13,9 @@ docker compose run --rm migrate
 docker compose up -d server worker
 ```
 
-Para testes Python diretos:
+`/healthz` verifica liveness; `/readyz` verifica acesso ao banco. Em desenvolvimento, a documentação OpenAPI pode estar em `/docs`, conforme `ENABLE_DOCS`. O comando de migração é uma etapa separada, não uma consequência implícita do boot da API.
+
+Para executar a suíte Python fora do contêiner, com o PostgreSQL de desenvolvimento disponível:
 
 ```bash
 cd backend
@@ -23,9 +25,4 @@ pip install -e '.[dev]'
 pytest
 ```
 
-A suíte roda contra um banco próprio, derivado de `DATABASE_URL` com o sufixo
-`_test` (`flashcards` → `flashcards_test`). Ele é criado, migrado e limpo pela
-própria suíte: não há nada a exportar antes de rodar, e `pytest` com o
-`docker compose up` ligado não toca nos dados de desenvolvimento. Se a
-derivação falhar, a suíte se recusa a rodar em vez de apagar o banco errado —
-os testes apagam linhas de propósito, e o dano só apareceria depois.
+A suíte deriva um banco de testes próprio de `DATABASE_URL`, migra e limpa suas tabelas. Verifique as variáveis antes de executar em outra infraestrutura. A API de terminal separa bearer da conta de bearer físico; `POST /v1/terminal/reviews` atualmente rejeita o lote que `firmware/t5-touch/src/storage.cpp` produz, pois espera `reviewedAtMs` e `source` do contrato interno. O comportamento e o plano de conformidade estão em [docs/integration/t5-touch.md](../docs/integration/t5-touch.md).

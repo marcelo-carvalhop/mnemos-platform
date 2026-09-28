@@ -1,5 +1,7 @@
 # Backend Implementation Guide — v0.4
 
+> **Histórico v0.4.** Para rotas e validação da ramificação T5 Touch, consulte [backend-implementation.md](backend-implementation.md) e [a matriz de integração](../integration/t5-touch.md).
+
 A compatible backend is not required to use the Mnemos reference Python implementation. Compatibility is defined by public schemas and API semantics.
 
 ## Separate account and terminal credentials

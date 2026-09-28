@@ -1,5 +1,7 @@
 # Mnemos Backend Implementation Guide v1
 
+> **Contrato histórico v1.** Os exemplos de `mnemos.sync/v1` e `mnemos.review-batch/v1` abaixo não descrevem o comportamento atual da API de terminal com o T5 Touch. Consulte [a implementação do backend](../../docs/developers/backend-implementation.md) e [a divergência de revisão v2](../../docs/integration/t5-touch.md).
+
 ## 1. Objetivo e independência tecnológica
 
 Um backend compatível com Mnemos deve oferecer identidade, autorização, conteúdo canônico, histórico append-only e sincronização para dispositivos. A implementação de referência usa FastAPI, SQLAlchemy e PostgreSQL, mas isso não é requisito de compatibilidade. Qualquer stack é válida se respeitar schemas, autenticação, escopo e semântica descritos aqui.

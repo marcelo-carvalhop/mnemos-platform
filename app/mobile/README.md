@@ -1,9 +1,20 @@
-# Mnemos Android v0.3.1
+# Aplicativo móvel Mnemos
 
-Aplicativo Flutter do ecossistema Mnemos. A versão v0.3 mantém o banco local Drift/SQLite e acrescenta uma camada pública de interoperabilidade baseada em JSON Schema. O app exporta `mnemos.sync/v1` para o terminal e importa `mnemos.review/v1` sem acoplar o formato externo às tabelas internas.
+Cliente Flutter para Android/iOS. O móvel permite estudar, criar e organizar cartões, acompanhar progresso, utilizar geração assistida e configurar um terminal dedicado. O estudo móvel produz revisões no mesmo histórico da web e do backend. A biblioteca e a outbox persistem em Drift/SQLite, de modo que uma sessão local não depende continuamente da rede.
 
-A tela `Terminal Mnemos` lê o QR Code v2, registra o hardware no backend quando possível, solicita ao Android uma conexão temporária ao SoftAP, transfere relógio, credenciais da rede Wi-Fi de infraestrutura, biblioteca inicial e token restrito de dispositivo. O app então encerra sua ligação ao SoftAP; o terminal permanece conectado à infraestrutura e pode sincronizar diretamente com o backend.
+## Desenvolvimento
 
-No Android 13+ o projeto declara `NEARBY_WIFI_DEVICES`. A listagem de SSIDs usa `WifiManager.startScan/getScanResults`, que também exige `ACCESS_FINE_LOCATION` e Serviços de localização ativos nas versões atuais do Android. O SSID continua editável manualmente quando a varredura não estiver disponível. A senha da infraestrutura é informada pelo usuário e não é recuperada automaticamente do sistema.
+```bash
+flutter pub get
+flutter analyze
+flutter test
+flutter run
+```
 
-Para desenvolvimento, execute `flutter pub get`, `flutter analyze` e `flutter run`. A documentação para integrações externas está em `../../docs/developers`; os schemas ficam em `../../spec/schemas`. O único seed demonstrativo contém um deck `Redes de Computadores` com 10 cards.
+Os pacotes do domínio ficam em `packages/` e são referenciados por caminho no `pubspec.yaml`. O código gerado de `shared/contract.yaml` é verificado a partir da raiz com `python shared/generate.py --check`. Consulte [a arquitetura móvel](../../docs/architecture/mobile.md) para persistência, sincronização e divisão dos pacotes.
+
+## Terminal e rede
+
+O módulo `lib/device/` decodifica QR, consulta o Device Protocol v4, provisiona a credencial restrita e executa DirectSync por LAN ou SoftAP temporário. A importação preserva IDs para deduplicação e o parser aceita `reviewedAt` em segundos ou `reviewedAtMs` em milissegundos. Contudo, se o cartão estiver ausente no SQLite, o evento é ignorado e o ACK posterior pode apagar a outbox inteira do terminal. A correção e o teste de integridade necessários estão em [DirectSync e confirmação](../../docs/integration/t5-touch.md#directsync-e-confirmação).
+
+O Android pode exigir permissões Wi-Fi e localização para listar redes próximas; o SSID permanece editável manualmente e a senha não é lida do sistema. Uma URL que só funciona no emulador, como `10.0.2.2`, não deve ser provisionada no ESP32 físico. O construtor atual de snapshots para terminal emite `open_recall`; os demais tipos não devem ser anunciados como integrados ponta a ponta até resolver [a lacuna de conteúdo](../../docs/integration/t5-touch.md#conteúdo-e-tipos-de-cartão).

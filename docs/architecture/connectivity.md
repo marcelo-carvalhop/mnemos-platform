@@ -1,7 +1,9 @@
-# Conectividade
+# Conectividade e segurança de transporte
 
-Na v0.4, Conexão e Sincronização são responsabilidades separadas. O provisionamento temporário identifica o terminal e grava um `mnemos.network-profile/v1` mais uma credencial restrita do backend quando disponível; ele **não transfere decks**.
+A conectividade não faz parte da decisão pedagógica: estudo, agenda e gravação local de revisões devem funcionar sem rede. `firmware/t5-touch/src/network_service.cpp` gerencia a associação Wi-Fi, e o firmware mantém credenciais/perfis de infraestrutura para reconectar quando habilitado. Descoberta, tentativa de associação e observação de NTP são conduzidas sem bloquear a interface. A disponibilidade de Wi-Fi não deve ser inferida do relógio RTC.
 
-O SoftAP de provisionamento opera em modo AP exclusivo. Somente após `/v3/pairing/complete` o terminal encerra o AP e volta ao modo Station. O terminal persiste múltiplas redes conhecidas, tenta autoconexão apenas quando está desconectado e mantém perfis mesmo com o rádio Wi-Fi desligado.
+O canal local usa Device Protocol v4. Quando o terminal já está na mesma LAN, `LocalLinkService` pode atender ali sem mudar para AP+STA; caso contrário, o terminal cria um SoftAP temporário para provisionamento ou DirectSync. Os modos são separados: provisionar rede não transfere biblioteca, e sincronizar biblioteca não altera credenciais. O token efêmero exibido pelo terminal autoriza apenas a sessão local. O aplicativo obtém antes, por meio da conta, uma credencial de terminal com escopo restrito para o acesso remoto.
 
-BLE é um transporte direto de sincronização iniciado pelo usuário e desligado após a sessão. Veja `docs/architecture/connectivity-v0.4.md` para o desenho completo.
+O T5 Touch anuncia `bleSync=false`; os documentos de BLE v1 e conectividade v0.4 descrevem outras variantes e decisões históricas, não uma promessa de BLE nesta placa. O backend físico precisa ser alcançável pelo ESP32 por endereço LAN ou DNS/HTTPS. Para HTTPS, o firmware exige cadeia de CA válida em `Config::BACKEND_ROOT_CA` ou `/backend_ca.pem` no LittleFS; sem CA, a conexão é rejeitada. Não incorporar tokens, senhas Wi-Fi ou corpos completos de revisão em logs de diagnóstico.
+
+Sleep, tentativas de conexão e OTA devem respeitar energia e operação em andamento. A build de bancada mantém sleep desativado para preservar USB e permitir depuração; consumo, wake e retomada após sleep devem ser verificados na build de produto. Procedimentos e limites estão em [firmware/t5-touch/docs/BENCH_BUILDS.md](../../firmware/t5-touch/docs/BENCH_BUILDS.md).

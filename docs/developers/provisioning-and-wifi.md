@@ -1,43 +1,18 @@
-# Mnemos Provisioning and Wi-Fi v1
+# Provisionamento e conectividade do T5 Touch
 
-## 1. Objetivo
+O provisionamento configura o terminal físico sem acoplar o estudo à presença do telefone. A HMI expõe uma sessão local temporária em modo `provision` ou `sync`. Se já existe Wi-Fi funcional, `LocalLinkService` anuncia o IP da LAN sem alternar a interface; caso contrário, inicia SoftAP com SSID `MNEMOS-<sufixo>` e senha efêmera. O QR `mnemos://local` contém `v=4`, modo, transporte, host, identificador, dados do acesso temporário, token efêmero, modelo e firmware. Esse QR é uma credencial de sessão local, não o bearer da conta nem a senha da infraestrutura a ser configurada.
 
-A operação `CONFIGURAR / SINCRONIZAR` não cria uma dependência permanente do telefone. Ela abre um canal temporário para o app provisionar o terminal. Depois, o terminal permanece conectado à mesma infraestrutura Wi-Fi informada pelo usuário e pode sincronizar diretamente com um backend compatível.
+## Transação de provisionamento
 
-## 2. Estados
+1. O app lê o QR e, se a API é alcançável, registra o terminal com credencial própria; falha no registro não impede operação offline. A biblioteca desejada começa vazia, salvo seleção explícita posterior.
+2. O app conecta ao endereço indicado, envia o relógio a `POST /v4/time` e lê `/v4/info`, inclusive capacidades. A conexão em SoftAP pode interromper o acesso normal do telefone à Internet; registrar antes evita depender da API durante essa etapa.
+3. Em `mode=provision`, `POST /v4/provision` recebe `mnemos.provision/v2`: `networkProfile`, intervalo e, opcionalmente, `backend.baseUrl` e `backend.deviceToken`. O firmware guarda o perfil de rede e a credencial física, sem transferir o bearer humano. O modo `sync` não aceita essa rota (409).
+4. `POST /v4/complete` encerra a sessão local e devolve a política normal de conexão. `/v4/network/status` informa conectividade e último erro; não equivale a confirmação de sincronização de conteúdo ou revisões.
 
-`UNPROVISIONED` significa ausência de credenciais de infraestrutura. `ONLINE` significa rádio habilitado e associação ao AP configurado. `OFFLINE_RETRY` significa credenciais preservadas mas rede temporariamente indisponível. `RADIO_OFF` significa rádio explicitamente desligado pelo usuário; SSID, senha, backend e token continuam persistidos.
+O perfil de rede admite rede aberta ou pessoal e pode anunciar `enterprise-password` somente se a build oferecer suporte. O app consulta essa capacidade antes de enviar Enterprise. Redes conhecidas e preferência de rádio são persistidas; scans e reconexão usam fluxo cooperativo para não congelar a HMI. O RTC e a obtenção posterior de NTP seguem caminhos separados. Informações de protocolo e semântica dos perfis estão em [`spec/protocol/provisioning-v2.md`](../../spec/protocol/provisioning-v2.md).
 
-## 3. Sequência completa
+## Sincronização local e remota
 
-O terminal abre SoftAP WPA2 temporário e mostra QR. O app lê o QR e, antes de abandonar a Internet normal, pode registrar o terminal no backend e obter um token de dispositivo. O app tenta identificar o SSID atual apenas como conveniência; o campo permanece editável. A senha da rede precisa ser fornecida pelo usuário, pois o fluxo não depende de recuperar senha salva pelo Android.
+`mode=sync` aceita `POST /v4/sync/library`, `GET /v4/sync/reviews`, `POST /v4/sync/reviews/ack` e `GET /v4/metrics`. O token do QR é obrigatório em `?token=`; uma requisição em modo errado recebe 409. O móvel coleta revisões antes de transmitir o snapshot, mas o ACK atual limpa toda a outbox e pode incluir revisões que a importação ignorou por falta do cartão local. Tratar esse caso como bloqueador de integridade, conforme [integração](../integration/t5-touch.md#directsync-e-confirmação). Não confundir sucesso de `/v4/complete` com persistência remota dos eventos.
 
-O app pede ao Android uma conexão local ao SoftAP, sincroniza relógio, envia `mnemos.provision/v1`, transfere biblioteca e coleta reviews. O ESP32 fica em AP+STA enquanto tenta a infraestrutura. O app consulta `/v2/network/status`. Ao concluir, chama `/v2/pairing/complete`, libera a rede temporária no Android e o terminal encerra o SoftAP.
-
-## 4. Android
-
-Android 10+ usa `WifiNetworkSpecifier` para a solicitação de rede local. Android 13+ requer tratamento da permissão `NEARBY_WIFI_DEVICES` para operações Wi-Fi compatíveis com esse modelo; versões anteriores podem exigir `ACCESS_FINE_LOCATION` conforme API/target. O projeto pede permissões em runtime e mantém entrada manual de SSID quando o sistema não expõe o nome atual.
-
-Referências oficiais: https://developer.android.com/develop/connectivity/wifi/wifi-bootstrap e https://developer.android.com/develop/connectivity/wifi/wifi-permissions.
-
-## 5. Perfil de rede suportado
-
-O CYD v0.3 aceita SSID de 1..32 caracteres e senha vazia para rede aberta ou 8..63 caracteres para rede pessoal. Redes 802.1X/Enterprise, portais cativos e fluxos que exigem navegador não fazem parte do perfil atual. Um app deve informar isso antes de prometer provisionamento em ambientes corporativos.
-
-## 6. Persistência no firmware
-
-O namespace `mnemos-net` armazena `enabled`, `ssid`, `password`, `backend`, `token` e `sync`. Desligar Wi-Fi altera apenas `enabled=false`; não apaga segredo nem escopo. Reprovisionar substitui credenciais. Reset de fábrica futuro deve limpar esse namespace explicitamente.
-
-## 7. Economia de bateria
-
-O botão `DESLIGAR WI-FI` chama uma desativação real do rádio. Estudo, scheduling local e log de reviews continuam funcionando. `LIGAR WI-FI` ativa o rádio, reconecta e dispara sincronização quando há backend. Quando habilitado mas sem rede, o firmware espaça tentativas automáticas em vez de executar loop agressivo.
-
-A sincronização periódica padrão é 30 minutos, configurável de 5 minutos a 24 horas. Essa estratégia evita uma conexão permanente apenas para verificar atualizações. Referência oficial para modos de Wi-Fi do ESP32: https://docs.espressif.com/projects/arduino-esp32/en/latest/api/wifi.html.
-
-## 8. Falhas recuperáveis
-
-Senha incorreta, AP fora de alcance e backend indisponível não apagam biblioteca. O terminal pode concluir o provisionamento de conteúdo local mesmo se a infraestrutura não for confirmada. O usuário pode abrir `CONFIGURAR / SINCRONIZAR` novamente e substituir dados de rede.
-
-## 9. Relação com backend
-
-Se o backend estiver configurado e alcançável, o terminal sincroniza imediatamente após concluir o pareamento, ao habilitar Wi-Fi e nos intervalos periódicos. Reviews são enviados primeiro; depois o snapshot de conteúdo é obtido. Assim, o snapshot pode ser construído depois de o servidor conhecer os eventos mais recentes do próprio terminal.
+Depois do provisionamento, `BackendSyncService` usa a rede de infraestrutura para falar com `/v1/terminal/*`. `10.0.2.2` é exclusivo do emulador Android e não resolve o backend para um ESP32 real. Usar endereço LAN roteável pelo terminal ou hostname HTTPS com CA configurada em `Config::BACKEND_ROOT_CA` ou `/backend_ca.pem`. HTTPS sem CA é recusado; HTTP deve ficar restrito a laboratório/LAN controlada. Se a rede falhar, conteúdo e histórico local permanecem utilizáveis, e a outbox deve aguardar a próxima tentativa.
