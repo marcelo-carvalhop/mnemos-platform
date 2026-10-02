@@ -1,7 +1,9 @@
 #include "power_service.h"
 
 #include <algorithm>
+#include <Wire.h>
 #include <driver/gpio.h>
+#include <driver/rtc_io.h>
 #include <esp_sleep.h>
 #include <esp_timer.h>
 
@@ -45,6 +47,14 @@ PowerWakeReason PowerService::mapWakeCause(
 
 
 void PowerService::begin() {
+    /*
+     * EXT0 usa o domínio RTC durante deep sleep.
+     * Devolvemos GPIO0 ao domínio digital no boot.
+     */
+    rtc_gpio_deinit(
+        static_cast<gpio_num_t>(
+            Config::WAKE_BUTTON_PIN));
+
     pinMode(
         Config::WAKE_BUTTON_PIN,
         INPUT_PULLUP);
@@ -61,10 +71,21 @@ void PowerService::begin() {
     lastActivityUs_ =
         nowUs();
 
+    const esp_sleep_wakeup_cause_t rawWakeCause =
+        esp_sleep_get_wakeup_cause();
+
+    const uint64_t ext1WakeStatus =
+        esp_sleep_get_ext1_wakeup_status();
+
     Serial.printf(
-        "[power] boot wake=%u light=%lu ms deep=%lu ms\n",
+        "[power] boot wake=%u raw=%d ext1=0x%llx "
+        "light=%lu ms deep=%lu ms\n",
         static_cast<unsigned>(
             bootWakeReason_),
+        static_cast<int>(
+            rawWakeCause),
+        static_cast<unsigned long long>(
+            ext1WakeStatus),
         static_cast<unsigned long>(
             Config::
                 LIGHT_SLEEP_IDLE_MS),
@@ -287,21 +308,67 @@ void PowerService::enterDeepSleep() {
 }
 
 void PowerService::enterPowerOff() {
-    // Deep sleep sem timer, inclusive no build bench.
+    /*
+     * Power-off lógico do H752-01:
+     * deep sleep sem timer, com wake exclusivamente
+     * pelo BOOT/GPIO0. RST permanece reset físico.
+     *
+     * EXT1 foi escolhido aqui porque é controlado pelo
+     * RTC controller e permanece operacional mesmo com
+     * outros domínios de periféricos em sleep.
+     */
     esp_sleep_disable_wakeup_source(
         ESP_SLEEP_WAKEUP_ALL);
 
-    pinMode(
-        Config::POWER_OFF_WAKE_PIN,
-        INPUT_PULLUP);
-
-    esp_sleep_enable_ext0_wakeup(
+    const gpio_num_t wakePin =
         static_cast<gpio_num_t>(
-            Config::POWER_OFF_WAKE_PIN),
-        0);
+            Config::POWER_OFF_WAKE_PIN);
 
-    Serial.println(
-        "[power] power-off; wake somente pelo BOOT");
+    /*
+     * Mantém RTC_PERIPH ativo para preservar o pull-up
+     * interno de GPIO0 durante o deep sleep.
+     */
+    esp_sleep_pd_config(
+        ESP_PD_DOMAIN_RTC_PERIPH,
+        ESP_PD_OPTION_ON);
+
+    rtc_gpio_init(
+        wakePin);
+
+    rtc_gpio_set_direction(
+        wakePin,
+        RTC_GPIO_MODE_INPUT_ONLY);
+
+    rtc_gpio_pullup_en(
+        wakePin);
+
+    rtc_gpio_pulldown_dis(
+        wakePin);
+
+    const uint64_t wakeMask =
+        1ULL <<
+        static_cast<uint64_t>(
+            Config::POWER_OFF_WAKE_PIN);
+
+    const esp_err_t wakeResult =
+        esp_sleep_enable_ext1_wakeup(
+            wakeMask,
+            ESP_EXT1_WAKEUP_ANY_LOW);
+
+    Serial.printf(
+        "[power] power-off; BOOT=GPIO%d level=%d "
+        "ext1=%d mask=0x%llx\n",
+        Config::POWER_OFF_WAKE_PIN,
+        static_cast<int>(
+            rtc_gpio_get_level(
+                wakePin)),
+        static_cast<int>(
+            wakeResult),
+        static_cast<unsigned long long>(
+            wakeMask));
+
     Serial.flush();
+    delay(30);
+
     esp_deep_sleep_start();
 }

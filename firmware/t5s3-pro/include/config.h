@@ -170,7 +170,10 @@ constexpr uint16_t EPD_AUTO_DEEP_CLEAN_INTERVAL = 5;
 // Energia do terminal. Também vale no build bench.
 constexpr uint32_t AUTO_POWER_OFF_IDLE_MS = 10U * 60U * 1000U;
 constexpr uint32_t WIFI_RADIO_IDLE_OFF_MS = 3U * 60U * 1000U;
-// BOOT físico do H752-01. Power-off não usa wake por timer.
+constexpr uint32_t BOOT_POWER_OFF_HOLD_MS = 1200U;
+
+// BOOT físico (GPIO0): única fonte de wake do power-off.
+// RST atua no EN e permanece reservado para reset físico.
 constexpr int POWER_OFF_WAKE_PIN = 0;
 
 constexpr bool KEEP_EPD_AUX_POWER_WHILE_AWAKE = false;

@@ -1275,14 +1275,15 @@ void T5Display::drawBatteryIcon(
         return;
     }
 
+    // Patamares do firmware de fábrica H752-01: <20, <40, <65, <90, cheio.
     const uint8_t segments =
-        batteryPercent_ >= 76
+        batteryPercent_ >= 90
             ? 4
-            : batteryPercent_ >= 51
+            : batteryPercent_ >= 65
                 ? 3
-                : batteryPercent_ >= 26
+                : batteryPercent_ >= 40
                     ? 2
-                    : batteryPercent_ >= 6
+                    : batteryPercent_ >= 20
                         ? 1
                         : 0;
 
@@ -2543,19 +2544,20 @@ void T5Display::showMainMenu() {
     drawContextStrip(
         "Menu");
 
-    const String labels[3] = {
+    const String labels[4] = {
         "Decks",
         "Conexão",
-        "Configurações"
+        "Configurações",
+        "Desligar dispositivo"
     };
 
     for (
         uint8_t i = 0;
-        i < 3;
+        i < 4;
         ++i
     ) {
         const HmiLayout::Rect card =
-            HmiLayout::connectionCard(
+            HmiLayout::menuCard(
                 portrait(),
                 i);
 
@@ -2588,14 +2590,13 @@ void T5Display::showSettings(
     drawSystemBar("", true, false, "", true, false);
     drawContextStrip("Configurações");
 
-    const String labels[4] = {
+    const String labels[3] = {
         "Luz de fundo · " + backlightLabel,
         "Limpeza profunda",
-        "Armazenamento",
-        "Desligar dispositivo"
+        "Armazenamento"
     };
 
-    for (uint8_t i = 0; i < 4; ++i) {
+    for (uint8_t i = 0; i < 3; ++i) {
         const HmiLayout::Rect card =
             HmiLayout::connectionCard(
                 portrait(), i);
@@ -2616,34 +2617,23 @@ void T5Display::showSettings(
 
 
 void T5Display::showPowerOff(
-    bool automatic) {
+    bool) {
 
     clearBuffer();
 
     drawCenteredTextInRect(
         "MNEMOS",
         0,
-        portrait() ? 150 : 70,
+        portrait() ? 240 : 115,
         logicalWidth(),
-        portrait() ? 100 : 70,
+        portrait() ? 110 : 80,
         MnemosFontRole::Title22,
         BLACK);
 
     drawCenteredTextInRect(
-        "Dispositivo desligado",
+        "estudo sem distrações",
         MARGIN,
-        portrait() ? 360 : 200,
-        logicalWidth() - 2 * MARGIN,
-        portrait() ? 90 : 70,
-        MnemosFontRole::Title22,
-        BLACK);
-
-    drawCenteredTextInRect(
-        automatic
-            ? "Desligado automaticamente por inatividade"
-            : "Desligado pelo usuário",
-        MARGIN,
-        portrait() ? 470 : 280,
+        portrait() ? 365 : 220,
         logicalWidth() - 2 * MARGIN,
         portrait() ? 70 : 55,
         MnemosFontRole::Body18,
@@ -2652,7 +2642,7 @@ void T5Display::showPowerOff(
     drawCenteredTextInRect(
         "Pressione BOOT para ligar",
         MARGIN,
-        portrait() ? 610 : 355,
+        portrait() ? 625 : 365,
         logicalWidth() - 2 * MARGIN,
         portrait() ? 80 : 60,
         MnemosFontRole::Body18,

@@ -55,9 +55,22 @@ bool BatteryService::begin() {
     }
 
     /*
-     * O BQ27220 já vem provisionado no H752-01.
-     * Não chamamos init()/Data Memory.
+     * O firmware oficial LilyGO do H752-01 chama bq27220.init()
+     * no bring-up. Fazemos o mesmo para validar perfil,
+     * INITCOMP e Data Memory antes de confiar no SOC.
      *
+     * Se a inicialização completa falhar, ainda tentamos
+     * leituras diretas para não perder um gauge funcional
+     * por uma falha transitória de configuração.
+     */
+    const bool gaugeReady =
+        gauge_.init();
+
+    Serial.printf(
+        "[battery] BQ27220 init=%d\n",
+        gaugeReady ? 1 : 0);
+
+    /*
      * No boot, o primeiro acesso pode retornar 0xFFFF.
      * Fazemos até três leituras curtas antes de declarar
      * o gauge indisponível.
@@ -222,17 +235,32 @@ bool BatteryService::sample(
         oldCharging != charging_ ||
         oldPercent != displayPercent_;
 
-    if (force || changed) {
-        Serial.printf(
-            "[battery] %.3f V rawSOC=%u "
-            "display=%u%% charging=%d\n",
-            voltage_,
-            static_cast<unsigned>(
-                rawSoc),
-            static_cast<unsigned>(
-                displayPercent_),
-            charging_ ? 1 : 0);
-    }
+    const int16_t currentMa =
+        gauge_.getCurrent();
+
+    const uint16_t remainingMah =
+        gauge_.getRemainingCapacity();
+
+    const uint16_t fullMah =
+        gauge_.getFullChargeCapacity();
+
+    Serial.printf(
+        "[battery] %.3f V rawSOC=%u display=%u%% "
+        "current=%d mA remaining=%u mAh full=%u mAh "
+        "charging=%d changed=%d\n",
+        voltage_,
+        static_cast<unsigned>(
+            rawSoc),
+        static_cast<unsigned>(
+            displayPercent_),
+        static_cast<int>(
+            currentMa),
+        static_cast<unsigned>(
+            remainingMah),
+        static_cast<unsigned>(
+            fullMah),
+        charging_ ? 1 : 0,
+        changed ? 1 : 0);
 
     return changed;
 }

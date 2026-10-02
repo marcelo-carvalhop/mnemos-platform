@@ -8,9 +8,8 @@
 namespace {
 
 bool supportedType(const String& type) {
-    return type == "open_recall" || type == "cloze" ||
-           type == "multiple_choice" || type == "true_false" ||
-           type == "application";
+    // Primeira versão integrada: servidor <-> terminal somente open_recall.
+    return type == "open_recall";
 }
 
 String deckNameFor(JsonDocument& doc, const String& deckId) {
@@ -524,8 +523,37 @@ String buildReviewBatchV2(const Storage& storage) {
         const String line = ndjson.substring(start, end);
         start = end + 1;
         if (line.length() == 0) continue;
-        JsonDocument row;
-        if (!deserializeJson(row, line)) reviews.add(row.as<JsonObject>());
+
+        JsonDocument local;
+        if (deserializeJson(local, line)) continue;
+
+        JsonObject remote = reviews.add<JsonObject>();
+        remote["schema"] = "mnemos.review/v2";
+        remote["id"] = local["id"] | "";
+        remote["cardId"] = local["cardId"] | "";
+
+        const uint64_t reviewedAtMs =
+            local["reviewedAtMs"].is<uint64_t>()
+                ? local["reviewedAtMs"].as<uint64_t>()
+                : static_cast<uint64_t>(local["reviewedAt"] | 0ULL) * 1000ULL;
+
+        const uint64_t dueAfterMs =
+            local["dueAfterMs"].is<uint64_t>()
+                ? local["dueAfterMs"].as<uint64_t>()
+                : static_cast<uint64_t>(
+                      local["dueAfter"] | static_cast<uint64_t>(reviewedAtMs / 1000ULL)
+                  ) * 1000ULL;
+
+        remote["reviewedAtMs"] = reviewedAtMs;
+        remote["dueAfterMs"] = dueAfterMs;
+        remote["schedulerRating"] = local["schedulerRating"] | 0U;
+        remote["responseTimeMs"] = local["responseTimeMs"] | 0U;
+
+        const String cardType = local["cardType"] | "";
+        remote["source"] =
+            cardType == "multiple_choice"
+                ? "multiple_choice"
+                : "standard";
     }
 
     String body;
