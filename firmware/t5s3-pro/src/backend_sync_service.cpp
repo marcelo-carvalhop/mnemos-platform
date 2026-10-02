@@ -1,0 +1,601 @@
+#include "backend_sync_service.h"
+
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+#include <LittleFS.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
+
+#include "config.h"
+#include "network_service.h"
+#include "storage.h"
+#include "sync_codec.h"
+
+BackendSyncService::BackendSyncService(NetworkService& network,
+                                       Storage& storage,
+                                       CardDefinition* cards,
+                                       CardState* states,
+                                       size_t maxCards,
+                                       size_t& cardCount)
+    : network_(network),
+      storage_(storage),
+      cards_(cards),
+      states_(states),
+      maxCards_(maxCards),
+      cardCount_(cardCount) {}
+
+void BackendSyncService::begin() {
+    lastSyncMs_ = millis();
+}
+
+bool BackendSyncService::consumeLibraryUpdated() {
+    const bool value = libraryUpdated_;
+    libraryUpdated_ = false;
+    return value;
+}
+
+void BackendSyncService::loop() {
+    if (!network_.enabled() || !network_.connected()) return;
+    if (network_.backendUrl().length() == 0 || network_.deviceToken().length() == 0) return;
+    const uint32_t intervalMs = network_.syncIntervalSeconds() * 1000U;
+    if (millis() - lastSyncMs_ < intervalMs) return;
+    syncNow();
+}
+
+bool BackendSyncService::request(const String& method,
+                                 const String& path,
+                                 const String& body,
+                                 int& status,
+                                 String& response) {
+    String base = network_.backendUrl();
+    while (base.endsWith("/")) base.remove(base.length() - 1);
+    const String url = base + path;
+
+    HTTPClient http;
+    bool begun = false;
+    WiFiClient plain;
+    WiFiClientSecure secure;
+
+    if (url.startsWith("https://")) {
+        String rootCa =
+            Config::BACKEND_ROOT_CA;
+
+        if (
+            rootCa.length() == 0 &&
+            LittleFS.exists(
+                Config::BACKEND_CA_FILE)
+        ) {
+            File caFile =
+                LittleFS.open(
+                    Config::BACKEND_CA_FILE,
+                    "r");
+
+            if (caFile) {
+                rootCa =
+                    caFile.readString();
+                caFile.close();
+            }
+        }
+
+        if (rootCa.length() == 0) {
+            Serial.println(
+                "[backend] HTTPS bloqueado: CA ausente "
+                "(compile BACKEND_ROOT_CA ou grave /backend_ca.pem)");
+            return false;
+        }
+
+        secure.setCACert(
+            rootCa.c_str());
+
+        begun =
+            http.begin(
+                secure,
+                url);
+    } else if (url.startsWith("http://")) {
+        begun = http.begin(plain, url);
+    }
+    if (!begun) return false;
+
+    http.setTimeout(6000);
+    http.addHeader("Authorization", "Bearer " + network_.deviceToken());
+    http.addHeader("Content-Type", "application/json");
+    if (method == "GET") status = http.GET();
+    else status = http.POST(body);
+    if (status > 0) response = http.getString();
+    http.end();
+    return status > 0;
+}
+
+bool BackendSyncService::pushReviews() {
+    if (storage_.pendingReviewCount() == 0) return true;
+    const String body = SyncCodec::buildReviewBatchV2(storage_);
+    int status = 0;
+    String response;
+    if (!request("POST", "/v1/terminal/reviews", body, status, response)) return false;
+    if (status < 200 || status >= 300) {
+        Serial.printf("[backend] reviews HTTP %d\n", status);
+        return false;
+    }
+    return storage_.clearReviewOutbox();
+}
+
+bool BackendSyncService::pullReviews() {
+
+    uint64_t cursor =
+        storage_.reviewCursor();
+
+    // Limite defensivo: 32 páginas x 100 eventos por ciclo.
+    for (
+        uint8_t page = 0;
+        page < 32;
+        ++page
+    ) {
+        char cursorText[24];
+
+        snprintf(
+            cursorText,
+            sizeof(cursorText),
+            "%llu",
+            static_cast<unsigned long long>(
+                cursor));
+
+        const String path =
+            String(
+                "/v1/terminal/reviews?since=")
+            +
+            cursorText
+            +
+            "&limit=100";
+
+        int status = 0;
+        String body;
+
+        if (
+            !request(
+                "GET",
+                path,
+                "",
+                status,
+                body)
+        ) {
+            return false;
+        }
+
+        if (status == 410) {
+            if (cursor == 0) {
+                Serial.println(
+                    "[backend] review cursor 0 rejeitado pelo servidor");
+                return false;
+            }
+
+            Serial.println(
+                "[backend] review cursor expirado; reiniciando em 0");
+
+            if (!storage_.saveReviewCursor(0)) {
+                return false;
+            }
+
+            cursor = 0;
+            continue;
+        }
+
+        if (
+            status < 200 ||
+            status >= 300
+        ) {
+            Serial.printf(
+                "[backend] review pull HTTP %d\n",
+                status);
+            return false;
+        }
+
+        SyncCodec::
+            ReviewDeltaApplyResult result;
+
+        String error;
+
+        if (
+            !SyncCodec::applyReviewDeltaV2(
+                body,
+                storage_,
+                result,
+                error)
+        ) {
+            Serial.printf(
+                "[backend] delta de reviews rejeitado: %s\n",
+                error.c_str());
+            return false;
+        }
+
+        if (result.appended > 0) {
+            // O nome histórico permanece por compatibilidade;
+            // o sinal agora significa conteúdo OU estado alterado.
+            libraryUpdated_ = true;
+
+            Serial.printf(
+                "[backend] reviews remotas=%u cursor=%llu\n",
+                static_cast<unsigned>(
+                    result.appended),
+                static_cast<unsigned long long>(
+                    result.cursor));
+        }
+
+        if (!result.hasMore) {
+            return true;
+        }
+
+        if (result.cursor <= cursor) {
+            Serial.println(
+                "[backend] cursor de reviews nao avancou");
+            return false;
+        }
+
+        cursor =
+            result.cursor;
+    }
+
+    Serial.println(
+        "[backend] limite de paginas de reviews atingido");
+
+    return false;
+}
+
+
+bool BackendSyncService::pullProgressResets() {
+
+    uint64_t cursor =
+        storage_.progressResetCursor();
+
+    for (
+        uint8_t page = 0;
+        page < 32;
+        ++page
+    ) {
+        char cursorText[24];
+
+        snprintf(
+            cursorText,
+            sizeof(cursorText),
+            "%llu",
+            static_cast<unsigned long long>(
+                cursor));
+
+        const String path =
+            String(
+                "/v1/terminal/progress-resets?since=")
+            +
+            cursorText
+            +
+            "&limit=100";
+
+        int status = 0;
+        String body;
+
+        if (
+            !request(
+                "GET",
+                path,
+                "",
+                status,
+                body)
+        ) {
+            return false;
+        }
+
+        if (status == 410) {
+            if (cursor == 0) {
+                Serial.println(
+                    "[backend] cursor de resets 0 rejeitado pelo servidor");
+                return false;
+            }
+
+            Serial.println(
+                "[backend] cursor de resets expirado; reiniciando em 0");
+
+            if (!storage_.saveProgressResetCursor(0)) {
+                return false;
+            }
+
+            cursor = 0;
+            continue;
+        }
+
+        if (
+            status < 200 ||
+            status >= 300
+        ) {
+            Serial.printf(
+                "[backend] progress resets HTTP %d\n",
+                status);
+            return false;
+        }
+
+        SyncCodec::
+            ProgressResetDeltaApplyResult result;
+
+        String error;
+
+        if (
+            !SyncCodec::
+                applyProgressResetDeltaV2(
+                    body,
+                    storage_,
+                    result,
+                    error)
+        ) {
+            Serial.printf(
+                "[backend] delta de resets rejeitado: %s\n",
+                error.c_str());
+            return false;
+        }
+
+        if (result.appended > 0) {
+            libraryUpdated_ = true;
+
+            Serial.printf(
+                "[backend] resets remotos=%u cursor=%llu\n",
+                static_cast<unsigned>(
+                    result.appended),
+                static_cast<unsigned long long>(
+                    result.cursor));
+        }
+
+        if (!result.hasMore) {
+            return true;
+        }
+
+        if (result.cursor <= cursor) {
+            Serial.println(
+                "[backend] cursor de resets nao avancou");
+            return false;
+        }
+
+        cursor =
+            result.cursor;
+    }
+
+    Serial.println(
+        "[backend] limite de paginas de resets atingido");
+
+    return false;
+}
+
+
+bool BackendSyncService::pullSettings() {
+
+    uint64_t cursor =
+        storage_.settingsCursor();
+
+    for (
+        uint8_t page = 0;
+        page < 32;
+        ++page
+    ) {
+        char cursorText[24];
+
+        snprintf(
+            cursorText,
+            sizeof(cursorText),
+            "%llu",
+            static_cast<unsigned long long>(
+                cursor));
+
+        const String path =
+            String(
+                "/v1/terminal/settings?since=")
+            +
+            cursorText
+            +
+            "&limit=100";
+
+        int status = 0;
+        String body;
+
+        if (
+            !request(
+                "GET",
+                path,
+                "",
+                status,
+                body)
+        ) {
+            return false;
+        }
+
+        if (status == 410) {
+            if (cursor == 0) {
+                Serial.println(
+                    "[backend] cursor de settings 0 rejeitado pelo servidor");
+                return false;
+            }
+
+            Serial.println(
+                "[backend] cursor de settings expirado; reiniciando em 0");
+
+            if (!storage_.saveSettingsCursor(0)) {
+                return false;
+            }
+
+            cursor = 0;
+            continue;
+        }
+
+        if (
+            status < 200 ||
+            status >= 300
+        ) {
+            Serial.printf(
+                "[backend] settings HTTP %d\n",
+                status);
+            return false;
+        }
+
+        SyncCodec::
+            UserSettingDeltaApplyResult result;
+
+        String error;
+
+        if (
+            !SyncCodec::
+                applyUserSettingDeltaV2(
+                    body,
+                    storage_,
+                    result,
+                    error)
+        ) {
+            Serial.printf(
+                "[backend] delta de settings rejeitado: %s\n",
+                error.c_str());
+            return false;
+        }
+
+        if (result.applied > 0) {
+            // Mudança de retention exige reconstrução
+            // integral do estado derivado.
+            libraryUpdated_ = true;
+
+            Serial.printf(
+                "[backend] settings pedagogicos=%u cursor=%llu retention=%.4f\n",
+                static_cast<unsigned>(
+                    result.applied),
+                static_cast<unsigned long long>(
+                    result.cursor),
+                storage_.desiredRetention());
+        }
+
+        if (!result.hasMore) {
+            return true;
+        }
+
+        if (result.cursor <= cursor) {
+            Serial.println(
+                "[backend] cursor de settings nao avancou");
+            return false;
+        }
+
+        cursor =
+            result.cursor;
+    }
+
+    Serial.println(
+        "[backend] limite de paginas de settings atingido");
+
+    return false;
+}
+
+
+bool BackendSyncService::pullSnapshot() {
+    int status = 0;
+    String body;
+    const String path = "/v1/terminal/snapshot?limit=" + String(maxCards_) + "&schema=mnemos.sync%2Fv2";
+    if (!request("GET", path, "", status, body)) return false;
+    if (status < 200 || status >= 300) {
+        Serial.printf("[backend] snapshot HTTP %d\n", status);
+        return false;
+    }
+
+    String error;
+    if (!SyncCodec::applySnapshotV2(body, cards_, states_, maxCards_, cardCount_, storage_, error)) {
+        Serial.printf("[backend] snapshot rejeitado: %s\n", error.c_str());
+        return false;
+    }
+    libraryUpdated_ = true;
+    return true;
+}
+
+bool BackendSyncService::reportStatus(bool synced) {
+    JsonDocument doc;
+    JsonArray deckIds = doc["reported_deck_ids"].to<JsonArray>();
+    uint64_t revision = 0;
+    for (size_t i = 0; i < cardCount_; ++i) {
+        if (cards_[i].revision > revision) revision = cards_[i].revision;
+        bool exists = false;
+        for (JsonVariantConst value : deckIds) {
+            if (String(value.as<const char*>()) == cards_[i].deckId) { exists = true; break; }
+        }
+        if (!exists && cards_[i].deckId.length() > 0) deckIds.add(cards_[i].deckId);
+    }
+    doc["firmware"] = Config::APP_VERSION;
+    doc["protocol"] = Config::DEVICE_PROTOCOL_VERSION;
+    doc["card_count"] = cardCount_;
+    doc["max_cards"] = maxCards_;
+    doc["pending_reviews"] = storage_.pendingReviewCount();
+    doc["connectivity"] = network_.connected() ? "wifi" : "offline";
+    doc["wifi_ssid"] = network_.ssid();
+    doc["library_revision"] = revision;
+    doc["synced"] = synced;
+    doc["capabilities"]["directWifiSync"] = true;
+    doc["capabilities"]["bleSync"] = false;
+    doc["capabilities"]["keyboard"] = false;
+    doc["capabilities"]["touch"] = Config::TOUCH_ENABLED;
+    doc["capabilities"]["typedRecall"] = false;
+    doc["capabilities"]["display"] = "epaper-960x540";
+    doc["capabilities"]["microSD"] = true;
+    doc["capabilities"]["sdFirstLibrary"] = true;
+    doc["capabilities"]["lazyCardContent"] = true;
+    doc["capabilities"]["lightSleep"] = true;
+    doc["capabilities"]["deepSleep"] = true;
+    doc["capabilities"]["deepSleepTouchWake"] = false;
+
+    String body;
+    serializeJson(doc, body);
+    int status = 0;
+    String response;
+    return request("POST", "/v1/terminal/status", body, status, response) && status >= 200 && status < 300;
+}
+
+bool BackendSyncService::syncNow() {
+
+    if (
+        !network_.connected() ||
+        network_.backendUrl().length() == 0 ||
+        network_.deviceToken().length() == 0
+    ) {
+        return false;
+    }
+
+    lastSyncMs_ =
+        millis();
+
+    const bool pushOk =
+        pushReviews();
+
+    const bool snapshotOk =
+        pullSnapshot();
+
+    const bool reviewsPullOk =
+        snapshotOk
+            ? pullReviews()
+            : false;
+
+    const bool resetsPullOk =
+        snapshotOk
+            ? pullProgressResets()
+            : false;
+
+    const bool settingsPullOk =
+        snapshotOk
+            ? pullSettings()
+            : false;
+
+    const bool synced =
+        pushOk &&
+        snapshotOk &&
+        reviewsPullOk &&
+        resetsPullOk &&
+        settingsPullOk;
+
+    const bool statusOk =
+        reportStatus(synced);
+
+    Serial.printf(
+        "[backend] sync push=%d snapshot=%d reviews=%d resets=%d settings=%d status=%d\n",
+        pushOk,
+        snapshotOk,
+        reviewsPullOk,
+        resetsPullOk,
+        settingsPullOk,
+        statusOk);
+
+    return synced;
+}
