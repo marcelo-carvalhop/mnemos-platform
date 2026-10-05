@@ -4,6 +4,8 @@ import os
 import subprocess
 import sys
 
+from firmware_meta import pio_executable
+
 override = os.environ.get("MNEMOS_UPLOAD_PORT", "").strip()
 if override:
     if not os.path.exists(override):
@@ -13,7 +15,7 @@ if override:
     sys.exit(0)
 
 result = subprocess.run(
-    ["pio", "device", "list", "--json-output"],
+    [pio_executable(), "device", "list", "--json-output"],
     text=True,
     capture_output=True,
 )
@@ -49,7 +51,7 @@ if len(candidates) == 1:
 if not candidates:
     print("[ERRO] Nenhuma porta USB Espressif /dev/ttyACM* foi encontrada.", file=sys.stderr)
     print("[ERRO] Upload abortado para impedir fallback em /dev/ttyS0.", file=sys.stderr)
-    print("[DICA] Acorde a placa ou use SIR_IO0 + RST para download mode.", file=sys.stderr)
+    print("[DICA] Ligue a placa (PWR ~2 s) ou entre em download mode: segure BOOT, pressione RST, solte BOOT.", file=sys.stderr)
     sys.exit(4)
 
 print("[ERRO] Mais de uma porta Espressif: " + ", ".join(candidates), file=sys.stderr)

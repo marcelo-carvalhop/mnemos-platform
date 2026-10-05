@@ -2,10 +2,9 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-ENV_NAME="lilygo-t5-47-s3-touch-bench-ota-target"
-VERSION="0.7.0-preview.4.2-touch"
-GENERATION="70403"
-OUT="/tmp/mnemos-ota-${GENERATION}"
+ENV_NAME="t5s3-pro-bench-ota-target"
+GENERATION="$(python3 tools/firmware_meta.py --env "$ENV_NAME" --field generation)"
+OUT="${MNEMOS_OTA_OUT:-/tmp/mnemos-ota-${GENERATION}}"
 
 echo "[ota-test] compilando alvo: $ENV_NAME"
 pio run -e "$ENV_NAME"
@@ -16,11 +15,9 @@ BIN=".pio/build/${ENV_NAME}/firmware.bin"
     exit 2
 }
 
-rm -rf "$OUT"
 python3 tools/make_ota_bundle.py \
   "$BIN" \
-  --version "$VERSION" \
-  --generation "$GENERATION" \
+  --env "$ENV_NAME" \
   --output "$OUT"
 
 echo
