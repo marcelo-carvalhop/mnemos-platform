@@ -8,6 +8,8 @@
 #include <cstdint>
 #include <cstdio>
 
+#include "WString.h"
+
 namespace test_support {
 
 inline uint32_t millisValue = 0;

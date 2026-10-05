@@ -136,9 +136,10 @@ Onde ficam os dados:
 
 ## Testes e CI
 
-- `pio test -e native` roda no PC os testes de FSRS (fixtures de referência)
-  e da política de bateria, com stubs de Arduino, Wire e BQ27220 em
-  `test/support`.
+- `pio test -e native` roda no PC os testes de FSRS (fixtures de referência),
+  da política de bateria e do contrato do lote de revisões enviado ao backend
+  (mesmas regras de `_validate_terminal_review`), com stubs de Arduino,
+  `String`, Wire e BQ27220 em `test/support`.
 - `.github/workflows/firmware-t5s3-pro.yml` roda esses testes, compila os
   cinco ambientes com `-Werror` e publica o binário de produto, o de bancada e
   o pacote OTA como artefatos.

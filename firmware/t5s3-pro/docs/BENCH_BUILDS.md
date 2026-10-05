@@ -65,9 +65,9 @@ SHA-256 não conferir.
 pio test -e native
 ```
 
-Roda no PC os testes de FSRS e da política de bateria. Os ambientes do
-ESP32 ignoram os testes (`test_ignore = *`), então `pio test` nunca grava
-nada na placa.
+Roda no PC os testes de FSRS, da política de bateria e do contrato do lote de
+revisões com o backend. Os ambientes do ESP32 ignoram os testes
+(`test_ignore = *`), então `pio test` nunca grava nada na placa.
 
 ## Diagnóstico
 

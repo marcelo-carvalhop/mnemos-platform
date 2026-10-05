@@ -5,10 +5,16 @@ estão marcados com **(bancada)**.
 
 ## Validação
 
-- [ ] **(bancada)** Validar a sincronização terminal → backend ponta a ponta.
-  `sync_codec.cpp` já converte as revisões para `reviewedAtMs` e mapeia
-  `source` para `standard`/`multiple_choice`, mas isso nunca foi testado
-  contra o servidor.
+- [ ] **(bancada)** Validar a sincronização terminal → backend ponta a ponta
+  (HTTP, ingestão e pull nos outros clientes). O lote gerado por
+  `sync_codec.cpp` já passa pelas regras de `_validate_terminal_review` do
+  backend (`test/test_sync_codec`), mas não foi enviado a um servidor real.
+- [ ] Enviar a outbox em lotes de no máximo 500 revisões. Hoje
+  `BackendSyncService::pushReviews()` manda a outbox inteira num único POST e
+  só a limpa após 2xx; a rota recusa mais de 500 revisões (`max_length=500`),
+  então, com mais de 500 pendentes, a sincronização fica travada (sem perda de
+  dados). A correção precisa remover da outbox só o prefixo confirmado e deve
+  ser testada no hardware, porque reescreve o arquivo no LittleFS.
 - [ ] **(bancada)** Executar e registrar as checklists
   ([TEST_CHECKLIST.md](TEST_CHECKLIST.md) e
   [HMI_TEST_CHECKLIST.md](HMI_TEST_CHECKLIST.md)) com data, versão do
@@ -53,8 +59,8 @@ estão marcados com **(bancada)**.
 - [ ] Dividir `main.cpp` (telas, toque, energia e rede) e `t5_display.cpp`.
 - [ ] Logging com níveis e tags no lugar dos `Serial.print*` espalhados.
 - [ ] `.clang-format` para o código do projeto e `pio check` no CI.
-- [ ] Ampliar os testes no host: `sync_codec` contra os schemas de `spec/` e
-  `schedule_service`.
+- [ ] Ampliar os testes no host: aplicação de snapshot e deltas do
+  `sync_codec` e `schedule_service`.
 
 ## Segurança
 
@@ -79,3 +85,6 @@ estão marcados com **(bancada)**.
 - [ ] Backend: o registro da API anuncia `protocol=3`, enquanto o terminal
   negocia v4.
 - [ ] Backend e app reduzem todos os cartões a `open_recall` nos snapshots.
+- [ ] Alinhar `spec/schemas/review-v2.schema.json` ao validador do backend: o
+  schema público exige `reviewedAt`, `outcome`, `effort` e outros campos e não
+  tem `reviewedAtMs` nem `source`, que o backend exige.

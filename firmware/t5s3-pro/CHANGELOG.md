@@ -17,7 +17,8 @@ fork do `firmware/t5-touch`; o histórico anterior ao fork está ao final.
 - epdiy: a espera por `PWR_GOOD` do TPS65185 deixa de ser infinita;
 - build: `-Wall -Wextra` nos fontes do projeto, sem `-Wno-return-type`, e
   dependências com versão exata;
-- testes unitários no host (`pio test -e native`) para FSRS e bateria;
+- testes unitários no host (`pio test -e native`) para FSRS, bateria e o
+  contrato do lote de revisões com o validador do backend;
 - CI: build dos cinco ambientes com `-Werror`, testes e pacote OTA;
 - ferramentas: scripts de bancada e OTA apontam para os ambientes `t5s3-pro`
   e leem versão, geração e modelo de `include/config.h`;
