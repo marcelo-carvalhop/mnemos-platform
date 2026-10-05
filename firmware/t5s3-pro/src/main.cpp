@@ -132,11 +132,6 @@ bool powerOffRequested = false;
 bool networkRadioSuspended = false;
 uint32_t lastNetworkDemandMs = 0;
 
-bool bootPowerButtonArmed = false;
-bool bootPowerButtonPressed = false;
-bool bootPowerHoldAccepted = false;
-uint32_t bootPowerPressedAtMs = 0;
-
 bool localLinkProvisioning = false;
 
 DeckSummary deckView[MAX_VISIBLE_DECKS];
@@ -176,90 +171,6 @@ void noteNetworkDemand() {
             "[wifi] radio reativado por demanda do usuário");
     }
 }
-
-void serviceBootPowerButton() {
-    const bool pressed =
-        digitalRead(
-            Config::POWER_OFF_WAKE_PIN) ==
-        LOW;
-
-    /*
-     * Após boot/wake, o BOOT pode continuar pressionado.
-     * Só armamos a função de desligar depois de observar
-     * uma liberação do botão.
-     */
-    if (!bootPowerButtonArmed) {
-        if (!pressed) {
-            bootPowerButtonArmed =
-                true;
-
-            Serial.println(
-                "[power] BOOT power button armed");
-        }
-
-        return;
-    }
-
-    if (pressed) {
-        if (!bootPowerButtonPressed) {
-            bootPowerButtonPressed =
-                true;
-
-            bootPowerPressedAtMs =
-                millis();
-
-            bootPowerHoldAccepted =
-                false;
-        }
-
-        if (
-            !bootPowerHoldAccepted &&
-            millis() -
-                bootPowerPressedAtMs >=
-                Config::
-                    BOOT_POWER_OFF_HOLD_MS
-        ) {
-            bootPowerHoldAccepted =
-                true;
-
-            Serial.println(
-                "[power] BOOT long-press; "
-                "solte para desligar");
-        }
-
-        return;
-    }
-
-    if (!bootPowerButtonPressed) {
-        return;
-    }
-
-    bootPowerButtonPressed =
-        false;
-
-    bootPowerPressedAtMs =
-        0;
-
-    if (!bootPowerHoldAccepted) {
-        return;
-    }
-
-    /*
-     * Só entramos em deep sleep depois que GPIO0 voltou
-     * a HIGH. Assim EXT0 não encontra a condição de wake
-     * já ativa no instante em que o sleep começa.
-     */
-    bootPowerHoldAccepted =
-        false;
-
-    powerOffRequested =
-        true;
-
-    Serial.println(
-        "[power] BOOT liberado; "
-        "power-off solicitado");
-}
-
 
 void serviceNetworkPowerPolicy() {
     if (networkService.busy() || localLink.active()) {
@@ -3069,7 +2980,7 @@ void performDeepSleep() {
     backlightService.suspend();
 
     Serial.println(
-        "[app] entrando em deep sleep; acorde pelo botao GPIO21");
+        "[app] entrando em deep sleep interno por timer");
 
     delay(20);
 
@@ -3078,14 +2989,58 @@ void performDeepSleep() {
 
 
 void performPowerOff(bool automatic) {
+    if (!powerService.pmicAvailable()) {
+        Serial.println(
+            "[power] power-off indisponivel: "
+            "BQ25896 ausente");
+
+        powerService.noteActivity();
+        return;
+    }
+
+    if (powerService.externalPowerPresent()) {
+        Serial.println(
+            "[power] power-off indisponivel: "
+            "desconecte o USB");
+
+        powerService.noteActivity();
+        return;
+    }
+
     prepareForSleep();
-    display.showPowerOff(automatic);
+
+    display.showPowerOff(
+        automatic);
+
     networkService.forceRadioOff();
     networkRadioSuspended = true;
+
+    /*
+     * Coloca o frontlight em zero antes do corte de VSYS.
+     * Nao existe Serial.flush() no caminho final de hard-off:
+     * o USB pode ja estar fisicamente desconectado.
+     */
     backlightService.suspend();
+
+    ledcWrite(
+        Config::BACKLIGHT_PWM_CHANNEL,
+        0);
+
     sdCardService.suspend();
-    delay(40);
+
+    /*
+     * A partir daqui nao depender de USB CDC.
+     * enterPowerOff() deve terminar com a remocao de VSYS.
+     */
     powerService.enterPowerOff();
+
+    /*
+     * Hard-off correto nunca retorna.
+     * Se retornar, permanece inerte em vez de reiniciar.
+     */
+    while (true) {
+        delay(1000);
+    }
 }
 
 void canonicalizeActiveLibraryIfPossible() {
@@ -3183,6 +3138,7 @@ void setup() {
 
     batteryService.begin();
     powerService.begin();
+
 
     display.setBatteryStatus(
         batteryService.available(),
@@ -3393,8 +3349,6 @@ void setup() {
 }
 
 void loop() {
-    serviceBootPowerButton();
-
     if (
         batteryService.update()
     ) {
@@ -3418,7 +3372,8 @@ void loop() {
         !activeStudyForPowerPolicy() &&
         !networkService.busy() &&
         !localLink.active() &&
-        powerService.idleMs() >= Config::AUTO_POWER_OFF_IDLE_MS
+        powerService.idleMs() >= Config::AUTO_POWER_OFF_IDLE_MS &&
+        powerService.canPowerOff()
     ) {
         Serial.println(
             "[power] auto-off por inatividade");
@@ -3435,7 +3390,19 @@ void loop() {
         powerDecision ==
         PowerDecision::DeepSleep
     ) {
-        performDeepSleep();
+        if (powerService.canPowerOff()) {
+            performPowerOff(true);
+        } else {
+            /*
+             * USB/VBUS presente ou PMIC indisponível:
+             * não prender o aparelho em deep sleep.
+             */
+            Serial.println(
+                "[power] hard-off adiado; "
+                "mantendo terminal ativo");
+            powerService.noteActivity();
+        }
+
         return;
     }
 

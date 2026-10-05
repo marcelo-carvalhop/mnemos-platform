@@ -28,20 +28,25 @@ public:
     void enterDeepSleep();
     void enterPowerOff();
 
+    bool externalPowerPresent();
+    bool canPowerOff();
+
     uint64_t idleMs() const;
 
     PowerWakeReason bootWakeReason() const {
         return bootWakeReason_;
     }
 
+    bool pmicAvailable() const {
+        return pmicAvailable_;
+    }
+
 private:
     uint64_t lastActivityUs_ = 0;
-
     PowerWakeReason bootWakeReason_ =
         PowerWakeReason::ColdBoot;
+    bool pmicAvailable_ = false;
 
     static uint64_t nowUs();
-
-    static PowerWakeReason mapWakeCause(
-        int cause);
+    static PowerWakeReason mapWakeCause(int cause);
 };

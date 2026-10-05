@@ -2640,7 +2640,7 @@ void T5Display::showPowerOff(
         DARK_GRAY);
 
     drawCenteredTextInRect(
-        "Pressione BOOT para ligar",
+        "Segure PWR para ligar",
         MARGIN,
         portrait() ? 625 : 365,
         logicalWidth() - 2 * MARGIN,

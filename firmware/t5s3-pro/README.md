@@ -1,31 +1,66 @@
-# Mnemos T5S3 Pro — pacote de migração completa
+# Mnemos T5S3 Pro — H752-01
 
-Este pacote gera `firmware/t5s3-pro` a partir da implementação funcional existente em `firmware/t5-touch`, preservando as bibliotecas locais `lib/epdiy` e `lib/BQ27220` que já foram validadas no H752-01.
+Firmware do terminal dedicado Mnemos para o LILYGO T5 E-Paper S3 Pro H752-01.
 
-O instalador não executa operações Git remotas.
+A HMI opera em retrato lógico 540×960 sobre o painel físico 960×540. O
+terminal é offline-first: estudo, sessão, FSRS, biblioteca local e histórico
+não dependem de servidor.
 
-## Uso
-
-```bash
-unzip mnemos-t5s3-pro-package.zip
-cd mnemos-t5s3-pro-package
-chmod +x install.sh
-./install.sh /caminho/para/mnemos-platform
-```
-
-Depois:
+## Build
 
 ```bash
 cd firmware/t5s3-pro
-pio run -e t5s3-pro-bench -t clean
 pio run -e t5s3-pro-bench
-```
-
-Somente depois de um build bem-sucedido:
-
-```bash
 pio run -e t5s3-pro-bench -t upload
 pio device monitor -b 115200
 ```
 
-A HMI fica permanentemente em retrato lógico 540×960.
+Para entrar manualmente em download mode: segure BOOT, pressione e solte RST,
+depois solte BOOT.
+
+## Energia
+
+O gerenciamento de power-off usa um serviço direto do BQ25896 pelo barramento
+I2C compartilhado. No boot, o firmware reseta os registradores do carregador,
+sai de HIZ, habilita explicitamente o caminho da bateria, desliga OTG e
+watchdog e reaplica o perfil elétrico do H752-01.
+
+No desligamento, todas as gravações e suspensões de periféricos acontecem antes
+do comando destrutivo. Em seguida OTG e carga são desabilitados e
+`REG09.BATFET_DIS=1` é a última escrita I2C. `BATFET_DLY` fica desligado. Se o
+ESP32 ainda estiver executando 1,5 s depois, o terminal reinicia
+automaticamente em vez de permanecer com aparência falsa de desligado.
+
+
+O H752-01 possui BQ25896 em `0x6B` para gerenciamento de energia e BQ27220 em
+`0x55` para fuel gauge.
+
+O Mnemos segue o modelo do firmware oficial da LilyGO:
+
+- `Menu -> Desligar dispositivo` salva estado, suspende periféricos e chama
+  `REG09.BATFET_DIS=1` no BQ25896, preservando os demais bits;
+- o auto-off por inatividade usa o mesmo shutdown físico;
+- em alimentação somente por bateria, o BQ25896 corta o battery power path;
+- o terminal volta a ligar mantendo `PWR/QON` pressionado até o boot iniciar (~1–1,5 s no hardware validado) ou conectando USB;
+- `RST` permanece reset físico pelo EN;
+- `BOOT` fica reservado para boot/download do ESP32-S3 e não é tratado como
+  botão de energia pelo aplicativo.
+
+O BQ25896 não consegue desligar fisicamente o sistema enquanto VBUS/USB está
+alimentando a placa. Por isso o auto-off é bloqueado com USB conectado e o
+shutdown manual é recusado nesse estado. O teste final de liga/desliga deve ser
+feito somente com bateria.
+
+O light sleep continua sendo uma otimização interna. Ele pode acordar por touch
+ou timer. Deep sleep não é usado como substituto de power-off.
+
+## Bateria
+
+O BQ27220 fornece SOC, tensão, corrente e capacidades. A barra superior mantém
+somente o ícone de bateria; não há porcentagem numérica redundante.
+
+## Servidor
+
+A ausência de backend não impede o estudo local. Quando houver servidor, o
+terminal precisa de uma URL alcançável pela rede e de sua credencial de
+terminal.
