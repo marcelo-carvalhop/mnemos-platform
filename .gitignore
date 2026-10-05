@@ -95,3 +95,6 @@ docker/data/
 
 # Experiment outputs
 **/out/
+
+# Local snapshots of earlier versions (use git tags/branches instead)
+/.mnemos-*backup*/
