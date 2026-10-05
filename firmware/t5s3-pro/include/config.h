@@ -61,7 +61,7 @@ constexpr float DSR_W7 = 0.90f;
 constexpr float CRAM_GAIN_FACTOR = 0.30f;
 constexpr float CRAM_RECONSOLIDATION_MAX_DAYS = 3.0f;
 
-// T5-4.7-S3 Touch: GT911 integrado.
+// H752-01: painel ED047TC1 960×540 e touch GT911 no I2C principal.
 constexpr int DISPLAY_WIDTH = 960;
 constexpr int DISPLAY_HEIGHT = 540;
 constexpr uint8_t TOUCH_I2C_ADDRESS_PRIMARY = 0x5D;
@@ -84,7 +84,7 @@ constexpr uint32_t NTP_SYNC_TIMEOUT_MS = 10000U;
 // CA HTTPS opcional no LittleFS.
 constexpr char BACKEND_CA_FILE[] = "/backend_ca.pem";
 
-// T5-4.7-S3: slot microSD/TF onboard via SPI.
+// H752-01: microSD no SPI compartilhado com o LoRa SX1262.
 constexpr int SD_MISO_PIN = 21;
 constexpr int SD_MOSI_PIN = 13;
 constexpr int SD_SCK_PIN = 14;
@@ -121,7 +121,8 @@ constexpr uint8_t BATTERY_CRITICAL_PERCENT = 5;
 constexpr float BATTERY_CRITICAL_V = 3.45f;
 constexpr uint8_t BATTERY_CRITICAL_SAMPLES = 2;
 
-// Política de energia da T5 Touch atual.
+// Perfis de build: a bancada desliga o sleep e, exceto na fonte do
+// ensaio OTA, a OTA automática.
 #if defined(MNEMOS_BENCH_BUILD)
 constexpr bool BENCH_BUILD = true;
 #if defined(MNEMOS_OTA_TEST_SOURCE)

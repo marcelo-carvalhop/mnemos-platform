@@ -9,6 +9,7 @@ Mnemos é uma plataforma de estudo com recuperação ativa e revisão adaptativa
 | [`app/mobile/`](app/mobile/) | Flutter para Android/iOS; estudo, autoria, progresso, persistência local, sincronização e configuração de terminal. |
 | [`app/web/`](app/web/) | Angular 22; estudo, biblioteca, criação, progresso, conta e dispositivo. O espelho de estudo vive em memória e é reconstruído do servidor ao recarregar. |
 | [`backend/`](backend/) | FastAPI, PostgreSQL, autenticação, sincronização, tarefas de geração e API de terminal. O worker executa tarefas em segundo plano. |
+| [`firmware/t5s3-pro/`](firmware/t5s3-pro/) | Firmware do LILYGO T5 E-Paper S3 Pro H752-01, fork do T5 Touch; HMI por toque em retrato, estudo local, biblioteca no microSD, hard-off pelo BQ25896, bateria pelo BQ27220 em modo somente leitura e OTA A/B local. O ambiente padrão de compilação é de bancada. |
 | [`firmware/t5-touch/`](firmware/t5-touch/) | Firmware do T5-4.7-S3 Touch; HMI por toque, estudo local, biblioteca no microSD, sincronização e OTA A/B local. O ambiente padrão de compilação é de bancada. |
 | [`firmware/t5/`](firmware/t5/) | Variante T5 sem touch, mantida separadamente. |
 | [`firmware/cyd/`](firmware/cyd/) | Protótipo anterior e referência para compatibilidade histórica. |
@@ -31,7 +32,7 @@ docker compose run --rm migrate
 docker compose up -d server worker
 ```
 
-O aplicativo móvel é preparado em `app/mobile/` com `flutter pub get`, `flutter analyze` e `flutter run`. A web é preparada em `app/web/` com `npm ci`, `npm run test:ci` e `npm start`; a versão de Node consta em `app/web/.nvmrc`. Para o terminal por toque, `cd firmware/t5-touch && pio run` compila o perfil de bancada; consulte o [guia do firmware](firmware/t5-touch/README.md) antes de gravar o hardware. O contrato interno pode ser verificado por `python shared/generate.py --check`, e os schemas por `python tools/schema-validator/validate_mnemos_examples.py`.
+O aplicativo móvel é preparado em `app/mobile/` com `flutter pub get`, `flutter analyze` e `flutter run`. A web é preparada em `app/web/` com `npm ci`, `npm run test:ci` e `npm start`; a versão de Node consta em `app/web/.nvmrc`. Para o terminal por toque, `cd firmware/t5-touch && pio run` compila o perfil de bancada; consulte o [guia do firmware](firmware/t5-touch/README.md) antes de gravar o hardware. Para o T5S3 Pro, `cd firmware/t5s3-pro && pio run` compila a bancada e `pio test -e native` roda os testes no host; o [guia do firmware](firmware/t5s3-pro/README.md) descreve energia, bateria e gravação. O contrato interno pode ser verificado por `python shared/generate.py --check`, e os schemas por `python tools/schema-validator/validate_mnemos_examples.py`.
 
 O backend físico acessado por um terminal precisa de um endereço alcançável pela rede local ou de HTTPS com CA confiável; `localhost` e `10.0.2.2` do emulador não servem como endereço do ESP32. O envio direto de revisões do T5 Touch ainda contém uma incompatibilidade de payload com a API. O diagnóstico e os critérios para encerrá-la estão documentados em [docs/integration/t5-touch.md](docs/integration/t5-touch.md).
 

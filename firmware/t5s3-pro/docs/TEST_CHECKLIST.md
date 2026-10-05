@@ -3,6 +3,7 @@
 ## Build e boot
 
 - [ ] `pio run -e t5s3-pro-bench` compila.
+- [ ] `pio test -e native` passa.
 - [ ] upload entra por BOOT + RST.
 - [ ] display inicia em 960×540 físico / 540×960 lógico.
 - [ ] LittleFS monta.
@@ -29,10 +30,9 @@
 
 ## PMIC e energia
 
-- [ ] log de boot mostra `batfet=0 dly=0 qon=1`.
-
-- [ ] boot registra `BQ25896 online`.
-- [ ] BQ25896 responde em `0x6B`.
+- [ ] boot registra `[power] BQ25896 XPowers online` com `vbus` coerente com o
+  USB conectado ou não.
+- [ ] boot registra `[power] boot reset=POWERON` depois de religar pelo PWR.
 - [x] com USB conectado, shutdown é recusado e o terminal permanece recuperável.
 - [x] em bateria apenas, `Menu -> Desligar dispositivo` corta o BATFET e remove `VSYS`; se o corte falhar, o firmware permanece inerte sem reboot.
 - [x] depois do corte por BQ25896, manter `PWR/QON` por ~1–1,5 s liga o terminal.

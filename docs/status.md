@@ -1,6 +1,6 @@
 # Estado técnico da plataforma
 
-**Base de auditoria:** `feature/t5-s3-touch` em `2acab5d` (28/09/2026). Este registro distingue código presente, testes automatizados e integração física verificada. Não representa homologação de produção. O histórico de trabalho de agosto permanece em `docs/releases/legacy/STATUS-2026-08-09.md` e não deve ser interpretado como estado atual.
+**Base de auditoria:** `feature/t5-s3-touch` em `2acab5d` (28/09/2026); a linha do T5S3 Pro reflete `feature/t5s3-pro-hardening` (05/10/2026). Este registro distingue código presente, testes automatizados e integração física verificada. Não representa homologação de produção. O histórico de trabalho de agosto permanece em `docs/releases/legacy/STATUS-2026-08-09.md` e não deve ser interpretado como estado atual.
 
 | Área | Implementação observada | Limite ou verificação pendente |
 | --- | --- | --- |
@@ -8,6 +8,7 @@
 | Web | Angular 22 com estudo, biblioteca, criação, progresso e conta sobre a API comum. | O espelho de estudo fica em memória; recarregar sem rede não preserva uma sessão offline. |
 | Backend | FastAPI, 17 modelos persistentes, API de conta/sync/terminal, geração assíncrona, PostgreSQL e armazenamento de objetos local no Compose. | Não declarar implantação de produção nem integração física ponta a ponta apenas pela existência das rotas. |
 | T5 Touch | HMI touch-first, FSRS, RTC, microSD como fonte de definições quando presente, LittleFS para estado/histórico, rede cooperativa, sleep e atualização local A/B. | A build padrão é de bancada; checklists de hardware ainda têm itens abertos. Rollback automático depende da configuração real do bootloader. |
+| T5S3 Pro (H752-01) | Fork do T5 Touch para o hardware atual: epdiy v7, HMI em retrato, hard-off pelo BQ25896 com religamento por PWR/QON, BQ27220 somente leitura com estimativa de carga por tensão, lote de revisões convertido para `reviewedAtMs`; testes de FSRS e bateria no host e CI de build. | O envio de revisões ao backend não foi validado ponta a ponta; checklists de bancada com itens abertos; o gauge da unidade está `SEALED` com perfil de 3000 mAh. Pendências em `firmware/t5s3-pro/docs/ROADMAP.md`. |
 | Interoperabilidade | `shared/contract.yaml` gera código para os clientes oficiais; `spec/` contém schemas públicos versionados; Device Protocol v4 e sync v2 estão em uso no terminal. | O corpo de revisão publicado pelo firmware não satisfaz a validação atual de `POST /v1/terminal/reviews`. O tipo de cartão é reduzido a `open_recall` nos snapshots construídos pelo backend e pelo móvel. |
 
 ## Bloqueadores de integração
@@ -20,4 +21,4 @@ Há uma segunda perda semântica: `backend/app/terminal/service.py::snapshot` e 
 
 ## Evidência e manutenção
 
-Os checklists em `firmware/t5-touch/docs/` são roteiros de bancada; caixas não marcadas não são testes executados. Os workflows em `.github/workflows/` cobrem backend, móvel, web, schemas e **firmware CYD**; não há job de build do T5 Touch nesta ramificação. Esta revisão documental não executou hardware nem confirmou o estado remoto dos workflows. Um item só deve mudar para **integrado** depois de um teste ponta a ponta com revisão criada no terminal, confirmação, pull nos demais clientes, retry idempotente e reinicialização do dispositivo. Atualize esta página e o guia de integração no mesmo PR que corrigir o contrato.
+Os checklists em `firmware/t5-touch/docs/` são roteiros de bancada; caixas não marcadas não são testes executados. Os workflows em `.github/workflows/` cobrem backend, móvel, web, schemas, **firmware CYD** e **firmware T5S3 Pro** (testes no host e build dos cinco ambientes); não há job de build do T5 Touch nesta ramificação. Esta revisão documental não executou hardware nem confirmou o estado remoto dos workflows. Um item só deve mudar para **integrado** depois de um teste ponta a ponta com revisão criada no terminal, confirmação, pull nos demais clientes, retry idempotente e reinicialização do dispositivo. Atualize esta página e o guia de integração no mesmo PR que corrigir o contrato.
