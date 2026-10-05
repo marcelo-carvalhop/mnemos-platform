@@ -93,16 +93,33 @@ constexpr int LORA_CS_PIN = 46;
 constexpr uint32_t SD_FREQUENCY_HZ = 4000000U;
 
 
-// T5-4.7-S3: monitoramento integrado da bateria Li-Po.
-constexpr int BATTERY_ADC_PIN = 14;
-constexpr float BATTERY_DIVIDER_RATIO = 2.0f;
-constexpr float BATTERY_PRESENT_MIN_V = 2.80f;
-constexpr float BATTERY_MAX_V = 4.20f;
+// H752-01: célula Li-Po oficial de 3,7 V / 1500 mAh, medida pelo
+// BQ27220 (0x55). O SOC do gauge só é usado quando o perfil gravado
+// nele corresponde a essa célula; caso contrário a carga é estimada
+// pela tensão.
+constexpr uint16_t BATTERY_DESIGN_CAPACITY_MAH = 1500U;
+constexpr uint16_t BATTERY_VALID_MIN_MV = 2800U;
+constexpr uint16_t BATTERY_VALID_MAX_MV = 4400U;
 constexpr uint32_t BATTERY_SAMPLE_INTERVAL_MS = 60000U;
 constexpr uint8_t BATTERY_DISPLAY_STEP_PERCENT = 5;
 
+// Estimativa por tensão: compensação da queda I·R, filtro
+// exponencial por amostra e histerese contra a recuperação de
+// tensão depois de picos de consumo.
+constexpr float BATTERY_INTERNAL_RESISTANCE_OHM = 0.12f;
+constexpr float BATTERY_MAX_IR_COMPENSATION_V = 0.15f;
+constexpr float BATTERY_VOLTAGE_FILTER_ALPHA = 0.35f;
+constexpr uint8_t BATTERY_ESTIMATE_HYSTERESIS_PERCENT = 10;
+constexpr int16_t BATTERY_CHARGING_MIN_MA = 20;
+
 constexpr uint8_t BATTERY_LOW_PERCENT = 15;
 constexpr uint8_t BATTERY_CRITICAL_PERCENT = 5;
+
+// Crítico só sem VBUS: tensão compensada abaixo do limite em
+// amostras consecutivas (entre EDV1 e EDV2 do perfil CEDV de
+// 1500 mAh da LilyGO).
+constexpr float BATTERY_CRITICAL_V = 3.45f;
+constexpr uint8_t BATTERY_CRITICAL_SAMPLES = 2;
 
 // Política de energia da T5 Touch atual.
 #if defined(MNEMOS_BENCH_BUILD)

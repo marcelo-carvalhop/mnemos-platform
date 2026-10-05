@@ -56,8 +56,42 @@ ou timer. Deep sleep não é usado como substituto de power-off.
 
 ## Bateria
 
-O BQ27220 fornece SOC, tensão, corrente e capacidades. A barra superior mantém
-somente o ícone de bateria; não há porcentagem numérica redundante.
+O BQ27220 (`0x55`) é usado estritamente como sensor read-only. O firmware lê
+identidade (Device Number `0x0220`), estado de segurança, tensão, corrente e
+capacidades, mas nunca envia chaves de UNSEAL/FULL ACCESS, `RESET`,
+`CFGUPDATE` ou `SEAL`, nem escreve Data Memory.
+
+A confiança no gauge tem três níveis:
+
+- **ausente** — sem resposta em `0x55` ou Device Number diferente de `0x0220`.
+  O ícone aparece riscado e nenhuma decisão de energia usa a bateria; a
+  identificação é tentada novamente a cada amostra;
+- **perfil não validado** — o gauge responde, mas `DesignCapacity()` não é
+  1500 mAh (célula oficial do H752-01) ou `FullChargeCapacity()` /
+  `RemainingCapacity()` são incoerentes com ela. SOC e capacidades do gauge
+  vão apenas para o log; a carga exibida é estimada pela tensão;
+- **perfil validado** — capacidades coerentes com 1500 mAh, `INITCOMP=1` e
+  `CFGUPDATE=0`. O SOC do BQ27220 passa a ser a fonte da porcentagem.
+
+A estimativa por tensão compensa a queda I·R com a corrente medida pelo gauge
+(0,12 Ω, limitada a ±0,15 V), aplica filtro exponencial a cada amostra de 60 s
+e histerese: em bateria o indicador só desce e, carregando, só sobe; o sentido
+oposto exige diferença de pelo menos 10 pontos.
+
+Bateria crítica só é avaliada sem alimentação externa (VBUS do BQ25896 ou
+corrente de carga medida): tensão compensada ≤ 3,45 V em duas amostras
+seguidas (sem o filtro da HMI, para não atrasar o corte no fim da descarga) e,
+com perfil validado, também SOC ≤ 5%. O SOC de um perfil não validado nunca
+dispara hard-off. O limite de 20% do OTA usa a mesma porcentagem exibida.
+
+Estado conhecido da unidade de desenvolvimento: o gauge está `SEALED` com
+perfil de 3000 mAh (`DesignCapacity` e `FullChargeCapacity`), as sequências
+`0x0414/0x3672` e `0x8000/0x8000` não o devolveram a `UNSEALED` e o firmware
+factory da LilyGO também reporta `BQ27220 NOK`. Reprovisionar exige a golden
+image ou o procedimento oficial do H752-01; não use tentativa e erro.
+
+A barra superior mantém somente o ícone de bateria; não há porcentagem numérica
+redundante.
 
 ## Servidor
 

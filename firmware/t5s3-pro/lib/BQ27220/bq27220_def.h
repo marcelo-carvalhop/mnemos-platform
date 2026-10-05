@@ -77,6 +77,8 @@
 #define Control_EXIT_CFG_UPDATE        (0x0092u)
 #define Control_RETURN_TO_ROM          (0x0F00u)
 
+// TI default keys (TRM Data Memory update example). Neither this
+// pair nor 0x8000/0x8000 unsealed the H752-01 gauge (SEC stayed 3).
 #define UnsealKey1 (0x0414u)
 #define UnsealKey2 (0x3672u)
 

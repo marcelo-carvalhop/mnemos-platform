@@ -3136,8 +3136,12 @@ void setup() {
 
     display.setOrientation(DisplayOrientation::Portrait);
 
-    batteryService.begin();
+    // VBUS vem do BQ25896; o BQ27220 é só sensor de bateria.
     powerService.begin();
+    batteryService.begin(
+        []() {
+            return powerService.externalPowerPresent();
+        });
 
 
     display.setBatteryStatus(

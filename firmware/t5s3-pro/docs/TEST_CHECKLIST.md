@@ -10,9 +10,21 @@
 
 ## Bateria
 
-- [ ] BQ27220 responde em `0x55`.
-- [ ] serial mostra tensão, SOC, corrente e capacidades válidos.
-- [ ] ícone de bateria muda de nível conforme o SOC.
+- [ ] boot registra `[battery] identity=OK device=0x0220`.
+- [ ] boot registra `profile=UNTRUSTED reason=design-capacity` com
+  `design=3000 mAh expected=1500 mAh percent=voltage data-memory=UNTOUCHED`
+  nesta unidade.
+- [ ] nenhum log de unseal, full-access, seal, reset ou CFGUPDATE aparece no boot
+  e o `SEC` do gauge é o mesmo de antes do boot.
+- [ ] a cada 60 s a serial mostra `trust=UNTRUSTED source=voltage` com tensão,
+  corrente, tensão compensada (`comp`) e filtrada (`filt`).
+- [ ] ícone de bateria aparece (não riscado) e muda de nível conforme a estimativa.
+- [ ] em bateria, o indicador não sobe depois de picos de consumo (sync Wi-Fi,
+  refresh); com USB carregando, não desce.
+- [ ] `charging=1` e o `+` do ícone só aparecem com corrente de carga ≥ 20 mA.
+- [ ] com USB conectado, `critical=0` mesmo com bateria baixa.
+- [ ] `critical=1` só aparece em bateria, com `comp` ≤ 3,45 V em duas amostras
+  seguidas.
 - [ ] não existe porcentagem textual na barra superior.
 
 ## PMIC e energia
