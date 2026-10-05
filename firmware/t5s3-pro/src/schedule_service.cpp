@@ -156,7 +156,7 @@ String ScheduleService::humanize(uint32_t targetEpoch) const {
     time_t shifted = static_cast<time_t>(targetEpoch) + Config::GMT_OFFSET_SECONDS + Config::DAYLIGHT_OFFSET_SECONDS;
     tm value{};
     gmtime_r(&shifted, &value);
-    char buffer[20];
+    char buffer[48];
     std::snprintf(buffer, sizeof(buffer), "%02d/%02d as %02d:%02d",
                   value.tm_mday, value.tm_mon + 1, value.tm_hour, value.tm_min);
     return String(buffer);

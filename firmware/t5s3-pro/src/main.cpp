@@ -3122,8 +3122,6 @@ void setup() {
         Config::TOUCH_I2C_FREQUENCY);
 
 
-    const bool startPortrait = true;
-
     if (!display.begin()) {
         Serial.println(
             "[app] display indisponivel; "
