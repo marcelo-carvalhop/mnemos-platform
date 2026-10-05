@@ -84,7 +84,9 @@ Produto:
 ```
 
 A causa do último reset aparece em `[power] boot reset=...` (`POWERON`, `SW`,
-`PANIC`, `TASK_WDT`, `BROWNOUT`...).
+`PANIC`, `TASK_WDT`, `BROWNOUT`...). O ESP-IDF 4.4 não tem código próprio para
+reset pelo USB, então um upload ou um reset pelo monitor aparece como
+`UNKNOWN`.
 
 O projeto isolado `tools/diagnostics/boot-wake/` testa o wake de deep sleep
 pelo BOOT/GPIO0, fora do firmware Mnemos.
