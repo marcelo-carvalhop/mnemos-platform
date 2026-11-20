@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 
+import 'demo_seed.dart';
 import 'features/app_shell.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'providers.dart';
@@ -70,6 +71,9 @@ class _BootstrapState extends ConsumerState<_Bootstrap> with WidgetsBindingObser
   }
 
   Future<void> _start(String deviceId) async {
+    if (kSeedDemo) {
+      await seedDemoIfEmpty(ref.read(databaseProvider), deviceId, ref.read(clockProvider)());
+    }
     // Registration and the first sync are not awaited: see the class comment.
     unawaited(_registerAndSync());
   }
