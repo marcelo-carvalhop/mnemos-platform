@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 
 import jwt
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -173,17 +174,33 @@ def register_device(
         # than minting a second free allowance.
         return _issue_pair(session, existing.user_id, device_id, now)
 
+    if existing is None:
+        # A first launch can register twice at once (the app's bootstrap and a
+        # resume racing). Both requests see no device; the second insert then
+        # hits the primary key. That loser must land on the winner's account —
+        # exactly what a sequential retry gets above — not answer 500, and not
+        # leave behind the orphan user it created.
+        try:
+            with session.begin_nested():
+                user = User(id=secrets.token_hex(18), email=None)
+                session.add(user)
+                session.flush()
+                session.add(
+                    Device(id=device_id, user_id=user.id, platform=platform, attested=attested)
+                )
+                session.flush()
+        except IntegrityError:
+            winner = session.execute(
+                select(Device).where(Device.id == device_id)
+            ).scalar_one()
+            return _issue_pair(session, winner.user_id, device_id, now)
+        return _issue_pair(session, user.id, device_id, now)
+
     user = User(id=secrets.token_hex(18), email=None)
     session.add(user)
     session.flush()
-
-    if existing is None:
-        session.add(
-            Device(id=device_id, user_id=user.id, platform=platform, attested=attested)
-        )
-    else:
-        existing.user_id = user.id
-        existing.attested = attested
+    existing.user_id = user.id
+    existing.attested = attested
     session.flush()
 
     # §8.4 against §8.1. A device whose free generation was already spent

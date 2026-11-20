@@ -58,6 +58,41 @@ def test_the_same_device_does_not_get_a_second_free_allowance():
     assert first["user_id"] == second["user_id"], "re-registering must not mint a new account"
 
 
+def test_a_concurrent_first_launch_lands_on_the_same_account(monkeypatch):
+    """Two registrations of one new device at once: both read "no device", and
+    the second insert hits the primary key. It used to answer 500; it must
+    answer like a sequential retry — same account, no orphan user."""
+    from sqlalchemy import func, select
+    from sqlalchemy.orm import Session
+
+    from app.db import SessionLocal
+    from app.models import Device, User
+
+    did = device_id()
+    payload = {"device_id": did, "platform": "android", "attestation": "stub"}
+    first = client.post("/v1/auth/device", json=payload).json()
+
+    with SessionLocal() as db:
+        users_before = db.scalar(select(func.count()).select_from(User))
+
+    # The losing request read the devices table before the winner committed.
+    real_get = Session.get
+
+    def stale_get(self, entity, ident, *args, **kwargs):
+        if entity is Device and ident == did:
+            return None
+        return real_get(self, entity, ident, *args, **kwargs)
+
+    monkeypatch.setattr(Session, "get", stale_get)
+    second = client.post("/v1/auth/device", json=payload)
+    monkeypatch.undo()
+
+    assert second.status_code == 200, second.text
+    assert second.json()["user_id"] == first["user_id"]
+    with SessionLocal() as db:
+        assert db.scalar(select(func.count()).select_from(User)) == users_before
+
+
 def test_signup_keeps_the_same_user_so_nothing_migrates():
     """§8.1 — the anonymous row *is* the account; it only gains credentials."""
     anon = register()
