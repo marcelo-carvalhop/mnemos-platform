@@ -1,0 +1,23 @@
+# One origin for everything, with a Let's Encrypt certificate.
+#   /v1/*, /healthz  -> API (mobile app and terminal use the bare host)
+#   /api/*           -> API with the prefix stripped (the web build calls /api,
+#                       as the ng serve proxy does in development)
+#   everything else  -> Angular build, falling back to index.html for routes
+{$DOMAIN} {
+	encode zstd gzip
+
+	handle_path /api/* {
+		reverse_proxy server:8000
+	}
+
+	@api path /v1/* /healthz
+	handle @api {
+		reverse_proxy server:8000
+	}
+
+	handle {
+		root * /srv/web
+		try_files {path} /index.html
+		file_server
+	}
+}
