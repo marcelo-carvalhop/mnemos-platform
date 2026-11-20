@@ -16,9 +16,9 @@ class Settings(BaseSettings):
         "postgresql+psycopg://flashcards:change-me-locally@localhost:5435/flashcards"
     )
 
-    # §7.2 — MinIO locally, any S3-compatible endpoint in production.
+    # §7.2 — RustFS locally, any S3-compatible endpoint in production.
     # Two endpoints, not one. The server and the worker reach storage over the
-    # internal network — in compose that is `http://minio:9000`, in production
+    # internal network — in compose that is `http://s3:9000`, in production
     # a VPC address — while the pre-signed URL is handed to a phone, which can
     # resolve neither. Signing includes the host, so the URL must be signed
     # against the host the client will actually use.

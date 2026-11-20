@@ -8,7 +8,7 @@ Na raiz do repositório:
 
 ```bash
 cp backend/.env.example .env
-docker compose up -d postgres minio minio-init
+docker compose up -d postgres s3 s3-init
 docker compose run --rm migrate
 docker compose up -d server worker
 ```
