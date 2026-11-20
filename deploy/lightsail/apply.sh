@@ -27,8 +27,13 @@ mkdir -p "$DIR"
 find "$DIR" -maxdepth 1 -type f ! -name .env -delete
 cp -a "$SRC/deploy/lightsail/." "$DIR/"
 rm -f "$DIR/.env.example"
-cp -a "$WEB" "$ROOT/web.new"
-rm -rf "$ROOT/web" && mv "$ROOT/web.new" "$ROOT/web"
+# Replace the contents, never the directory: Caddy bind-mounts web/, and a
+# bind mount follows the inode. rm + mv left the container serving an empty,
+# deleted directory (every page 404, API unaffected).
+mkdir -p "$ROOT/web"
+find "$ROOT/web" -mindepth 1 -delete
+cp -a "$WEB/." "$ROOT/web/"
+rm -rf "$ROOT/web.new"
 cp /tmp/mnemos.env "$DIR/.env" && chmod 600 "$DIR/.env" && rm -f /tmp/mnemos.env
 chmod +x "$DIR"/*.sh
 
