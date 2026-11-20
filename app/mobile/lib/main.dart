@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 
+import 'demo_seed.dart';
 import 'features/app_shell.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'providers.dart';
@@ -69,7 +70,25 @@ class _BootstrapState extends ConsumerState<_Bootstrap> with WidgetsBindingObser
     }
   }
 
+  /// Started once per device id. `build` runs again whenever a watched
+  /// provider changes, and a FutureBuilder handed a fresh `_start` each time
+  /// registered the device twice at once on first launch — two concurrent
+  /// `/v1/auth/device` calls, one of which the server answered with a 500.
+  Future<void>? _starting;
+  String? _startedFor;
+
+  Future<void> _startOnce(String deviceId) {
+    if (_startedFor != deviceId) {
+      _startedFor = deviceId;
+      _starting = _start(deviceId);
+    }
+    return _starting!;
+  }
+
   Future<void> _start(String deviceId) async {
+    if (kSeedDemo) {
+      await seedDemoIfEmpty(ref.read(databaseProvider), deviceId, ref.read(clockProvider)());
+    }
     // Registration and the first sync are not awaited: see the class comment.
     unawaited(_registerAndSync());
   }
@@ -90,7 +109,7 @@ class _BootstrapState extends ConsumerState<_Bootstrap> with WidgetsBindingObser
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('Erro ao iniciar: $e'))),
       data: (id) => FutureBuilder(
-        future: _start(id),
+        future: _startOnce(id),
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));

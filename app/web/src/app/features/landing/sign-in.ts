@@ -20,54 +20,88 @@ import { Sync } from '../../core/sync';
   imports: [FormsModule, RouterLink],
   styleUrl: './sign-in.css',
   template: `
-    <a class="brand" routerLink="/">
-      <span class="mark" aria-hidden="true"></span>
-      Mnemos
-    </a>
+    <aside class="pitch">
+      <a class="brand" routerLink="/">
+        <span class="mark" aria-hidden="true"></span>
+        Mnemos
+      </a>
 
-    <form (submit)="submit($event)">
-      <h1>{{ creating() ? 'Criar conta' : 'Entrar' }}</h1>
+      <div class="pitch-body">
+        <p class="claim">O que você aprendeu, de volta na hora certa.</p>
+        <ul>
+          <li>
+            <strong>Cards curtos, uma ideia cada.</strong>
+            Escritos por você ou propostos pela IA, sempre com a sua aprovação.
+          </li>
+          <li>
+            <strong>Um histórico só.</strong>
+            Navegador, celular e terminal de tinta eletrônica com o mesmo cronograma.
+          </li>
+          <li>
+            <strong>Uma métrica: memória.</strong>
+            Quanto tempo o que você sabe fica de pé sem precisar de revisão.
+          </li>
+        </ul>
+      </div>
 
-      <label>
-        <span>E-mail</span>
-        <input
-          type="email"
-          name="email"
-          autocomplete="email"
-          required
-          [(ngModel)]="email"
-          [disabled]="busy()"
-        />
-      </label>
+      <p class="fine">Grátis para estudar e escrever cards.</p>
+    </aside>
 
-      <label>
-        <span>Senha</span>
-        <input
-          type="password"
-          name="password"
-          [attr.autocomplete]="creating() ? 'new-password' : 'current-password'"
-          required
-          minlength="8"
-          [(ngModel)]="password"
-          [disabled]="busy()"
-        />
-        @if (creating()) {
-          <small>Ao menos 8 caracteres.</small>
+    <main class="panel">
+      <form (submit)="submit($event)">
+        <h1>{{ creating() ? 'Criar conta' : 'Entrar' }}</h1>
+        <p class="lede">
+          {{
+            creating()
+              ? 'Estude no navegador com o mesmo histórico do celular e do terminal.'
+              : 'Continue de onde parou, em qualquer superfície.'
+          }}
+        </p>
+
+        <label>
+          <span>E-mail</span>
+          <input
+            type="email"
+            name="email"
+            autocomplete="email"
+            required
+            [(ngModel)]="email"
+            [disabled]="busy()"
+          />
+        </label>
+
+        <label>
+          <span>Senha</span>
+          <input
+            type="password"
+            name="password"
+            [attr.autocomplete]="creating() ? 'new-password' : 'current-password'"
+            required
+            minlength="8"
+            [(ngModel)]="password"
+            [disabled]="busy()"
+          />
+          @if (creating()) {
+            <small>Ao menos 8 caracteres.</small>
+          }
+        </label>
+
+        @if (problem(); as message) {
+          <p class="problem" role="alert">{{ message }}</p>
         }
-      </label>
 
-      @if (problem(); as message) {
-        <p class="problem" role="alert">{{ message }}</p>
-      }
+        <button class="primary" type="submit" [disabled]="!valid() || busy()">
+          {{ busy() ? 'Um momento…' : creating() ? 'Criar conta' : 'Entrar' }}
+        </button>
 
-      <button class="primary" type="submit" [disabled]="!valid() || busy()">
-        {{ busy() ? 'Um momento…' : creating() ? 'Criar conta' : 'Entrar' }}
-      </button>
-
-      <button class="switch" type="button" (click)="creating.set(!creating())">
-        {{ creating() ? 'Já tenho conta' : 'Criar uma conta' }}
-      </button>
-    </form>
+        <p class="switch">
+          {{ creating() ? 'Já tem conta?' : 'Ainda não tem conta?' }}
+          <button type="button" (click)="creating.set(!creating())">
+            {{ creating() ? 'Entrar' : 'Criar uma conta' }}
+          </button>
+        </p>
+      </form>
+    </main>
   `,
 })
 export class SignIn {

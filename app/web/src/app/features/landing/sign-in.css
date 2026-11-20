@@ -1,17 +1,31 @@
-/* Centrado nos dois eixos, como a tela de login do iCloud.com: o painel
- * começava em y≈250 e deixava ~750 px vazios embaixo, o que numa tela de uma
- * coisa só lê como página que não terminou de carregar. */
+/* Desktop: tela dividida. À esquerda a promessa do produto, à direita o
+ * formulário com largura de formulário de verdade (400 px), centrado na
+ * vertical. Antes era a coluna do celular solta no meio de 1440 px: o grid
+ * com `place-items: center` encolhia o form até ~210 px e o `margin-top`
+ * de 12vh empurrava tudo para baixo da marca.
+ *
+ * Abaixo de 900 px a promessa some (a landing já a contou) e fica só a
+ * marca no topo e o formulário em largura cheia. */
 :host {
   display: grid;
-  place-items: center;
+  grid-template-columns: minmax(380px, 5fr) 6fr;
   min-height: 100dvh;
-  padding: var(--mn-gap-5);
+}
+
+.pitch {
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  padding: 40px 56px;
+  background: var(--mn-surface-sunken);
+  border-right: 1px solid var(--mn-line);
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  align-self: flex-start;
   font-family: var(--mn-font-content);
   font-size: 21px;
   font-weight: 600;
@@ -25,14 +39,65 @@
   border-radius: 2px;
 }
 
+.pitch-body {
+  margin: auto 0;
+  max-width: 440px;
+}
+.claim {
+  font-family: var(--mn-font-content);
+  font-size: 34px;
+  line-height: 1.15;
+  font-weight: 600;
+  color: var(--mn-text);
+  margin: 0 0 36px;
+}
+.pitch ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 22px;
+}
+.pitch li {
+  border-left: 2px solid var(--mn-accent);
+  padding-left: 16px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--mn-text-muted);
+}
+.pitch li strong {
+  display: block;
+  color: var(--mn-text);
+  font-size: 15.5px;
+  margin-bottom: 2px;
+}
+
+.fine {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--mn-text-faint);
+}
+
+.panel {
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+}
+
 form {
-  max-width: 380px;
-  margin: 12vh auto 0;
+  width: 100%;
+  max-width: 400px;
 }
 
 h1 {
-  font-size: 30px;
-  margin-bottom: 26px;
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+.lede {
+  margin: 0 0 30px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--mn-text-muted);
 }
 
 label {
@@ -67,6 +132,7 @@ small {
 
 .primary {
   width: 100%;
+  margin-top: 6px;
   padding: 14px;
   background: var(--mn-accent);
   color: var(--mn-text-on-accent);
@@ -75,6 +141,9 @@ small {
   font-size: 15.5px;
   font-weight: 600;
 }
+.primary:hover:not(:disabled) {
+  background: var(--mn-accent-hover);
+}
 /* Mantém a cor, perde a promessa — a mesma regra de `create.css`. */
 .primary:disabled {
   background: color-mix(in srgb, var(--mn-accent) 30%, transparent);
@@ -82,13 +151,19 @@ small {
 }
 
 .switch {
-  display: block;
-  width: 100%;
-  margin-top: 14px;
+  margin: 22px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--mn-text-muted);
+}
+.switch button {
   border: 0;
   background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
   color: var(--mn-accent);
-  font-size: 14px;
+  cursor: pointer;
 }
 
 .problem {
@@ -98,4 +173,24 @@ small {
   color: var(--mn-again);
   border-radius: var(--mn-radius);
   font-size: 13.5px;
+}
+
+@media (max-width: 899px) {
+  :host {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+  .pitch {
+    padding: 20px 20px;
+    background: none;
+    border-right: 0;
+  }
+  .pitch-body,
+  .fine {
+    display: none;
+  }
+  .panel {
+    place-items: start center;
+    padding: 24px 20px 40px;
+  }
 }

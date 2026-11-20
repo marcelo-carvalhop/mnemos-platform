@@ -1,0 +1,98 @@
+# Staging on a single Lightsail instance: postgres, API, worker and Caddy
+# (HTTPS + the web build) on one box. Object storage is a Lightsail bucket,
+# configured through .env. See README.md in this directory.
+#
+# Run from /opt/mnemos/deploy/lightsail on the server:
+#   docker compose build
+#   docker compose run --rm migrate
+#   docker compose up -d
+
+name: mnemos
+
+services:
+  postgres:
+    # Same major as dev and CI (§11.7). Not published: only the API reaches it.
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build:
+      context: ../..
+      dockerfile: backend/docker/server.Dockerfile
+    image: mnemos-server:latest
+    command: ["api"]
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Generation only. The worker exits without ANTHROPIC_API_KEY, which staging
+  # leaves empty on purpose (see .env.example), so it would crash-loop. Start
+  # it with `docker compose --profile generation up -d` once a key is set.
+  worker:
+    image: mnemos-server:latest
+    command: ["worker"]
+    restart: unless-stopped
+    profiles: ["generation"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - |
+          import os,sys,time
+          p = os.getenv("WORKER_HEARTBEAT", "/tmp/worker-heartbeat")
+          age = time.time() - os.path.getmtime(p)
+          sys.exit(0 if age < 30 else 1)
+      interval: 30s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
+
+  # One-shot, never part of `up` (§11.7).
+  migrate:
+    image: mnemos-server:latest
+    command: ["migrate"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  caddy:
+    image: caddy:2.11.8-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../../web:/srv/web:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - server
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

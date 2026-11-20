@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:authoring/authoring.dart';
 import 'package:domain/domain.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers.dart';
+import '../providers_sync.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../ui/ui.dart';
@@ -64,6 +67,11 @@ class _EditorScreenState extends ConsumerState<EditorScreen> {
 
     ref.invalidate(deckMaturityProvider);
     ref.invalidate(queueProvider);
+    // A new card is content the other surfaces are waiting for — above all a
+    // terminal, which only sees what reached the server. Without this the
+    // card sat in the outbox until the app was next resumed. `syncNow`
+    // coalesces, so "Salvar e criar outro" in a burst costs one sync at a time.
+    unawaited(ref.read(syncControllerProvider.notifier).syncNow());
 
     if (!mounted) return;
     if (another) {
