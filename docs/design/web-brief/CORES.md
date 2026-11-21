@@ -1,5 +1,7 @@
 # Cores do Mnemos
 
+> **Substituído em 2026-11-21** por [`../DESIGN-SYSTEM.md`](../DESIGN-SYSTEM.md) (design system "Marinho"). Este documento fica como histórico da paleta anterior.
+
 A paleta vem do aplicativo (`app/mobile/lib/theme.dart`) e é a mesma que o
 firmware usa no que consegue reproduzir. Este documento é a fonte para a
 interface web.

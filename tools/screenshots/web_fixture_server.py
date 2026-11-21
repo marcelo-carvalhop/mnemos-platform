@@ -97,6 +97,21 @@ DIREITO = [
 ]
 
 
+GENERATING_JOB = "01927f01-0000-7000-8000-00000000a001"
+READY_JOB = "01927f01-0000-7000-8000-00000000a002"
+
+PENDING = [
+    ("O que o controle de congestionamento do TCP tenta evitar?",
+     "Que o emissor injete mais tráfego do que a rede consegue escoar."),
+    ("Quando UDP é preferível a TCP?",
+     "Quando latência importa mais que entrega garantida, como em voz e jogos."),
+    ("O que é a janela deslizante do TCP?",
+     "O número de bytes que o emissor pode enviar sem esperar confirmação."),
+    ("Para que serve o número de porta?",
+     "Para identificar o processo de destino dentro do host."),
+]
+
+
 def build_rows():
     seq = 0
 
@@ -285,7 +300,7 @@ def click_after_load(label):
     escaped = json.dumps(label)
     return (
         "<script>(function(){var t=setInterval(function(){"
-        "var b=[].slice.call(document.querySelectorAll('.sources button'))"
+        "var b=[].slice.call(document.querySelectorAll('.sources button, .tabbar button'))"
         f".filter(function(x){{return x.textContent.trim()==={escaped};}})[0];"
         "if(b){clearInterval(t);b.click();}},80);"
         "setTimeout(function(){clearInterval(t);},8000);})()</script>"
@@ -388,12 +403,61 @@ class Handler(SimpleHTTPRequestHandler):
                 )
             return self._json([])
 
+        if path.startswith("/v1/generation/"):
+            return self._generation(method, path)
+
         if path.startswith("/v1/account/export"):
             self._log("export")
             return self._json({"decks": TABLES["decks"], "cards": TABLES["cards"]})
 
         self._log("UNHANDLED")
         return self._json({"detail": "not stubbed"}, status=404)
+
+    def _generation(self, method, path):
+        """Duas gerações de mentira: uma ainda rodando, outra pronta para aprovar.
+
+        Os ids são fixos (`GENERATING_JOB`, `READY_JOB`) para o script de captura
+        alcançar `/gerar/:id` e `/aprovar/:id`, que antes ficavam de fora por
+        exigir um id que só existe depois de gastar uma geração.
+        """
+        self._log(f"generation {path}")
+        if path.rstrip("/") == "/v1/generation/jobs":
+            return self._json({"jobs": []})
+        job_id = path.split("/v1/generation/jobs/", 1)[-1].split("/", 1)[0]
+        if path.endswith("/queue"):
+            cards = [
+                {
+                    "id": f"pending-{i}",
+                    "front": front,
+                    "back": back,
+                    "tags": ["transporte"],
+                    "position": i,
+                    "decision": None,
+                }
+                for i, (front, back) in enumerate(PENDING)
+            ]
+            return self._json({"cards": cards, "decided": 0, "total": len(cards)})
+        if job_id == GENERATING_JOB:
+            return self._json(
+                {
+                    "id": job_id,
+                    "status": "generating",
+                    "stage": "escrevendo os cards",
+                    "error_code": None,
+                    "error_detail": None,
+                    "card_count": 0,
+                }
+            )
+        return self._json(
+            {
+                "id": job_id,
+                "status": "ready",
+                "stage": "pronto",
+                "error_code": None,
+                "error_detail": None,
+                "card_count": len(PENDING),
+            }
+        )
 
     # -- static -------------------------------------------------------------
     @staticmethod
