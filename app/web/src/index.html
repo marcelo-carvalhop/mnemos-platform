@@ -7,7 +7,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="O que você aprendeu, de volta na hora certa." />
     <meta name="color-scheme" content="light dark" />
-    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!-- O símbolo do Mnemos. O SVG se ajusta à aba escura; o .ico fica para
+         navegadores antigos e o PNG para a tela inicial do iPhone. -->
+    <link rel="icon" href="favicon.ico" sizes="48x48" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <meta name="theme-color" content="#fafbfc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b1429" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
     <app-root></app-root>
