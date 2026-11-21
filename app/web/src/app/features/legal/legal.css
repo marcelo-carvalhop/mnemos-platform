@@ -1,0 +1,144 @@
+/* Páginas legais: texto para ler, numa medida de leitura. */
+:host {
+  display: block;
+  min-height: 100vh;
+  background: var(--mn-surface);
+  color: var(--mn-text);
+}
+
+.top {
+  border-bottom: 1px solid var(--mn-line);
+}
+.top-row,
+.doc {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-inline: 24px;
+}
+.top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 16px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--mn-font-display);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--mn-text);
+  text-decoration: none;
+}
+.mark {
+  flex: none;
+}
+.other {
+  font-size: 14px;
+  color: var(--mn-text-faint);
+  text-decoration: none;
+}
+.other:hover {
+  color: var(--mn-text);
+}
+
+.doc {
+  padding-block: 56px 96px;
+}
+.kicker {
+  margin: 0 0 14px;
+  font-family: var(--mn-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mn-highlight);
+}
+h1 {
+  font-size: clamp(32px, 5vw, 44px);
+  line-height: 1.05;
+  margin-bottom: 14px;
+}
+.meta {
+  margin: 0 0 40px;
+  font-size: 14px;
+  color: var(--mn-text-faint);
+}
+.summary {
+  margin: 0 0 48px;
+  padding: 20px 22px;
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  background: var(--mn-surface-raised);
+}
+.summary p {
+  margin: 0 0 10px;
+  font-family: var(--mn-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+.summary ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--mn-text-muted);
+}
+h2 {
+  margin: 44px 0 12px;
+  font-size: 22px;
+  line-height: 1.2;
+}
+h3 {
+  margin: 24px 0 8px;
+  font-size: 16.5px;
+}
+.doc p,
+.doc li {
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--mn-text-muted);
+}
+.doc ul {
+  padding-left: 20px;
+}
+.doc strong {
+  color: var(--mn-text);
+  font-weight: 500;
+}
+.fill {
+  padding: 1px 6px;
+  border-radius: var(--mn-radius);
+  background: var(--mn-again-bg);
+  color: var(--mn-again);
+  font-family: var(--mn-font-mono);
+  font-size: 13px;
+}
+.table {
+  overflow-x: auto;
+  margin: 12px 0;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+th,
+td {
+  text-align: left;
+  vertical-align: top;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--mn-line);
+  color: var(--mn-text-muted);
+}
+th {
+  font-weight: 500;
+  color: var(--mn-text);
+  white-space: nowrap;
+}

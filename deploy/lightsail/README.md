@@ -79,6 +79,14 @@ aws lightsail put-instance-public-ports --instance-name mnemos-1 --profile mnemo
 gunzip -c mnemos-<data>.sql.gz | docker compose exec -T postgres psql -U mnemos -d mnemos
 ```
 
+## Registros de acesso
+
+O Caddy grava um registro por requisição em `/data/logs/access.log`, no volume `caddy-data`. Os arquivos giram a cada 50 MB e são apagados depois de 6 meses: é o que o Marco Civil (art. 15) exige e o que a política de privacidade (`/privacidade`) promete. Cabeçalhos de autorização e cookies saem mascarados, e o token do link de confirmação também.
+
+```bash
+docker compose exec caddy tail -f /data/logs/access.log
+```
+
 ## Terminal (firmware)
 
 O terminal usa HTTPS e precisa das CAs raiz em `BACKEND_ROOT_CA` ou `/backend_ca.pem`. O certificado é ECDSA P-256 e a cadeia servida hoje (verificada em 2026-11-20) é:

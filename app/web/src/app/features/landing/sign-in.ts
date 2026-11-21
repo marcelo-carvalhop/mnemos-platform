@@ -184,6 +184,13 @@ import { Sync } from '../../core/sync';
             {{ busy() ? 'Um momento…' : creating() ? 'Criar conta' : 'Entrar' }}
           </button>
 
+          @if (creating()) {
+            <p class="consent">
+              Ao criar a conta você aceita os <a routerLink="/termos">termos de uso</a> e a
+              <a routerLink="/privacidade">política de privacidade</a>.
+            </p>
+          }
+
           <p class="switch">
             {{
               creating()

@@ -51,6 +51,13 @@ docker compose up -d postgres </dev/null
 # new schema if we have to roll back below.
 docker compose run --rm -T migrate </dev/null
 docker compose up -d --remove-orphans </dev/null
+# The Caddyfile was deleted and copied again above, so it is a new file and
+# the container's bind mount still shows the old one. Restart Caddy only when
+# the config actually changed: a restart on every deploy drops connections.
+if ! docker compose exec -T caddy cat /etc/caddy/Caddyfile </dev/null | cmp -s - Caddyfile; then
+  echo "[apply] Caddyfile changed; restarting caddy"
+  docker compose restart caddy </dev/null
+fi
 
 healthy() {
   for _ in $(seq 1 24); do
