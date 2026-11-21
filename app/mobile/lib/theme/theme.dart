@@ -45,7 +45,7 @@ ThemeData buildTheme() {
     splashFactory: InkSparkle.splashFactory,
 
     // O `fontFamily` de topo é a rede de segurança: qualquer texto que escape
-    // do textTheme cai em Public Sans em vez de cair na fonte do sistema — que
+    // do textTheme cai em Geist em vez de cair na fonte do sistema — que
     // é o que fazia os títulos saírem como tarjas pretas nas capturas.
     fontFamily: MnemosFonts.sans,
 
@@ -90,28 +90,28 @@ ThemeData buildTheme() {
         // habilitado ao lado — o elemento mais forte da tela era o que não
         // funciona, e a pessoa mirava nele. A App Store faz o mesmo com
         // "OBTER": ele perde a cor, não ganha um preenchimento novo.
-        disabledBackgroundColor: Color(0x4D6E6FA0),
+        disabledBackgroundColor: Color(0x4D0F1C3D),
         disabledForegroundColor: Color(0x99FFFFFF),
         minimumSize: const Size.fromHeight(54),
-        shape: squircle(MnemosRadii.control),
+        shape: const StadiumBorder(),
         textStyle: MnemosText.labelLarge,
       ),
     ),
 
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
-        foregroundColor: MnemosColors.primaryDeep,
+        foregroundColor: MnemosColors.ink,
         disabledForegroundColor: MnemosColors.faint,
         minimumSize: const Size.fromHeight(54),
         side: const BorderSide(color: MnemosColors.outline),
-        shape: squircle(MnemosRadii.control),
+        shape: const StadiumBorder(),
         textStyle: MnemosText.label,
       ),
     ),
 
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: MnemosColors.primary,
+        foregroundColor: MnemosColors.highlight,
         textStyle: MnemosText.labelSmall,
       ),
     ),
@@ -127,12 +127,21 @@ ThemeData buildTheme() {
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(MnemosRadii.control),
-        borderSide: const BorderSide(color: MnemosColors.hairline),
+        borderSide: const BorderSide(color: MnemosColors.line),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(MnemosRadii.control),
-        borderSide: const BorderSide(color: MnemosColors.primary, width: 1.4),
+        borderSide: const BorderSide(color: MnemosColors.highlight, width: 1.4),
       ),
+    ),
+
+    // Pílula com borda fina, como os exemplos e filtros da web.
+    chipTheme: ChipThemeData(
+      backgroundColor: MnemosColors.raised,
+      side: const BorderSide(color: MnemosColors.outline),
+      shape: const StadiumBorder(),
+      labelStyle: MnemosText.labelSmall.copyWith(color: MnemosColors.muted, fontSize: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
     ),
 
     checkboxTheme: CheckboxThemeData(
@@ -164,7 +173,7 @@ ThemeData buildTheme() {
       activeTrackColor: MnemosColors.primary,
       inactiveTrackColor: MnemosColors.track,
       thumbColor: MnemosColors.primary,
-      overlayColor: Color(0x226E6FA0),
+      overlayColor: Color(0x220F1C3D),
     ),
 
     progressIndicatorTheme: const ProgressIndicatorThemeData(
@@ -195,6 +204,7 @@ ThemeData buildTheme() {
     ),
 
     bottomSheetTheme: const BottomSheetThemeData(
+      dragHandleColor: MnemosColors.outline,
       backgroundColor: MnemosColors.raised,
       surfaceTintColor: MnemosColors.raised,
       shape: RoundedRectangleBorder(

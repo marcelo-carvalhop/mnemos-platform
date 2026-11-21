@@ -85,7 +85,7 @@
   font-size: 10.5px;
   color: var(--mn-text-muted);
   background: color-mix(in srgb, var(--mn-line) 55%, transparent);
-  border-radius: var(--mn-radius-lg);
+  border-radius: var(--mn-radius-pill);
   padding: 3px 9px;
 }
 
@@ -103,7 +103,7 @@
   padding: 0 var(--mn-gap-5);
   border: 0;
   background: var(--mn-accent);
-  border-radius: var(--mn-radius-lg);
+  border-radius: var(--mn-radius-pill);
   font-size: 16px;
   font-weight: 600;
   color: var(--mn-text-on-accent);
@@ -191,7 +191,7 @@
   padding: 12px 22px;
   background: var(--mn-accent);
   color: var(--mn-text-on-accent);
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   text-decoration: none;
   font-weight: 600;
 }
@@ -289,7 +289,7 @@
 .card .front {
   font-family: var(--mn-font-content);
   font-size: 38px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.28;
   margin: 16px 0 0;
   text-wrap: pretty;
@@ -322,4 +322,22 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+}
+
+/* Celular: a régua desce para uma linha só dela, em vez de espremer o
+ * contador numa coluna de três palavras; a pergunta encolhe para caber. */
+@media (max-width: 620px) {
+  .bar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .bar .middle {
+    order: 3;
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .card .front {
+    font-size: 26px;
+  }
 }

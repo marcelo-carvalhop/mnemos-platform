@@ -15,6 +15,7 @@ import 'providers.dart';
 /// contagem crua ignoraria o teto. O badge de um baralho e o número do
 /// bloco-herói têm de somar, e só somam se vierem da mesma fonte.
 final dueByDeckProvider = FutureProvider<Map<String, int>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final queue = await ref.watch(queueProvider.future);
   if (queue.isEmpty) return const {};
 
@@ -30,6 +31,7 @@ final dueByDeckProvider = FutureProvider<Map<String, int>>((ref) async {
 
 /// O bloco-herói: "12 cards em 2 baralhos".
 final dueTodayProvider = FutureProvider<({int cards, int decks})>((ref) async {
+  ref.watch(dataRevisionProvider);
   final byDeck = await ref.watch(dueByDeckProvider.future);
   return (
     cards: byDeck.values.fold(0, (sum, n) => sum + n),
@@ -65,6 +67,7 @@ class DeckCardView {
 final deckCardsByBucketProvider = FutureProvider.family<
     ({List<DeckCardView> dueToday, List<DeckCardView> thisWeek, List<DeckCardView> settled}),
     String>((ref, deckId) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   final now = ref.watch(clockProvider)();
   final day = await ref.watch(dayBucketProvider.future);
@@ -125,6 +128,7 @@ final deckCardsByBucketProvider = FutureProvider.family<
 /// seria `0,0 dias`, que se lê como "você esquece tudo em um dia".
 final deckAverageIntervalProvider =
     FutureProvider.family<double?, String>((ref, deckId) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
 
   final row = await db.customSelect(

@@ -5,6 +5,7 @@ import 'package:timezone/data/latest.dart' as tzdata;
 import 'demo_seed.dart';
 import 'features/app_shell.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/sign_in_screen.dart';
 import 'providers.dart';
 import 'providers_sync.dart';
 import 'theme.dart';
@@ -118,6 +119,18 @@ class _BootstrapState extends ConsumerState<_Bootstrap> with WidgetsBindingObser
             // Previously swallowed: a failed start showed the home screen as
             // if nothing had happened.
             return Scaffold(body: Center(child: Text('Erro ao iniciar: ${snapshot.error}')));
+          }
+          // Invite-only server: it refused this app's anonymous account, so
+          // the person signs in before anything else. Local cards stay and go
+          // to the account on the first sync.
+          if (ref.watch(accountRequiredProvider)) {
+            return SignInScreen(
+              onSignedIn: () {
+                ref.read(accountRequiredProvider.notifier).state = false;
+                ref.read(syncControllerProvider.notifier).syncNow();
+                ref.invalidate(quotaProvider);
+              },
+            );
           }
           return ref.watch(onboardingDoneProvider).when(
                 loading: () =>

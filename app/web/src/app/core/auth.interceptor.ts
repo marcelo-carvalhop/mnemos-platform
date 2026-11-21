@@ -30,11 +30,16 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // uma conta anônima existente (§8.1) e exige o bearer dela. Tratá-lo como
   // "rota de autenticação" e tirar o cabeçalho devolve 401, que foi o que
   // aconteceu na primeira tentativa contra o servidor real.
-  const establishesSession =
-    req.url.includes('/v1/auth/device') ||
-    req.url.includes('/v1/auth/login') ||
-    req.url.includes('/v1/auth/refresh') ||
-    req.url.includes('/v1/auth/challenge');
+  const establishesSession = [
+    '/v1/auth/device',
+    '/v1/auth/login',
+    '/v1/auth/refresh',
+    '/v1/auth/challenge',
+    '/v1/auth/register',
+    '/v1/auth/verify-email',
+    '/v1/auth/resend-verification',
+    '/v1/auth/options',
+  ].some((path) => req.url.includes(path));
   if (establishesSession) return next(req);
 
   const withToken = (token: string | null) =>
@@ -42,6 +47,17 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
 
   return next(withToken(session.token())).pipe(
     catchError((error: unknown) => {
+      // Servidor só para convidados e uma conta que não é membro (anônima, de
+      // antes do convite): renovar o token não muda a resposta. A sessão acaba
+      // e a pessoa volta para a tela de entrar.
+      if (
+        error instanceof HttpErrorResponse &&
+        error.status === 403 &&
+        (error.error as { detail?: unknown } | null)?.detail === 'account_required'
+      ) {
+        session.signOut();
+        return throwError(() => error);
+      }
       if (!(error instanceof HttpErrorResponse) || error.status !== 401) {
         return throwError(() => error);
       }

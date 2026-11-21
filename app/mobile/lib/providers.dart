@@ -48,7 +48,16 @@ final deviceIdProvider = FutureProvider<String>((ref) async {
 /// One read, shared: the settings screen, the day bucket, the FSRS parameters
 /// and the queue all want the same rows, and four queries for one table is
 /// four chances for them to disagree within a frame.
+/// Bumped when a sync brings rows from the server (§6).
+///
+/// Every provider below reads the local database once and caches the answer;
+/// none of them can see a write that did not come from this screen. Watching
+/// this makes them recompute when another device's changes land — before it,
+/// signing in on a second device showed an empty home until the app restarted.
+final dataRevisionProvider = StateProvider<int>((ref) => 0);
+
 final userSettingsProvider = FutureProvider<Map<String, String>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   final rows = await db.select(db.userSettings).get();
   return {for (final r in rows) r.key: r.value};
@@ -56,6 +65,7 @@ final userSettingsProvider = FutureProvider<Map<String, String>>((ref) async {
 
 /// The stored timezone and cutoff, never the device's (§5.7).
 final dayBucketProvider = FutureProvider<DayBucket>((ref) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   final rows = await db.select(db.userSettings).get();
   final settings = {for (final r in rows) r.key: r.value};
@@ -69,6 +79,7 @@ final dayBucketProvider = FutureProvider<DayBucket>((ref) async {
 /// The FSRS vector and retention target — synced, because both are inputs to
 /// the interval formula (§3.1).
 final fsrsParamsProvider = FutureProvider<FsrsParams>((ref) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   final rows = await db.select(db.userSettings).get();
   final settings = {for (final r in rows) r.key: r.value};
@@ -81,6 +92,7 @@ final fsrsParamsProvider = FutureProvider<FsrsParams>((ref) async {
 });
 
 final studyServiceProvider = FutureProvider<StudyService>((ref) async {
+  ref.watch(dataRevisionProvider);
   return StudyService(
     ref.watch(databaseProvider),
     deviceId: await ref.watch(deviceIdProvider.future),
@@ -89,6 +101,7 @@ final studyServiceProvider = FutureProvider<StudyService>((ref) async {
 });
 
 final authoringServiceProvider = FutureProvider<AuthoringService>((ref) async {
+  ref.watch(dataRevisionProvider);
   return AuthoringService(
     ref.watch(databaseProvider),
     deviceId: await ref.watch(deviceIdProvider.future),
@@ -96,6 +109,7 @@ final authoringServiceProvider = FutureProvider<AuthoringService>((ref) async {
 });
 
 final progressServiceProvider = FutureProvider<ProgressService>((ref) async {
+  ref.watch(dataRevisionProvider);
   return ProgressService(
     ref.watch(databaseProvider),
     day: await ref.watch(dayBucketProvider.future),
@@ -108,11 +122,13 @@ final progressServiceProvider = FutureProvider<ProgressService>((ref) async {
 
 /// The headline of §9, as the home screen shows it.
 final accumulatedMemoryProvider = FutureProvider<AccumulatedMemory>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   return service.accumulatedMemory();
 });
 
 final dailyGoalProvider = FutureProvider<int>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   final day = await ref.watch(dayBucketProvider.future);
   return await service.goalOn(day.today(ref.watch(clockProvider)())) ?? 20;
@@ -120,6 +136,7 @@ final dailyGoalProvider = FutureProvider<int>((ref) async {
 
 /// Cards answered today, against the goal in force today.
 final studiedTodayProvider = FutureProvider<int>((ref) async {
+  ref.watch(dataRevisionProvider);
   final study = await ref.watch(studyServiceProvider.future);
   final day = await ref.watch(dayBucketProvider.future);
   final counts = await study.countReviewsOn(day.today(ref.watch(clockProvider)()), day);
@@ -128,6 +145,7 @@ final studiedTodayProvider = FutureProvider<int>((ref) async {
 
 /// Today's queue, honouring both daily limits (§5.8).
 final queueProvider = FutureProvider<List<String>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final study = await ref.watch(studyServiceProvider.future);
   final day = await ref.watch(dayBucketProvider.future);
   final db = ref.watch(databaseProvider);
@@ -149,12 +167,14 @@ final queueProvider = FutureProvider<List<String>>((ref) async {
 /// same one: a brand-new account with no cards was told its memory was working
 /// away on its own (§5.1, §5.2).
 final hasAnyCardsProvider = FutureProvider<bool>((ref) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   final rows = await (db.select(db.cards)..where((t) => t.deletedAt.isNull())..limit(1)).get();
   return rows.isNotEmpty;
 });
 
 final decksProvider = FutureProvider<List<Deck>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   return (db.select(db.decks)
         ..where((t) => t.deletedAt.isNull())
@@ -163,6 +183,7 @@ final decksProvider = FutureProvider<List<Deck>>((ref) async {
 });
 
 final deckCardCountsProvider = FutureProvider<Map<String, int>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   final rows = await db.customSelect(
     '''
@@ -180,11 +201,13 @@ final deckCardCountsProvider = FutureProvider<Map<String, int>>((ref) async {
 });
 
 final deckMaturityProvider = FutureProvider<Map<String, DeckMaturity>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   return {for (final m in await service.maturityByDeck()) m.deckId: m};
 });
 
 final cardProvider = FutureProvider.family<Card?, String>((ref, cardId) async {
+  ref.watch(dataRevisionProvider);
   final db = ref.watch(databaseProvider);
   return (db.select(db.cards)..where((t) => t.id.equals(cardId))).getSingleOrNull();
 });
@@ -195,6 +218,7 @@ final cardProvider = FutureProvider.family<Card?, String>((ref, cardId) async {
 /// promise something the review does not deliver.
 final previewProvider =
     FutureProvider.family<Map<Grade, Duration>, String>((ref, cardId) async {
+  ref.watch(dataRevisionProvider);
   final study = await ref.watch(studyServiceProvider.future);
   return study.preview(cardId, ref.watch(clockProvider)());
 });

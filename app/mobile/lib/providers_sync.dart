@@ -26,11 +26,24 @@ final apiBaseUrlProvider = Provider<Uri>((ref) {
 
 final tokenStoreProvider = Provider<TokenStore>((ref) => const KeychainTokenStore());
 
+/// True once the server said this app needs a real account (invite-only
+/// mode). The app then shows sign-in instead of the home screen.
+final accountRequiredProvider = StateProvider<bool>((ref) => false);
+
 final apiProvider = Provider<Api>((ref) {
   final api = Api(
     baseUrl: ref.watch(apiBaseUrlProvider),
     tokens: ref.watch(tokenStoreProvider),
   );
+  api.onAccountRequired = () => ref.read(accountRequiredProvider.notifier).state = true;
+  // A rejected refresh on an invite-only server cannot be fixed by a new
+  // anonymous registration (it is refused), so sign-in is the way back. On an
+  // open server nothing changes: the next launch registers again.
+  api.onAuthenticationLost = () {
+    AuthApi(api, ref.read(tokenStoreProvider)).options().then((o) {
+      if (o.inviteRequired) ref.read(accountRequiredProvider.notifier).state = true;
+    }).catchError((Object _) {});
+  };
   ref.onDispose(api.close);
   return api;
 });
@@ -56,6 +69,7 @@ final syncControllerProvider = StateNotifierProvider<SyncController, SyncState>(
   return SyncController(
     ref.watch(syncClientProvider),
     isSignedIn: () async => await tokens.readAccess() != null,
+    onPulled: () => ref.read(dataRevisionProvider.notifier).state++,
   );
 });
 
@@ -105,14 +119,16 @@ Future<void> ensureRegistered(WidgetRef ref) async {
     // and a real device, which is a human gate. Until then the server runs
     // with REQUIRE_ATTESTATION off in development and refuses to boot in
     // production without it, so this cannot ship silently unattested.
-    await auth.registerDevice(
+    final userId = await auth.registerDevice(
       deviceId: deviceId,
       platform: Platform.isIOS ? 'ios' : 'android',
     );
+    await ref.read(syncClientProvider).adoptAccount(userId);
   } on Offline {
     // Ordinary on a plane. Nothing is lost.
   } on ApiException {
-    // Attestation refused, or the server is unhappy. Local study is
+    // Attestation refused, an invite-only server (Api.onAccountRequired has
+    // already flagged it), or the server is unhappy. Local study is
     // unaffected; the app will try again next launch.
   }
 }

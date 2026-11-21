@@ -1,6 +1,15 @@
 import 'api.dart';
 import 'token_store.dart';
 
+/// How creating an account ended.
+enum RegisterOutcome {
+  /// The server needs no confirmation: the session is already stored.
+  signedIn,
+
+  /// A link went to the address; nothing is signed in until it is opened.
+  verificationSent,
+}
+
 /// §8.1 and §8.2 — identity, from first launch to signing in.
 class AuthApi {
   const AuthApi(this.api, this.tokens);
@@ -51,6 +60,42 @@ class AuthApi {
       'device_id': deviceId,
     });
     return _store(body);
+  }
+
+  /// What signing up asks for on this server.
+  Future<({bool inviteRequired, bool emailVerificationRequired})> options() async {
+    final body = await api.get('/v1/auth/options');
+    return (
+      inviteRequired: body['invite_required'] == true,
+      emailVerificationRequired: body['email_verification_required'] == true,
+    );
+  }
+
+  /// A new account with credentials from the start — the only way in on an
+  /// invite-only server, which refuses anonymous devices.
+  Future<({RegisterOutcome outcome, String? userId})> register({
+    required String email,
+    required String password,
+    required String deviceId,
+    String? inviteCode,
+  }) async {
+    final code = inviteCode?.trim();
+    final body = await api.postAnonymous('/v1/auth/register', body: {
+      'email': email,
+      'password': password,
+      'device_id': deviceId,
+      'invite_code': (code == null || code.isEmpty) ? null : code,
+    });
+    final tokens = body['tokens'];
+    if (body['status'] == 'signed_in' && tokens is Map<String, Object?>) {
+      return (outcome: RegisterOutcome.signedIn, userId: await _store(tokens));
+    }
+    return (outcome: RegisterOutcome.verificationSent, userId: null);
+  }
+
+  /// The same answer for any address, so it reveals nothing.
+  Future<void> resendVerification(String email) async {
+    await api.postAnonymous('/v1/auth/resend-verification', body: {'email': email});
   }
 
   /// Signing in on a second device, or after a reinstall (§8.3).

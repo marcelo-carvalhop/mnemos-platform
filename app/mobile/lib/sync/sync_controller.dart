@@ -47,9 +47,14 @@ class SyncState {
 /// is tested without a network. This owns the *when*: after a session, on
 /// resume, and never twice at once.
 class SyncController extends StateNotifier<SyncState> {
-  SyncController(this._client, {required this.isSignedIn}) : super(const SyncState());
+  SyncController(this._client, {required this.isSignedIn, this.onPulled})
+      : super(const SyncState());
 
   final SyncClient _client;
+
+  /// Called when a sync wrote rows that came from the server, so the screens
+  /// reading the local database recompute (see `dataRevisionProvider`).
+  final void Function()? onPulled;
 
   /// There is nothing to sync before an account exists, and trying would only
   /// produce 401s on a first launch that is working perfectly well offline.
@@ -75,7 +80,8 @@ class SyncController extends StateNotifier<SyncState> {
 
     state = state.copyWith(phase: SyncPhase.syncing);
     try {
-      await _client.syncNow();
+      final result = await _client.syncNow();
+      if (result.pulled > 0) onPulled?.call();
       _publish(SyncState(
         phase: SyncPhase.idle,
         pending: await _client.outboxDepth(),
@@ -88,7 +94,8 @@ class SyncController extends StateNotifier<SyncState> {
       // pause looks like a hang.
       state = state.copyWith(phase: SyncPhase.resyncing);
       try {
-        await _client.syncNow();
+        final result = await _client.syncNow();
+        if (result.pulled > 0) onPulled?.call();
         _publish(SyncState(
           phase: SyncPhase.idle,
           pending: await _client.outboxDepth(),

@@ -214,7 +214,7 @@ class DueBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: MnemosSpacing.sm, vertical: MnemosSpacing.xs),
       decoration: ShapeDecoration(
         color: MnemosColors.due,
-        shape: squircle(MnemosRadii.card),
+        shape: const StadiumBorder(),
       ),
       child: Text(
         '$count hoje',
@@ -247,27 +247,28 @@ class MnemosChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Pílula, como os chips da web (`.chips button`, `.counts button`): no
+    // design system um chip é para escolher, e escolher tem a forma de botão.
     final chip = InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(expand ? MnemosRadii.control : MnemosRadii.card),
+      customBorder: const StadiumBorder(),
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: expand ? 0 : MnemosSpacing.md,
+          horizontal: expand ? 0 : 14,
           vertical: expand ? MnemosSpacing.md : MnemosSpacing.sm,
         ),
         alignment: expand ? Alignment.center : null,
         decoration: ShapeDecoration(
-            color: selected ? MnemosColors.primary : null,
-            shape: squircle(expand ? MnemosRadii.control : MnemosRadii.card,
-                side: selected
-                    ? BorderSide.none
-                    : BorderSide(color: MnemosColors.line)),
+          color: selected ? MnemosColors.primary : MnemosColors.raised,
+          shape: StadiumBorder(
+            side: selected ? BorderSide.none : const BorderSide(color: MnemosColors.outline),
           ),
+        ),
         child: Text(
           label,
           style: MnemosText.labelSmall.copyWith(
             color: selected ? MnemosColors.onDark : MnemosColors.muted,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
             fontSize: expand ? 14 : 13,
           ),
         ),
@@ -761,6 +762,44 @@ class SettingGroup extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// O botão principal de uma ação da IA — gerar cards.
+///
+/// O gradiente azul→rosa é exclusivo da IA (`MnemosGradients.ai`): onde ele
+/// aparece, é a IA que vai agir, e a pessoa aprende isso sem legenda. Por
+/// fora é um [FilledButton] comum (mesma altura, mesma pílula, mesmo foco);
+/// só o fundo muda. Desligado, perde opacidade em vez de virar cinza.
+class AiButton extends StatelessWidget {
+  const AiButton({super.key, required this.onPressed, required this.child});
+
+  final VoidCallback? onPressed;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onPressed != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: DecoratedBox(
+        decoration: const ShapeDecoration(
+          gradient: MnemosGradients.ai,
+          shape: StadiumBorder(),
+        ),
+        child: FilledButton(
+          onPressed: onPressed,
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            disabledBackgroundColor: Colors.transparent,
+            foregroundColor: MnemosColors.onDark,
+            disabledForegroundColor: MnemosColors.onDark,
+            shadowColor: Colors.transparent,
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

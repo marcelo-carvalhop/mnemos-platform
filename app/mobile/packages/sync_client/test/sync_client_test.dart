@@ -128,6 +128,46 @@ void main() {
 
   tearDown(() async => db.close());
 
+  group('adoptAccount', () {
+    Future<String?> owner() async => (await (db.select(db.localSettings)
+              ..where((t) => t.key.equals(SyncClient.accountKey)))
+            .getSingleOrNull())
+        ?.value;
+
+    test('data that never reached a server goes to the new account', () async {
+      await makeDeck('d1');
+      expect(await sync.adoptAccount('u1'), isFalse);
+      expect(await owner(), 'u1');
+      expect(await sync.outboxDepth(), 1);
+    });
+
+    test('the same account again keeps everything', () async {
+      await makeDeck('d1');
+      await sync.adoptAccount('u1');
+      await sync.pushAll();
+      expect(await sync.adoptAccount('u1'), isFalse);
+      expect((await db.customSelect('SELECT id FROM decks').get()).length, 1);
+    });
+
+    test('synced data of another account leaves the device', () async {
+      await makeDeck('d1');
+      await db.into(db.localSettings).insert(
+            LocalSettingsCompanion.insert(key: 'reminder', value: '20:00'),
+          );
+      await sync.pushAll();
+
+      expect(await sync.adoptAccount('u2'), isTrue);
+      expect(await db.customSelect('SELECT id FROM decks').get(), isEmpty);
+      expect(await sync.cursorFor('decks'), 0);
+      expect(await owner(), 'u2');
+      // Per-install preferences are not account data.
+      final reminder = await (db.select(db.localSettings)
+            ..where((t) => t.key.equals('reminder')))
+          .getSingleOrNull();
+      expect(reminder?.value, '20:00');
+    });
+  });
+
   group('push (§6.4)', () {
     test('a deck goes before the card that references it', () async {
       // The other order makes the server reject the card for a deck it has

@@ -1,94 +1,115 @@
-/* Tokens do Mnemos — paleta G2, lavanda e coral.
+/* Tokens do Mnemos — design system "Marinho" (docs/design/DESIGN-SYSTEM.md).
  *
- * Mesma paleta e mesma tipografia do aplicativo (`app/mobile/lib/theme/`),
- * conforme o canvas `Mnemos Web.dc.html`. Lavanda é o produto, menta é o que
- * já está firme, coral é o que vence — a cor carrega significado e nunca é
- * escolhida por gosto de tela.
+ * Os mesmos valores do aplicativo (`app/mobile/lib/theme/`). A interface é
+ * azul-marinho sobre quase branco, com cinzas azulados entre os dois. A cor
+ * é rara de propósito:
  *
- * Onde a cor de origem reprova contraste como texto pequeno, existe uma
- * variante escurecida: as originais ficam reservadas para preencher área, onde
- * contraste de texto não se aplica. Não há preto nem branco puros; o produto
- * tem um terminal de tinta eletrônica, e a tela combina com o objeto na mesa.
+ * - **marinho** é a ação: botão principal, bloco-herói, item ativo;
+ * - **azul** é o destaque: link, foco, sobrancelha de seção, dado em gráfico;
+ * - **menta** é o que já está firme, **coral** é o que vence;
+ * - **o gradiente azul→rosa é só da IA** — onde ele aparece, é a IA agindo.
+ *
+ * Tipografia: Geist na interface e nos numerais, Geist Mono no que é técnico
+ * (rótulos, atalhos, dados que alinham), Literata só no conteúdo do card. O
+ * card é algo para ler; a interface é algo para operar.
+ *
+ * Formas: cantos de 4 e 8 px, botões em pílula, bordas finas no lugar de
+ * sombra. Sombra só no que flutua (menu, prévia em destaque).
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Literata:opsz,wght@7..72,400;7..72,500&display=swap');
 
 :root {
-  /* Superfícies */
-  --mn-surface: #f2f1f6;
-  --mn-surface-sunken: #ebeaf1;
-  /* Branco puro, como no aplicativo (`MnemosColors.raised`). `#fcfbfe` dava
-   * 1,09:1 contra a tela; branco dá 1,124:1, que é a separação do agrupado do
-   * iOS. Mesma superfície nas duas superfícies, mesmo valor. */
+  /* Superfícies. Quase branco na tela, branco no card: a separação vem da
+   * borda fina, não do contraste entre os dois fundos. */
+  --mn-surface: #fafbfc;
+  --mn-surface-sunken: #f5f7f9;
   --mn-surface-raised: #ffffff;
-  --mn-surface-soft: #efecf7;
-  --mn-line: #e5e1ee;
-  --mn-line-strong: #dedae8;
-  --mn-outline: #cbc7dc;
+  --mn-surface-soft: #ecf0f3;
+  --mn-line: #e0e6ec;
+  --mn-line-strong: #d3dce4;
+  --mn-outline: #c9d3dd;
 
-  /* Texto */
-  --mn-text: #232130;
-  --mn-text-muted: #4c4a5c;
-  --mn-text-faint: #5a5868;
-  --mn-text-fainter: #6a6878;
-  --mn-text-on-accent: #f6f4fa;
+  /* Texto. Contraste medido sobre `--mn-surface`:
+   * 16,2 · 9,4 · 5,6 · 4,8 — todos passam AA para texto pequeno. */
+  --mn-text: #0f1c3d;
+  --mn-text-muted: #39445f;
+  --mn-text-faint: #53687b;
+  --mn-text-fainter: #5e7285;
+  /* 3,2:1 — **só** em título de 24 px ou mais (a segunda linha que esmaece). */
+  --mn-text-quiet: #7d8fa2;
+  /* Decoração: grade, trilho, ícone que espera. Nunca texto que precise ser lido. */
+  --mn-deco: #9baec0;
+  --mn-text-on-accent: #fafbfc;
 
-  /* Ação */
-  --mn-accent: #6e6fa0;
-  --mn-accent-hover: #55568a;
-  --mn-accent-soft: #e1e1f3;
-  --mn-accent-40: #c9c8e1;
-  --mn-accent-60: #a9a9ce;
-  --mn-accent-dark: #3b3b63;
+  /* Ação — marinho. */
+  --mn-accent: #0f1c3d;
+  --mn-accent-hover: #26324f;
+  --mn-accent-soft: #ecf0f3;
+  --mn-accent-40: #c9d3dd;
+  --mn-accent-60: #9baec0;
+  --mn-accent-dark: #071022;
+
+  /* Destaque — azul. 6,4:1 sobre a tela. */
+  --mn-highlight: #2f5ba6;
+  --mn-highlight-soft: #eff3fa;
 
   /* Os quatro graus, sempre nesta ordem: errei, difícil, bom, fácil.
    * A ordem carrega significado e nunca é alfabética nem por frequência. */
-  --mn-again: #9e4a2c;
-  --mn-again-bg: #f7f1ee;
-  --mn-hard: #55568a;
-  --mn-hard-bg: #efecf7;
-  --mn-good: #4a6b5c;
-  --mn-good-bg: #e8efea;
-  --mn-easy: #6e6fa0;
-  --mn-easy-bg: #e1e1f3;
+  --mn-again: #a2432a;
+  --mn-again-bg: #fcf3ef;
+  --mn-hard: #39445f;
+  --mn-hard-bg: #f5f7f9;
+  --mn-good: #2e6b50;
+  --mn-good-bg: #eef7f2;
+  --mn-easy: #2f5ba6;
+  --mn-easy-bg: #eff3fa;
 
   /* Cores de origem — só para preencher área, nunca para texto pequeno. */
-  --mn-sage: #7fa894;
-  --mn-brass: #a9a9ce;
-  --mn-terracotta: #e08a72;
-  --mn-on-terracotta: #48261b;
+  --mn-sage: #6fae92;
+  --mn-brass: #9baec0;
+  --mn-terracotta: #e5876c;
+  --mn-on-terracotta: #4a1f12;
 
   /* A cor de um numeral é da **métrica**, não da tela em que ele aparece:
-   * retenção é menta, vencimento é coral escuro, memória acumulada é lavanda,
-   * e contagem sem juízo é tinta. Quatro telas com quatro critérios fazem o
-   * mesmo "98%" mudar de cor ao mudar de rota, e aí a cor deixa de informar.
-   * A mesma regra vale no aplicativo. */
+   * retenção é menta, vencimento é coral escuro, memória acumulada é azul,
+   * e contagem sem juízo é tinta. A mesma regra vale no aplicativo. */
 
   /* Destrutivo é um papel próprio, não um tom do vencimento. O coral diz
-   * "isto vence"; esta cor diz "isto some para sempre", e confundir as duas
-   * ensina a pessoa a ignorar exatamente o aviso que não deveria. */
-  --mn-destructive: #7a2410;
+   * "isto vence"; esta cor diz "isto some para sempre". */
+  --mn-destructive: #8a1f0e;
 
-  /* Tipografia. O card é conteúdo para ler, a interface é controle para
-   * operar: serifada no conteúdo e nos numerais, sem serifa na interface,
-   * mono no que é técnico (atalhos, ids, rótulos de seção). */
-  --mn-font-ui: 'Public Sans', system-ui, -apple-system, sans-serif;
+  /* Gradientes. O da IA é exclusivo dela; o herói é o marinho ganhando luz. */
+  --mn-ai: linear-gradient(-55deg, #6a7cf0 15%, #e14fb8 110%);
+  --mn-ai-soft: linear-gradient(
+    -10deg,
+    rgba(106, 124, 240, 0.06) 34%,
+    rgba(225, 79, 184, 0.07) 100%
+  );
+  --mn-hero: linear-gradient(-62deg, #2f5ba6 1%, #0f1c3d 100%);
+  --mn-text-on-hero: #fafbfc;
+  --mn-text-on-hero-muted: #c9d3dd;
+  --mn-hero-ink: #0f1c3d;
+
+  /* Sombra só no que flutua. */
+  --mn-shadow-float: 0 8px 32px rgba(15, 28, 61, 0.1);
+  --mn-shadow-menu: 0 8px 24px rgba(15, 28, 61, 0.24);
+
+  /* Tipografia. */
+  --mn-font-ui: Geist, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --mn-font-display: Geist, ui-sans-serif, system-ui, -apple-system, sans-serif;
   --mn-font-content: Literata, Georgia, serif;
-  --mn-font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --mn-font-mono: 'Geist Mono', ui-monospace, monospace;
+  --mn-tracking-display: -0.03em;
 
-  /* Três raios, os mesmos do aplicativo (`MnemosRadii` em tokens.dart):
-   * controle dentro de bloco, card, e o objeto central da tela. Para um
-   * elemento aninhado o raio interno é o do pai menos o padding — é o que
-   * deixa as duas curvas paralelas em vez de uma caixa dentro da outra. */
-  --mn-radius: 12px;
-  --mn-radius-lg: 20px;
-  --mn-radius-xl: 28px;
+  /* Raios: 4 para o que vive dentro de um bloco, 8 para o bloco. Botão,
+   * chip e selo são pílula. Os mesmos do aplicativo (`MnemosRadii`). */
+  --mn-radius: 4px;
+  --mn-radius-lg: 8px;
+  --mn-radius-xl: 8px;
+  --mn-radius-pill: 999px;
 
-  /* Uma escala só, para que espaçamento não vire opinião por tela — e **os
-   * mesmos seis degraus do aplicativo**. Antes eram `18` e `26` aqui contra
-   * `16`, `20`, `24` e `32` lá, com três valores em comum: nenhum padding de
-   * card podia coincidir entre as duas superfícies, por construção. Um degrau
-   * novo entra nos dois arquivos ou não entra em nenhum. */
+  /* Uma escala só, os mesmos seis degraus do aplicativo. */
   --mn-gap-1: 4px;
   --mn-gap-2: 8px;
   --mn-gap-3: 12px;
@@ -96,64 +117,59 @@
   --mn-gap-5: 24px;
   --mn-gap-6: 40px;
 
-  /* Superfície neutra: o lavanda era o botão, o herói, o item ativo **e** o
-   * papel de parede. Quando tudo é lavanda, o botão lavanda não se destaca de
-   * nada — é a raridade do acento que o torna uma indicação.
-   *
-   * Cinza e não branco, pela mesma razão do aplicativo: estas telas são cards
-   * e listas, a família do `systemGroupedBackground` do iOS (`#F2F2F7`), não a
-   * do `systemBackground`. A lightness é a da Apple; o tom é o da marca. */
+  --mn-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Modo escuro.
- *
- * Como todas as cores já vivem em token, isto é uma segunda tabela de valores
- * e não um redesenho. O produto tem por objeto companheiro um terminal de
- * tinta eletrônica usado à noite; entregar só o claro obriga quem estuda no
- * escuro a escolher entre o app e os próprios olhos.
- *
- * As superfícies não são cinzas neutros: recebem a mesma pitada de lavanda que
- * as claras, para que a identidade sobreviva à inversão. E os tons de ação
- * clareiam — `#6e6fa0` sobre um fundo escuro dá 3,1:1, abaixo do mínimo. */
+/* Modo escuro: o marinho vira o fundo, e a ação clareia. Como todas as cores
+ * já vivem em token, isto é uma segunda tabela de valores e não um redesenho. */
 @media (prefers-color-scheme: dark) {
   :root {
-    --mn-surface: #131218;
-    --mn-surface-sunken: #0e0d12;
-    --mn-surface-raised: #1c1b23;
-    --mn-surface-soft: #232231;
+    --mn-surface: #0b1429;
+    --mn-surface-sunken: #071022;
+    --mn-surface-raised: #111c36;
+    --mn-surface-soft: #17233f;
 
-    --mn-line: #2a2934;
-    --mn-line-strong: #343341;
-    --mn-outline: #454353;
+    --mn-line: #1e2a47;
+    --mn-line-strong: #26324f;
+    --mn-outline: #39445f;
 
-    --mn-text: #ecebf2;
-    --mn-text-muted: #c3c1d0;
-    --mn-text-faint: #a3a1b2;
-    --mn-text-fainter: #8b8999;
-    --mn-text-on-accent: #14131a;
+    --mn-text: #f5f7f9;
+    --mn-text-muted: #c9d3dd;
+    --mn-text-faint: #9baec0;
+    --mn-text-fainter: #8496a9;
+    --mn-text-quiet: #6d8196;
+    --mn-deco: #39445f;
+    --mn-text-on-accent: #0f1c3d;
 
-    --mn-accent: #a9a9d6;
-    --mn-accent-hover: #c2c2e6;
-    --mn-accent-soft: #2b2a3d;
-    --mn-accent-40: #3b3a52;
-    --mn-accent-60: #6f6e93;
-    --mn-accent-dark: #1e1d2b;
+    --mn-accent: #e8edf3;
+    --mn-accent-hover: #ffffff;
+    --mn-accent-soft: #17233f;
+    --mn-accent-40: #26324f;
+    --mn-accent-60: #53687b;
+    --mn-accent-dark: #071022;
 
-    --mn-again: #e39b7e;
-    --mn-again-bg: #33231d;
-    --mn-hard: #a9a9d6;
-    --mn-hard-bg: #26253a;
-    --mn-good: #8fc0a6;
-    --mn-good-bg: #1c2b23;
-    --mn-easy: #a9a9d6;
-    --mn-easy-bg: #2b2a3d;
+    --mn-highlight: #8fb0ee;
+    --mn-highlight-soft: #16223f;
 
-    --mn-sage: #7fa894;
-    --mn-brass: #6f6e93;
-    --mn-terracotta: #e08a72;
+    --mn-again: #ee9f86;
+    --mn-again-bg: #2a1a16;
+    --mn-hard: #c9d3dd;
+    --mn-hard-bg: #17233f;
+    --mn-good: #8fd0b0;
+    --mn-good-bg: #14261f;
+    --mn-easy: #9dbbf2;
+    --mn-easy-bg: #16223f;
+
+    --mn-sage: #6fae92;
+    --mn-brass: #53687b;
+    --mn-terracotta: #e5876c;
     --mn-on-terracotta: #2a1610;
 
-    --mn-destructive: #e08a72;
+    --mn-destructive: #ee9f86;
+
+    --mn-hero: linear-gradient(-62deg, #2f5ba6 1%, #17233f 100%);
+    --mn-shadow-float: 0 8px 32px rgba(0, 0, 0, 0.35);
+    --mn-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -180,14 +196,14 @@ body {
 h1,
 h2,
 h3 {
-  font-family: var(--mn-font-content);
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-family: var(--mn-font-display);
+  font-weight: 500;
+  letter-spacing: var(--mn-tracking-display);
   margin: 0;
 }
 
 a {
-  color: var(--mn-accent);
+  color: var(--mn-highlight);
 }
 
 button {
@@ -198,7 +214,7 @@ button {
 /* O foco visível não é decoração: esta interface é operada pelo teclado, e um
  * anel de foco removido torna metade dela inutilizável. */
 :focus-visible {
-  outline: 2px solid var(--mn-accent);
+  outline: 2px solid var(--mn-highlight);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -227,5 +243,13 @@ button {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Atalhos de teclado ("espaço", "D", "A") só onde há teclado: numa tela de
+ * toque eles são ruído dentro do botão. */
+@media (hover: none) and (pointer: coarse) {
+  kbd {
+    display: none;
   }
 }

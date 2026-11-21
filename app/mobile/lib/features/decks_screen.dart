@@ -343,7 +343,7 @@ class _DeckCard extends StatelessWidget {
                   semanticLabel: '$name: $due vencendo, $mature maduros, $total no total.',
                   segments: [
                     (weight: due, color: MnemosColors.due),
-                    (weight: mature, color: MnemosColors.primary),
+                    (weight: mature, color: MnemosColors.highlight),
                     (weight: rest, color: MnemosColors.line),
                   ],
                 ),
@@ -353,7 +353,7 @@ class _DeckCard extends StatelessWidget {
                   runSpacing: MnemosSpacing.sm,
                   children: [
                     if (due > 0) LegendDot(color: MnemosColors.due, label: '$due vencendo'),
-                    LegendDot(color: MnemosColors.primary, label: '$mature maduros'),
+                    LegendDot(color: MnemosColors.highlight, label: '$mature maduros'),
                     LegendDot(color: MnemosColors.primary60, label: '$total total'),
                   ],
                 ),

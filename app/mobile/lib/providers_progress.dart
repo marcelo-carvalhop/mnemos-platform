@@ -11,6 +11,7 @@ import 'providers.dart';
 ///
 /// Null until there is something to measure.
 final retentionProvider = FutureProvider<double?>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   return service.retention(
     since: ref.watch(clockProvider)().subtract(const Duration(days: 90)),
@@ -20,18 +21,21 @@ final retentionProvider = FutureProvider<double?>((ref) async {
 /// §5.11 — consecutive days, with the forgiveness §9 argues for: a streak that
 /// breaks on one missed day teaches people to fear the app.
 final streakProvider = FutureProvider<int>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   return service.streak(ref.watch(clockProvider)());
 });
 
 /// What is coming, so nobody is ambushed by four hundred cards on a Monday.
 final forecastProvider = FutureProvider<Map<String, int>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   return service.loadForecast(from: ref.watch(clockProvider)(), days: 14);
 });
 
 /// The last twelve weeks of answered days.
 final heatmapProvider = FutureProvider<Map<String, int>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   final now = ref.watch(clockProvider)();
   return service.heatmap(from: now.subtract(const Duration(days: 83)), to: now);
@@ -43,6 +47,7 @@ final heatmapProvider = FutureProvider<Map<String, int>>((ref) async {
 /// happened recently — a card that graduated a year ago is not news.
 final graduationsProvider =
     FutureProvider<List<({String cardId, int milestone})>>((ref) async {
+  ref.watch(dataRevisionProvider);
   final service = await ref.watch(progressServiceProvider.future);
   final now = ref.watch(clockProvider)();
   return service.graduations(from: now.subtract(const Duration(days: 30)), to: now);

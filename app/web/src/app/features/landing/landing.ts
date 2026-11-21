@@ -1,5 +1,14 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Session } from '../../core/session';
+
+interface SampleCard {
+  deck: string;
+  front: string;
+  back: string;
+}
+
+type Surface = 'phone' | 'web' | 'ink';
 
 /**
  * A landing — uma tela que o aplicativo não tem.
@@ -7,54 +16,76 @@ import { RouterLink } from '@angular/router';
  * Quem chega aqui não sabe o que é repetição espaçada e não deveria precisar
  * saber para entender a promessa. Por isso o texto fala do resultado — o que
  * você aprendeu volta na hora certa — e não do algoritmo.
+ *
+ * O card do herói funciona de verdade (virar e responder), porque mostrar o
+ * gesto ensina mais que qualquer frase sobre ele. Os textos dos botões seguem
+ * o servidor: num servidor só para convidados eles falam de convite.
  */
 @Component({
   selector: 'app-landing',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
   styleUrl: './landing.css',
-  template: `
-    <header class="top">
-      <span class="brand">
-        <span class="mark" aria-hidden="true"></span>
-        Mnemos
-      </span>
-      <a class="enter" routerLink="/entrar">Entrar</a>
-    </header>
-
-    <section class="hero">
-      <h1>O que você aprendeu, de volta na hora certa.</h1>
-      <p>
-        O Mnemos guarda o que você estuda e traz cada ideia de volta pouco antes de você esquecer.
-        Sem sequências para manter, sem notificação cobrando presença.
-      </p>
-      <a class="cta" routerLink="/entrar">Começar</a>
-      <p class="fine">Grátis para estudar e escrever cards. A IA que escreve por você é paga.</p>
-    </section>
-
-    <section class="three">
-      <article>
-        <h2>Cards curtos, uma ideia cada</h2>
-        <p>
-          Escreva, cole um texto ou descreva um assunto e deixe a IA propor. Nada vira card sem você
-          aprovar, um por um.
-        </p>
-      </article>
-      <article>
-        <h2>Três superfícies, um histórico</h2>
-        <p>
-          Navegador, celular e um terminal de tinta eletrônica. O que você respondeu num aparece nos
-          outros, e o cronograma é o mesmo em qualquer um.
-        </p>
-      </article>
-      <article>
-        <h2>Uma métrica só: memória</h2>
-        <p>
-          Não contamos dias seguidos nem cards digitados. O número que importa é quanto tempo o que
-          você sabe fica de pé sem precisar de revisão.
-        </p>
-      </article>
-    </section>
-  `,
+  templateUrl: './landing.html',
 })
-export class Landing {}
+export class Landing {
+  private readonly session = inject(Session);
+
+  protected readonly cards: readonly SampleCard[] = [
+    {
+      deck: 'Direito Constitucional',
+      front: 'Qual é o quórum para aprovar uma emenda à Constituição?',
+      back: 'Três quintos dos votos, em dois turnos, em cada Casa do Congresso (art. 60, § 2º).',
+    },
+    {
+      deck: 'Redes de Computadores',
+      front: 'Em que camada do modelo OSI opera um roteador?',
+      back: 'Na camada 3, a de rede: ele encaminha pacotes pelo endereço IP de destino.',
+    },
+    {
+      deck: 'Bioquímica',
+      front: 'Qual organela produz a maior parte do ATP da célula?',
+      back: 'A mitocôndria, pela fosforilação oxidativa na membrana interna.',
+    },
+  ];
+
+  protected readonly grades = [
+    { label: 'Errei', interval: '10 min', tone: 'again' },
+    { label: 'Difícil', interval: '2 d', tone: 'hard' },
+    { label: 'Bom', interval: '5 d', tone: 'good' },
+    { label: 'Fácil', interval: '12 d', tone: 'easy' },
+  ] as const;
+
+  private readonly index = signal(0);
+  protected readonly shown = signal(false);
+  protected readonly card = computed(() => this.cards[this.index() % this.cards.length]);
+  protected readonly position = computed(() => (this.index() % this.cards.length) + 1);
+
+  protected readonly surface = signal<Surface>('phone');
+
+  /** Na dúvida, fala de convite: é o modo do beta. */
+  protected readonly inviteOnly = signal(true);
+
+  protected readonly ctaShort = computed(() =>
+    this.inviteOnly() ? 'Tenho um convite' : 'Criar conta',
+  );
+  protected readonly ctaLong = computed(() =>
+    this.inviteOnly() ? 'Entrar com meu convite' : 'Começar grátis',
+  );
+
+  constructor() {
+    this.session
+      .options()
+      .then((o) => this.inviteOnly.set(o.invite_required))
+      .catch(() => undefined);
+  }
+
+  protected reveal(): void {
+    this.shown.set(true);
+  }
+
+  protected grade(): void {
+    this.index.update((i) => i + 1);
+    this.shown.set(false);
+  }
+}

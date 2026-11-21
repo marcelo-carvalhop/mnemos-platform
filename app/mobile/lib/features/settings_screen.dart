@@ -10,6 +10,7 @@ import '../providers_sync.dart';
 import 'account_screen.dart';
 import 'subscription_screen.dart';
 import 'device_screen.dart';
+import 'sign_in_screen.dart';
 import '../theme/tokens.dart';
 import '../theme/typography.dart';
 import '../ui/ui.dart';
@@ -38,7 +39,7 @@ class SettingsScreen extends ConsumerWidget {
         bottom: false,
         child: ScreenBody(
           children: [
-            BackHeader(label: 'Hoje'),
+            BackHeader(label: 'Voltar'),
             const SizedBox(height: MnemosSpacing.md),
             const Text('Configurações', style: MnemosText.screenTitle),
             const SizedBox(height: MnemosSpacing.xl),
@@ -171,6 +172,26 @@ class SettingsScreen extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const SubscriptionScreen()),
                   ),
                 ),
+                // Num servidor aberto a conta nasce anônima e presa ao aparelho;
+                // esta é a porta para a mesma conta da web. Num servidor só
+                // para convidados o app já abre na tela de entrar.
+                SettingRow(
+                  icon: Icons.login,
+                  title: 'Entrar com e-mail',
+                  detail: 'Use a mesma conta da web neste aparelho.',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (route) => SignInScreen(
+                        onCancel: () => Navigator.of(route).pop(),
+                        onSignedIn: () {
+                          Navigator.of(route).pop();
+                          ref.read(syncControllerProvider.notifier).syncNow();
+                          ref.invalidate(quotaProvider);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
                 SettingRow(
                   icon: Icons.folder_outlined,
                   title: 'Seus dados',
@@ -217,7 +238,7 @@ class SettingsScreen extends ConsumerWidget {
             // oposto de "apagar a conta", e a tela precisa dizer isso antes de
             // alguém confundir os dois.
             OutlinedButton(
-              onPressed: () => _signOut(context, ref),
+              onPressed: () => signOut(context, ref, closeScreen: true),
               child: const Text('Sair da conta'),
             ),
             const SizedBox(height: MnemosSpacing.sm),
@@ -233,7 +254,13 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  static Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+  /// Sair, com confirmação. Usado aqui e pelo "Mais" da barra de abas;
+  /// [closeScreen] fecha esta tela depois, o que só faz sentido daqui.
+  static Future<void> signOut(
+    BuildContext context,
+    WidgetRef ref, {
+    bool closeScreen = false,
+  }) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -258,7 +285,7 @@ class SettingsScreen extends ConsumerWidget {
     if (confirmed != true) return;
 
     await ref.read(tokenStoreProvider).clear();
-    if (context.mounted) Navigator.of(context).pop();
+    if (closeScreen && context.mounted) Navigator.of(context).pop();
   }
 
   /// Settings that change how scheduling behaves are synced (§5.4), so they go

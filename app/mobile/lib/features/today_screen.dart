@@ -16,7 +16,6 @@ import 'device_screen.dart';
 import 'generation/approval_screen.dart';
 import 'generation/generating_screen.dart';
 import 'modes/modes_screen.dart';
-import 'settings_screen.dart';
 
 /// O painel do dia — artboard 01.
 ///
@@ -41,13 +40,7 @@ class TodayScreen extends ConsumerWidget {
         ScreenHeader(
           eyebrow: longDate(now),
           title: 'Hoje',
-          trailing: RoundAction(
-            icon: Icons.settings_outlined,
-            tooltip: 'Configurações',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const SettingsScreen()),
-            ),
-          ),
+          // Configurações mora no "Mais" da barra de abas, como na web.
         ),
         const SizedBox(height: MnemosSpacing.xl),
         const _OpenGenerations(),
@@ -171,8 +164,8 @@ class _DueHero extends ConsumerWidget {
   }
 }
 
-/// O botão claro sobre o bloco lavanda. Inverte as cores do primário porque
-/// sobre lavanda o primário desapareceria.
+/// O botão claro sobre o bloco-herói. Inverte as cores do primário porque
+/// sobre o marinho o primário desapareceria.
 class _HeroButton extends StatelessWidget {
   const _HeroButton({required this.label, required this.onTap});
 
@@ -183,7 +176,7 @@ class _HeroButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      customBorder: squircle(MnemosRadii.control),
+      customBorder: const StadiumBorder(),
       child: Container(
         padding: const EdgeInsets.symmetric(
           horizontal: MnemosSpacing.lg,
@@ -191,14 +184,14 @@ class _HeroButton extends StatelessWidget {
         ),
         decoration: ShapeDecoration(
         color: MnemosColors.onDark,
-        shape: squircle(MnemosRadii.control),
+        shape: const StadiumBorder(),
       ),
         child: Text(
           label,
           style: MnemosText.labelSmall.copyWith(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: MnemosColors.primaryDeep,
+            color: MnemosColors.ink,
           ),
         ),
       ),

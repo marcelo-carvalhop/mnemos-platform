@@ -35,10 +35,15 @@ enum CreateSource { topic, text, pdf, photo, byHand }
 /// era preciso abrir um baralho, tocar em "gerenciar" e só então descobrir que
 /// dava para mandar um PDF.
 class CreateScreen extends ConsumerStatefulWidget {
-  const CreateScreen({super.key, this.deckId});
+  const CreateScreen({super.key, this.deckId, this.initialTopic});
 
   /// Baralho de destino quando a tela é aberta a partir de um deles.
   final String? deckId;
+
+  /// O assunto já escolhido — o onboarding pergunta "o que você quer
+  /// estudar?" e oferece "usar agora em (assunto)"; pedir de novo aqui seria
+  /// fazer a pessoa responder a mesma pergunta duas vezes.
+  final String? initialTopic;
 
   @override
   ConsumerState<CreateScreen> createState() => _CreateScreenState();
@@ -77,6 +82,8 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   void initState() {
     super.initState();
     _deckId = widget.deckId;
+    final topic = widget.initialTopic?.trim();
+    if (topic != null && topic.isNotEmpty) _topic.text = topic;
   }
 
   @override
@@ -460,7 +467,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                   child: const Text('Assinar para gerar'),
                 )
               else
-                FilledButton(
+                AiButton(
                   onPressed: (!ready || _busy) ? null : () => _generate(decks),
                   child: Text(_busy ? 'Enviando…' : 'Gerar $_count cards'),
                 ),

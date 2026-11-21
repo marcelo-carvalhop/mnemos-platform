@@ -326,7 +326,7 @@ class _PlanCard extends StatelessWidget {
                       DecoratedBox(
                         decoration: ShapeDecoration(
                           color: MnemosColors.due,
-                          shape: squircle(MnemosRadii.control),
+                          shape: const StadiumBorder(),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(

@@ -282,6 +282,55 @@ class SyncClient {
     await db.delete(db.syncState).go();
   }
 
+  /// The `local_settings` key naming the account this database syncs with.
+  static const accountKey = 'account_owner';
+
+  /// Binds this database to [userId] before the first sync with it.
+  ///
+  /// Rows carry no `user_id` locally, and the server refuses to take another
+  /// account's rows (ownership is checked on push), so data synced under one
+  /// account cannot simply follow the device into another. Three cases:
+  ///
+  /// - the same account again: nothing changes;
+  /// - nothing here has reached any server: it is kept, and the next push
+  ///   hands it to [userId] (a first sign-in after studying offline);
+  /// - it belongs to someone else: the device copy goes (the server keeps
+  ///   it under that account), and [userId]'s data is pulled from zero.
+  ///
+  /// Returns true when local data was cleared.
+  Future<bool> adoptAccount(String userId) async {
+    final owner = await (db.select(db.localSettings)
+          ..where((t) => t.key.equals(accountKey)))
+        .getSingleOrNull();
+    if (owner?.value == userId) return false;
+
+    final belongsElsewhere = owner != null || await _hasReachedAServer();
+    await db.transaction(() async {
+      if (belongsElsewhere) {
+        for (final table in db.allTables) {
+          if (table.actualTableName == db.localSettings.actualTableName) continue;
+          await db.delete(table).go();
+        }
+      }
+      await db.into(db.localSettings).insert(
+            LocalSettingsCompanion.insert(key: accountKey, value: userId),
+            mode: InsertMode.insertOrReplace,
+          );
+    });
+    return belongsElsewhere;
+  }
+
+  Future<bool> _hasReachedAServer() async {
+    if ((await db.select(db.syncState).get()).isNotEmpty) return true;
+    for (final table in kPushOrder) {
+      final row = await db
+          .customSelect('SELECT 1 FROM $table WHERE server_seq IS NOT NULL LIMIT 1')
+          .getSingleOrNull();
+      if (row != null) return true;
+    }
+    return false;
+  }
+
   /// Full round trip. Push before pull, so a device that has been away does
   /// not receive its own edits back as if they were someone else's.
   Future<({int pushed, int pulled})> syncNow() async {

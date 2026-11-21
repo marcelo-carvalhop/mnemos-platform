@@ -223,7 +223,7 @@ class _Bars extends StatelessWidget {
                     // claras. O pico é a informação — é o dia que dói.
                     color: switch (day.count) {
                       0 => MnemosColors.line,
-                      _ when day.count == peak => MnemosColors.primary,
+                      _ when day.count == peak => MnemosColors.highlight,
                       _ => MnemosColors.primary60,
                     },
                     borderRadius: const BorderRadius.vertical(
@@ -335,7 +335,7 @@ class _Heatmap extends ConsumerWidget {
           0.0 => MnemosColors.hairline,
           < 0.4 => MnemosColors.primary40,
           < 0.7 => MnemosColors.primary60,
-          _ => MnemosColors.primary,
+          _ => MnemosColors.highlight,
         },
         borderRadius: BorderRadius.circular(MnemosRadii.bar),
       ),

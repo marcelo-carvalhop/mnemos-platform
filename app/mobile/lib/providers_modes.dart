@@ -10,6 +10,7 @@ import 'providers.dart';
 /// that extra practice cannot touch the schedule is enforced by what these
 /// objects are handed, not by remembering not to call something.
 final multipleChoiceProvider = FutureProvider<MultipleChoiceMode>((ref) async {
+  ref.watch(dataRevisionProvider);
   return MultipleChoiceMode(
     ref.watch(databaseProvider),
     study: await ref.watch(studyServiceProvider.future),
@@ -30,5 +31,6 @@ final audioSessionProvider = Provider<AudioSessionBuilder>((ref) {
 
 /// The cards the drill would offer, worst first.
 final leechesProvider = FutureProvider<List<LeechCard>>((ref) async {
+  ref.watch(dataRevisionProvider);
   return ref.watch(leechDrillProvider).select();
 });

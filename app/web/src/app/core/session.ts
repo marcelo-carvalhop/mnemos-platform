@@ -10,6 +10,21 @@ interface TokenPair {
   user_id: string;
 }
 
+/** O que criar conta pede neste servidor (`GET /v1/auth/options`). */
+export interface AuthOptions {
+  invite_required: boolean;
+  email_verification_required: boolean;
+}
+
+/** Criar conta termina de um destes dois jeitos. */
+export type SignUpOutcome = 'signed-in' | 'verification-sent';
+
+interface RegisterResponse {
+  status: 'verification_sent' | 'signed_in';
+  email: string;
+  tokens: TokenPair | null;
+}
+
 const ACCESS = 'mnemos.access';
 const REFRESH = 'mnemos.refresh';
 const DEVICE = 'mnemos.device';
@@ -56,28 +71,50 @@ export class Session {
   }
 
   /**
-   * Registra este navegador como aparelho e anexa as credenciais.
+   * Cria a conta com e-mail e senha de uma vez (`POST /v1/auth/register`).
    *
-   * A atestação (Play Integrity / App Attest) não existe num navegador. O
-   * servidor recusa subir em produção com `REQUIRE_ATTESTATION` desligada
-   * (§8.1), o que significa que **este caminho não funciona em produção como
-   * está** — a web precisa de um mecanismo próprio antes de ir ao ar, e é
-   * melhor descobrir isso aqui do que numa conta grátis ilimitada.
+   * O caminho antigo — registrar o navegador como aparelho anônimo e depois
+   * anexar credenciais — não existe num servidor só para convidados: ele
+   * recusa contas anônimas. Com confirmação de e-mail ligada, nada entra
+   * aqui: a sessão nasce quando a pessoa abre o link (`confirmEmail`).
    */
-  async signUp(email: string, password: string): Promise<void> {
-    const anonymous = await this.post<TokenPair>('/v1/auth/device', {
-      device_id: this.deviceId,
-      platform: 'web',
-    });
-    this.store(anonymous);
-
-    // Com o bearer no lugar: o interceptor carimba esta chamada.
-    const pair = await this.post<TokenPair>('/v1/auth/signup', {
+  async signUp(email: string, password: string, inviteCode = ''): Promise<SignUpOutcome> {
+    const result = await this.post<RegisterResponse>('/v1/auth/register', {
       email,
       password,
       device_id: this.deviceId,
+      invite_code: inviteCode.trim() || null,
     });
-    this.store(pair);
+    if (result.status === 'signed_in' && result.tokens) {
+      this.store(result.tokens);
+      return 'signed-in';
+    }
+    return 'verification-sent';
+  }
+
+  /**
+   * Abre o link do e-mail. O link prova a caixa de entrada, então o navegador
+   * que o abriu já sai com sessão — sem pedir a senha de novo.
+   */
+  async confirmEmail(token: string): Promise<void> {
+    const result = await this.post<{ email: string; tokens: TokenPair | null }>(
+      '/v1/auth/verify-email',
+      { token, device_id: this.deviceId },
+    );
+    if (result.tokens) this.store(result.tokens);
+  }
+
+  /** A mesma resposta para qualquer e-mail: não revela quem tem conta. */
+  async resendVerification(email: string): Promise<void> {
+    await this.post('/v1/auth/resend-verification', { email });
+  }
+
+  async options(): Promise<AuthOptions> {
+    try {
+      return await firstValueFrom(this.http.get<AuthOptions>(`${this.baseUrl}/v1/auth/options`));
+    } catch (e) {
+      throw toFailure(e);
+    }
   }
 
   async signIn(email: string, password: string): Promise<void> {

@@ -10,10 +10,9 @@ import { Session } from './session';
 /**
  * A sessão e o interceptor.
  *
- * O teste que importa aqui é o do desenho de duas etapas: `signup` **anexa**
- * credenciais a uma conta anônima existente (§8.1) e exige o bearer dela. Um
- * `signup` solto devolve 401, e contra um mock ingênuo isso passa despercebido
- * — foi o que aconteceu antes de eu chamar o servidor de verdade.
+ * Criar conta é um pedido só (`/v1/auth/register`), com o código de convite:
+ * um servidor só para convidados recusa a conta anônima que o desenho antigo
+ * (aparelho primeiro, credenciais depois) criava.
  */
 describe('Session', () => {
   let session: Session;
@@ -44,24 +43,57 @@ describe('Session', () => {
 
   afterEach(() => http.verify());
 
-  it('criar conta registra o aparelho antes de anexar as credenciais', async () => {
+  it('criar conta manda convite e credenciais de uma vez, sem bearer', async () => {
+    const done = session.signUp('a@b.com', 'senha-de-teste', ' ConVite123 ');
+
+    const register = http.expectOne('/api/v1/auth/register');
+    expect(register.request.headers.has('Authorization')).toBe(false);
+    expect(register.request.body).toEqual({
+      email: 'a@b.com',
+      password: 'senha-de-teste',
+      device_id: session.deviceId,
+      invite_code: 'ConVite123',
+    });
+    register.flush({ status: 'verification_sent', email: 'a@b.com', tokens: null });
+
+    // Com confirmação ligada, nada de sessão até o link ser aberto.
+    expect(await done).toBe('verification-sent');
+    expect(session.signedIn()).toBe(false);
+  });
+
+  it('num servidor aberto, criar conta já entra', async () => {
     const done = session.signUp('a@b.com', 'senha-de-teste');
 
-    const device = http.expectOne('/api/v1/auth/device');
-    expect(device.request.body.platform).toBe('web');
-    expect(device.request.body.device_id).toBe(session.deviceId);
-    device.flush(pair(1));
+    const register = http.expectOne('/api/v1/auth/register');
+    expect(register.request.body.invite_code).toBeNull();
+    register.flush({ status: 'signed_in', email: 'a@b.com', tokens: pair(1) });
 
-    await tick();
+    expect(await done).toBe('signed-in');
+    expect(session.token()).toBe('access-1');
+  });
 
-    const signup = http.expectOne('/api/v1/auth/signup');
-    // O bearer da conta anônima: sem ele o servidor devolve 401.
-    expect(signup.request.headers.get('Authorization')).toBe('Bearer access-1');
-    signup.flush(pair(2));
+  it('abrir o link de confirmação entra neste navegador', async () => {
+    const done = session.confirmEmail('tok');
+
+    const verify = http.expectOne('/api/v1/auth/verify-email');
+    expect(verify.request.body).toEqual({ token: 'tok', device_id: session.deviceId });
+    verify.flush({ email: 'a@b.com', tokens: pair(3) });
 
     await done;
-    expect(session.token()).toBe('access-2');
-    expect(session.signedIn()).toBe(true);
+    expect(session.token()).toBe('access-3');
+  });
+
+  it('uma conta que deixou de ser membro encerra a sessão', async () => {
+    session['store'](pair(1));
+
+    const client = TestBed.inject(HttpClient);
+    const promise = firstValueFrom(client.get('/api/v1/quota/')).catch((e: unknown) => e);
+    http
+      .expectOne('/api/v1/quota/')
+      .flush({ detail: 'account_required' }, { status: 403, statusText: 'Forbidden' });
+
+    await promise;
+    expect(session.signedIn()).toBe(false);
   });
 
   it('entrar não leva bearer: é a chamada que cria a sessão', async () => {

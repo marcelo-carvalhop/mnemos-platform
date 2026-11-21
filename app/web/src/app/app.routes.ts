@@ -74,6 +74,12 @@ export const routes: Routes = [
     path: 'entrar',
     loadComponent: () => import('./features/landing/sign-in').then((m) => m.SignIn),
   },
+  {
+    // O link do e-mail de confirmação. Sem guarda: quem abre pode já ter sessão
+    // (outro login neste navegador) e o link ainda precisa valer.
+    path: 'confirmar',
+    loadComponent: () => import('./features/landing/confirm').then((m) => m.Confirm),
+  },
   // Uma URL desconhecida volta para a raiz, e a raiz já decide entre a landing
   // e o aplicativo pelos `canMatch` acima.
   //
