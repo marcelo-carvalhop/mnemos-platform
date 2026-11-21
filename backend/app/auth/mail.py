@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import smtplib
 from email.message import EmailMessage
+from email.utils import formataddr, parseaddr
 from urllib.parse import quote
 
 from app.config import get_settings
@@ -43,11 +44,22 @@ _HTML = (
 )
 
 
-def _message(to: str, link: str) -> EmailMessage:
+def sender() -> str:
+    """The From header: always "Mnemos <address>".
+
+    MAIL_FROM may hold a bare address or a whole "Name <address>"; only the
+    address is kept. Wrapping a full "Mnemos <...>" a second time produced
+    `Mnemos <Mnemos>, <>`, which Gmail accepted and never delivered.
+    """
     settings = get_settings()
+    address = parseaddr(settings.mail_from or settings.smtp_user)[1]
+    return formataddr(("Mnemos", address))
+
+
+def _message(to: str, link: str) -> EmailMessage:
     msg = EmailMessage()
     msg["Subject"] = "Confirme seu e-mail no Mnemos"
-    msg["From"] = f"Mnemos <{settings.mail_from or settings.smtp_user}>"
+    msg["From"] = sender()
     msg["To"] = to
     msg.set_content(
         "Olá!\n\n"

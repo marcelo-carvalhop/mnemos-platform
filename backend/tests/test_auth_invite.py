@@ -198,3 +198,17 @@ def test_an_open_server_signs_in_on_register(monkeypatch, outbox):
 def test_the_link_points_at_the_web_confirmation_route(monkeypatch):
     monkeypatch.setattr(get_settings(), "public_web_url", "https://exemplo.test/")
     assert mail.verification_link("a b") == "https://exemplo.test/confirmar?token=a%20b"
+
+
+def test_sender_keeps_only_the_address(monkeypatch):
+    """MAIL_FROM as a bare address or as "Name <address>" gives the same From."""
+    from app.auth import mail
+    from app.config import get_settings
+
+    settings = get_settings()
+    for value in ("eu@example.com", "Mnemos <eu@example.com>", "Outro Nome <eu@example.com>"):
+        monkeypatch.setattr(settings, "mail_from", value)
+        assert mail.sender() == "Mnemos <eu@example.com>"
+    monkeypatch.setattr(settings, "mail_from", "")
+    monkeypatch.setattr(settings, "smtp_user", "conta@example.com")
+    assert mail.sender() == "Mnemos <conta@example.com>"
