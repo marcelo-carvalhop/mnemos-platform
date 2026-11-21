@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:api_client/api_client.dart' show OpenGeneration;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers.dart';
 import '../providers_sync.dart';
 import '../providers_today.dart';
 import '../sync/sync_controller.dart';
@@ -11,6 +15,8 @@ import '../ui/ui.dart';
 import 'create/create_screen.dart';
 import 'decks_screen.dart';
 import 'device_screen.dart';
+import 'generation/approval_screen.dart';
+import 'generation/generating_screen.dart';
 import 'progress_screen.dart';
 import 'settings_screen.dart';
 import 'today_screen.dart';
@@ -56,6 +62,42 @@ class _AppShellState extends ConsumerState<AppShell> {
   final _navigators = [
     for (var i = 0; i < _tabs.length; i++) GlobalKey<NavigatorState>(),
   ];
+
+  /// Gerações abertas: perguntadas de novo a cada 30 s enquanto o app está
+  /// aberto. Sem isso o atalho do cabeçalho só mudava de "gerando" para
+  /// "para aprovar" quando a pessoa saía e voltava ao app.
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _poll = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) ref.invalidate(openGenerationsProvider);
+    });
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  /// O atalho do cabeçalho: a aprovação pendente ou a geração em curso. São
+  /// tarefas com começo e fim, então cobrem a barra (navegador raiz).
+  Future<void> _openGeneration(OpenGeneration job) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => job.isWaitingOnMe
+            ? ApprovalScreen(jobId: job.id, deckId: job.deckId)
+            : GeneratingScreen(jobId: job.id, deckId: job.deckId),
+      ),
+    );
+    if (!mounted) return;
+    ref
+      ..invalidate(openGenerationsProvider)
+      ..invalidate(queueProvider)
+      ..invalidate(dueByDeckProvider);
+  }
 
   void _open(int index) {
     // Tocar na aba onde já se está volta ao topo dela. É o que uma barra de
@@ -136,7 +178,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           bottom: false,
           child: Column(
             children: [
-              _TopBar(onHome: () => _open(0), onStatus: _more),
+              _TopBar(onHome: () => _open(0), onStatus: _more, onGeneration: _openGeneration),
               Expanded(
                 child: IndexedStack(
                   index: _index,
@@ -172,10 +214,11 @@ class _AppShellState extends ConsumerState<AppShell> {
 /// O cabeçalho curto da web no celular: a marca, e o estado da sincronização
 /// numa pílula que abre o "Mais".
 class _TopBar extends ConsumerWidget {
-  const _TopBar({required this.onHome, required this.onStatus});
+  const _TopBar({required this.onHome, required this.onStatus, required this.onGeneration});
 
   final VoidCallback onHome;
   final VoidCallback onStatus;
+  final ValueChanged<OpenGeneration> onGeneration;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -214,6 +257,7 @@ class _TopBar extends ConsumerWidget {
             ),
           ),
           const Spacer(),
+          _GenerationShortcut(onOpen: onGeneration),
           Semantics(
             button: true,
             label: 'Sincronização: $label',
@@ -382,6 +426,78 @@ class _Dot extends StatelessWidget {
           _Tone.pending => MnemosColors.due,
           _Tone.offline => MnemosColors.fainter,
         },
+      ),
+    );
+  }
+}
+
+/// O caminho de volta para uma geração, em qualquer tela.
+///
+/// "N para aprovar" no gradiente da IA quando há cards esperando resposta;
+/// "Gerando…" discreto enquanto o servidor ainda escreve. Some quando não há
+/// nada aberto. O aviso grande continua em Hoje; este é o atalho que segue a
+/// pessoa pelas outras abas.
+class _GenerationShortcut extends ConsumerWidget {
+  const _GenerationShortcut({required this.onOpen});
+
+  final ValueChanged<OpenGeneration> onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final jobs = ref.watch(openGenerationsProvider).valueOrNull ?? const <OpenGeneration>[];
+    if (jobs.isEmpty) return const SizedBox.shrink();
+
+    final waiting = jobs.where((j) => j.isWaitingOnMe).toList();
+    final job = waiting.isNotEmpty ? waiting.first : jobs.first;
+    final pending = waiting.fold<int>(0, (sum, j) => sum + j.pending);
+    final label = waiting.isNotEmpty ? '$pending para aprovar' : 'Gerando…';
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Semantics(
+        button: true,
+        label: waiting.isNotEmpty
+            ? '$pending ${pending == 1 ? 'card espera' : 'cards esperam'} sua aprovação'
+            : 'Gerando seus cards',
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: () => onOpen(job),
+          customBorder: const StadiumBorder(),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: ShapeDecoration(
+              gradient: waiting.isNotEmpty ? MnemosGradients.ai : null,
+              color: waiting.isNotEmpty ? null : MnemosColors.raised,
+              shape: StadiumBorder(
+                side: waiting.isNotEmpty
+                    ? BorderSide.none
+                    : const BorderSide(color: MnemosColors.line),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (waiting.isEmpty) ...[
+                  const SizedBox.square(
+                    dimension: 10,
+                    child: CircularProgressIndicator(strokeWidth: 1.6),
+                  ),
+                  const SizedBox(width: 7),
+                ] else ...[
+                  const Icon(Icons.auto_awesome, size: 13, color: MnemosColors.onDark),
+                  const SizedBox(width: 6),
+                ],
+                Text(
+                  label,
+                  style: MnemosText.caption.copyWith(
+                    color: waiting.isNotEmpty ? MnemosColors.onDark : MnemosColors.muted,
+                    fontWeight: waiting.isNotEmpty ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,7 +1,16 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
+import { PendingGenerations } from '../core/open-generations';
 import { Session } from '../core/session';
 import { Store } from '../core/store';
 import { Sync } from '../core/sync';
@@ -81,6 +90,19 @@ import { Sync } from '../core/sync';
             <kbd class="mn-mono">N</kbd>
           </a>
 
+          <!-- O caminho de volta para uma geração, em qualquer tela. -->
+          @if (gens.target(); as target) {
+            <a class="gen" [class.waiting]="gens.pending() > 0" [routerLink]="target">
+              @if (gens.pending() > 0) {
+                <strong>{{ gens.pending() }} para aprovar</strong>
+                <span>Cards da IA esperando você</span>
+              } @else {
+                <strong>Gerando cards…</strong>
+                <span>Pode continuar; avisamos aqui.</span>
+              }
+            </a>
+          }
+
           <div class="spacer"></div>
 
           <!-- O canvas põe aqui o estado do T5. A web não tem cliente de
@@ -146,6 +168,11 @@ import { Sync } from '../core/sync';
             </svg>
             Mnemos
           </a>
+          @if (gens.target(); as target) {
+            <a class="gen-pill" [class.waiting]="gens.pending() > 0" [routerLink]="target">
+              {{ gens.pending() > 0 ? gens.pending() + ' para aprovar' : 'Gerando…' }}
+            </a>
+          }
           <button class="sync-chip" type="button" (click)="more.showModal()">
             <span class="dot" [class]="'dot ' + syncTone()" aria-hidden="true"></span>
             {{ syncShort() }}
@@ -340,6 +367,7 @@ export class Shell {
   private readonly router = inject(Router);
   protected readonly store = inject(Store);
   protected readonly sync = inject(Sync);
+  protected readonly gens = inject(PendingGenerations);
 
   protected readonly sections = [
     { path: '/hoje', label: 'Hoje' },
@@ -406,6 +434,12 @@ export class Shell {
   }
 
   private readonly started = signal(false);
+
+  /** A cada troca de tela, pergunta de novo o que o servidor ainda deve. */
+  private readonly refreshGenerations = effect(() => {
+    this.route();
+    untracked(() => void this.gens.refresh());
+  });
 
   constructor() {
     // Uma sincronia ao abrir. É o momento em que as mudanças de outro aparelho

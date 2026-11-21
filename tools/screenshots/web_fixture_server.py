@@ -422,6 +422,14 @@ class Handler(SimpleHTTPRequestHandler):
         """
         self._log(f"generation {path}")
         if path.rstrip("/") == "/v1/generation/jobs":
+            # MNEMOS_FIXTURE_OPEN_JOB=1 shows the shortcut to a waiting queue;
+            # off by default so the documented captures stay as they are.
+            if os.environ.get("MNEMOS_FIXTURE_OPEN_JOB") == "1":
+                return self._json({"jobs": [{
+                    "id": READY_JOB, "status": "ready", "stage": "pronto",
+                    "target_deck_id": DECKS[0][0], "topic": "Camada de transporte",
+                    "pending": len(PENDING),
+                }]})
             return self._json({"jobs": []})
         job_id = path.split("/v1/generation/jobs/", 1)[-1].split("/", 1)[0]
         if path.endswith("/queue"):

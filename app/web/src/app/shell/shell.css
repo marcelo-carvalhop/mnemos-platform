@@ -130,6 +130,41 @@
   flex: 1;
 }
 
+/* O atalho para a geração: discreto enquanto roda, no gradiente da IA
+ * quando há cards esperando resposta. */
+.gen {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  background: var(--mn-surface-raised);
+  color: var(--mn-text);
+  text-decoration: none;
+}
+.gen strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.gen span {
+  font-size: 12.5px;
+  color: var(--mn-text-faint);
+}
+.gen.waiting {
+  border-color: transparent;
+  background: var(--mn-ai);
+  color: var(--mn-text-on-hero);
+}
+.gen.waiting span {
+  color: var(--mn-text-on-hero);
+  opacity: 0.85;
+}
+.gen-pill {
+  display: none;
+}
+
 /* O bloco-âncora do rodapé da barra, como o canvas o desenha. */
 .status {
   background: var(--mn-surface-raised);
@@ -256,6 +291,26 @@
     letter-spacing: -0.02em;
     color: var(--mn-text);
     text-decoration: none;
+  }
+  .gen-pill {
+    display: inline-flex;
+    align-items: center;
+    margin-left: auto;
+    margin-right: 8px;
+    padding: 6px 12px;
+    border: 1px solid var(--mn-line);
+    border-radius: var(--mn-radius-pill);
+    background: var(--mn-surface-raised);
+    color: var(--mn-text-muted);
+    font-size: 12.5px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .gen-pill.waiting {
+    border-color: transparent;
+    background: var(--mn-ai);
+    color: var(--mn-text-on-hero);
+    font-weight: 500;
   }
   .sync-chip {
     display: inline-flex;
