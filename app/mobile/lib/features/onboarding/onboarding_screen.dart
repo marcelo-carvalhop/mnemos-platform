@@ -646,7 +646,7 @@ class _Option extends StatelessWidget {
 // 16 — a geração grátis
 // ---------------------------------------------------------------------------
 
-class _FreeGeneration extends StatelessWidget {
+class _FreeGeneration extends ConsumerWidget {
   const _FreeGeneration({
     required this.subject,
     required this.busy,
@@ -660,17 +660,23 @@ class _FreeGeneration extends StatelessWidget {
   final VoidCallback onSkip;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Beta: quem tem conta gera sem cota. Falar em "uma geração" aqui seria
+    // ensinar uma regra que não vale.
+    final beta = ref.watch(quotaProvider).valueOrNull?.plan == 'beta';
     return _Page(
       children: [
         const SizedBox(height: 30),
-        const Text('Sua geração grátis', style: MnemosText.screenTitleWrapped),
+        Text(beta ? 'Gerações à vontade' : 'Sua geração grátis',
+            style: MnemosText.screenTitleWrapped),
         const SizedBox(height: 12),
         // §7.7.1 — it is one per lifetime, and it does not expire. Spending it
         // without saying so is taking something the user did not know they
         // had.
         Text(
-          'Você tem uma geração por IA para usar quando quiser. Ela não expira.',
+          beta
+              ? 'Durante o beta, você gera cards por IA sem limite. Comece por aqui.'
+              : 'Você tem uma geração por IA para usar quando quiser. Ela não expira.',
           style: MnemosText.bodyLong.copyWith(fontSize: 15, color: MnemosColors.muted),
         ),
         const SizedBox(height: 26),
@@ -693,8 +699,10 @@ class _FreeGeneration extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        const Text(
-          'Ou guarde para fotografar seu caderno depois — costuma impressionar mais.',
+        Text(
+          beta
+              ? 'Depois, dá para gerar também de um texto, de um PDF ou da foto do caderno.'
+              : 'Ou guarde para fotografar seu caderno depois — costuma impressionar mais.',
           style: TextStyle(fontSize: 12.5, height: 1.5, color: MnemosColors.faint),
         ),
         const Spacer(),
@@ -705,7 +713,10 @@ class _FreeGeneration extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         // A real second option, given the same weight the copy claims it has.
-        OutlinedButton(onPressed: busy ? null : onSkip, child: const Text('Guardar para depois')),
+        OutlinedButton(
+          onPressed: busy ? null : onSkip,
+          child: Text(beta ? 'Agora não' : 'Guardar para depois'),
+        ),
         const SizedBox(height: 6),
         const Center(
           child: Text(

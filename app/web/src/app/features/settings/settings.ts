@@ -106,6 +106,7 @@ export class Settings {
   protected readonly planLine = computed(() => {
     const plan = this.plan();
     if (plan === null) return 'Verificando…';
+    if (plan === 'beta') return 'Beta · gerações por IA ilimitadas enquanto o beta durar.';
     if (plan !== 'free') return `Plano ${plan}. Gerações liberadas.`;
     const left = this.remaining() ?? 0;
     return left > 0

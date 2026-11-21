@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # address: anonymous device accounts are refused, and so is any request
     # from an account without one. Compared case-insensitively.
     invite_code: str = ""
+    # Beta: accounts with an email generate without a quota (plan "beta").
+    # Spend is capped outside the app, in the Anthropic console; a monthly
+    # ceiling per account still stops a runaway client.
+    beta_unlimited_generation: bool = False
 
     # Login waits for the address to answer the link we send. Off in tests and
     # local development, where the link is only logged.

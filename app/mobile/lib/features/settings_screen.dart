@@ -163,6 +163,7 @@ class SettingsScreen extends ConsumerWidget {
                   detail: switch (quota.valueOrNull) {
                     null => 'Verificando…',
                     (remaining: -1, limit: _, plan: _) => 'Sem conexão',
+                    (remaining: _, limit: _, plan: 'beta') => 'Ilimitadas no beta',
                     (remaining: 0, limit: _, plan: _) =>
                       'Sua geração grátis já foi usada',
                     (remaining: final r, limit: final l, plan: _) =>

@@ -704,6 +704,8 @@ class _QuotaCard extends StatelessWidget {
     // chutar nem a favor nem contra o usuário.
     final unknown = value == null || value.remaining < 0;
     final remaining = unknown ? null : value.remaining;
+    // Beta: sem cota para quem tem conta; um número de 10 mil seria ruído.
+    final beta = !unknown && value.plan == 'beta';
 
     return SurfaceCard(
       radius: MnemosRadii.control,
@@ -730,8 +732,10 @@ class _QuotaCard extends StatelessWidget {
                 Text(
                   unknown
                       ? 'Cota desconhecida'
-                      : plural(remaining!, 'geração grátis restante',
-                          'gerações grátis restantes'),
+                      : beta
+                          ? 'Gerações ilimitadas no beta'
+                          : plural(remaining!, 'geração grátis restante',
+                              'gerações grátis restantes'),
                   style: MnemosText.labelSmall.copyWith(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
@@ -742,7 +746,9 @@ class _QuotaCard extends StatelessWidget {
                 Text(
                   unknown
                       ? 'Sem conexão com o servidor agora.'
-                      : 'Assinar remove o limite.',
+                      : beta
+                          ? 'Use à vontade enquanto o beta durar.'
+                          : 'Assinar remove o limite.',
                   style: MnemosText.caption,
                 ),
               ],

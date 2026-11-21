@@ -26,7 +26,8 @@ class SubscriptionScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final quota = ref.watch(quotaProvider);
     final plan = quota.valueOrNull?.plan ?? 'free';
-    final paying = plan != 'free' && plan != 'unknown';
+    final beta = plan == 'beta';
+    final paying = plan != 'free' && plan != 'unknown' && !beta;
 
     return Scaffold(
       
@@ -48,7 +49,7 @@ class SubscriptionScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  paying ? 'Assinatura ativa' : 'Plano grátis',
+                  paying ? 'Assinatura ativa' : (beta ? 'Beta' : 'Plano grátis'),
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w500,
@@ -61,6 +62,8 @@ class SubscriptionScreen extends ConsumerWidget {
                     null => 'Verificando…',
                     (remaining: -1, limit: _, plan: _) =>
                       'Sem conexão — não dá para confirmar agora.',
+                    (remaining: _, limit: _, plan: 'beta') =>
+                      'Gerações por IA ilimitadas enquanto o beta durar.',
                     (remaining: 0, limit: _, plan: _) =>
                       'Sua geração grátis já foi usada.',
                     (remaining: final r, limit: final l, plan: _) => r == 1

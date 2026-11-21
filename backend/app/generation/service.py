@@ -77,7 +77,15 @@ def enqueue(
     reservation_id = secrets.token_hex(18)
 
     # Raises QuotaExhausted / TooManyJobsInFlight before anything is written.
-    quota.reserve(session, user_id, reservation_id=reservation_id, at=now)
+    plan = quota.plan_for(session, user_id)
+    quota.reserve(
+        session,
+        user_id,
+        reservation_id=reservation_id,
+        plan=plan,
+        limit_count=quota.limit_for(plan),
+        at=now,
+    )
 
     job = GenerationJob(
         id=job_id,
