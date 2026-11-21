@@ -2,6 +2,7 @@
 
 #include <ArduinoJson.h>
 #include <WiFi.h>
+#include <vector>
 #include <esp_system.h>
 
 #include "config.h"
@@ -9,6 +10,7 @@
 #include "network_service.h"
 #include "storage.h"
 #include "sync_codec.h"
+#include "terminal_identity.h"
 #include "time_service.h"
 
 LocalLinkService::LocalLinkService(Storage& storage,
@@ -43,17 +45,11 @@ bool LocalLinkService::start(LocalLinkMode mode) {
 
     mode_ = mode;
 
-    const uint64_t mac =
-        ESP.getEfuseMac();
-
     const String suffix =
-        makeHex(
-            static_cast<uint32_t>(
-                mac & 0xFFFFFFU),
-            6);
+        TerminalIdentity::macSuffix();
 
     deviceId_ =
-        "T5S3-" + suffix;
+        TerminalIdentity::deviceId();
 
     token_ =
         makeHex(
@@ -63,46 +59,19 @@ bool LocalLinkService::start(LocalLinkMode mode) {
             esp_random(),
             8);
 
-    lanTransport_ =
-        network_.connected() &&
-        WiFi.localIP() !=
-            IPAddress(
-                0,
-                0,
-                0,
-                0);
+    // O app sempre entra na rede temporária indicada no QR (ssid/pwd) antes
+    // de falar com o terminal. Anunciar a rede da casa com senha vazia fazia
+    // o Android tentar uma rede aberta e o pareamento falhava; por isso o
+    // QR sempre aponta para o SoftAP. Com o STA conectado o rádio opera em
+    // AP+STA e a conexão atual é preservada.
+    lanTransport_ = false;
 
     radioPrepared_ = false;
 
     String localHost;
     String transport;
 
-    if (lanTransport_) {
-        transport = "lan";
-
-        ssid_ =
-            network_.ssid();
-
-        password_ = "";
-
-        localHost =
-            WiFi.localIP().
-                toString();
-
-        Serial.printf(
-            "[local-link] LAN provisioning: ssid=%s host=%s mode=%d status=%d heap=%u\n",
-            ssid_.c_str(),
-            localHost.c_str(),
-            static_cast<int>(
-                WiFi.getMode()),
-            static_cast<int>(
-                WiFi.status()),
-            static_cast<unsigned>(
-                ESP.getFreeHeap()));
-
-        // Intentionally do not call WiFi.mode(), WiFi.disconnect(),
-        // prepareProvisioning() or softAP() here.
-    } else {
+    {
         transport = "ap";
 
         ssid_ =
@@ -199,31 +168,33 @@ bool LocalLinkService::start(LocalLinkMode mode) {
             ? "provision"
             : "sync";
 
-    qrPayload_ =
-        "mnemos://local?v=" +
-        String(
-            Config::
-                DEVICE_PROTOCOL_VERSION) +
-        "&mode=" +
-        modeText +
-        "&transport=" +
-        transport +
-        "&id=" +
-        deviceId_ +
-        "&ssid=" +
-        ssid_ +
-        "&pwd=" +
-        password_ +
-        "&host=" +
-        localHost +
-        "&token=" +
-        token_ +
-        "&model=" +
-        String(
-            Config::DEVICE_MODEL) +
-        "&fw=" +
-        String(
-            Config::APP_VERSION);
+    // O QR é desenhado na versão 8 com correção L: cabem no máximo 192
+    // bytes. Acima disso a biblioteca gera um código corrompido sem avisar
+    // (o payload antigo, com "transport", tinha 195 bytes no modo SoftAP e
+    // não era lido pelo app). "transport" sai: o app não usa esse campo.
+    constexpr size_t QR_MAX_BYTES = 192U;
+
+    const String head =
+        "mnemos://pair?v=" +
+        String(Config::DEVICE_PROTOCOL_VERSION) +
+        "&mode=" + modeText +
+        "&id=" + deviceId_ +
+        "&ssid=" + ssid_ +
+        "&pwd=" + password_ +
+        "&host=" + localHost +
+        "&token=" + token_;
+
+    const String model = "&model=" + String(Config::DEVICE_MODEL);
+    const String firmware = "&fw=" + String(Config::APP_VERSION);
+
+    qrPayload_ = head + model + firmware;
+    if (qrPayload_.length() > QR_MAX_BYTES) qrPayload_ = head + firmware;  // app assume modelo genérico
+    if (qrPayload_.length() > QR_MAX_BYTES) qrPayload_ = head;
+
+    Serial.printf(
+        "[local-link] QR %u bytes (limite %u)\n",
+        static_cast<unsigned>(qrPayload_.length()),
+        static_cast<unsigned>(QR_MAX_BYTES));
 
     if (!routesConfigured_) {
         configureRoutes();
@@ -235,6 +206,7 @@ bool LocalLinkService::start(LocalLinkMode mode) {
     active_ = true;
     completeRequested_ = false;
     libraryUpdated_ = false;
+    provisioned_ = false;
     startedAtMs_ = millis();
 
     Serial.printf(
@@ -342,6 +314,12 @@ bool LocalLinkService::consumeLibraryUpdated() {
     return value;
 }
 
+bool LocalLinkService::consumeProvisioned() {
+    const bool value = provisioned_;
+    provisioned_ = false;
+    return value;
+}
+
 bool LocalLinkService::authorized() {
     return server_.hasArg("token") && server_.arg("token") == token_;
 }
@@ -384,6 +362,25 @@ void LocalLinkService::sendInfo() {
     doc["clockTrusted"] = clock_.trusted();
     doc["wifiEnabled"] = network_.enabled();
     doc["wifiConnected"] = network_.connected();
+    doc["backendPaired"] =
+        network_.backendUrl().length() > 0 && network_.deviceToken().length() > 0;
+    if (network_.ssid().length() > 0) doc["infrastructureSsid"] = network_.ssid();
+    // O app usa deckIds como "estado observado" logo depois do pareamento.
+    JsonArray deckIds = doc["deckIds"].to<JsonArray>();
+    if (storage_.libraryFromBackend()) {
+        for (size_t i = 0; i < cardCount_; ++i) {
+            const String& deckId = cards_[i].deckId;
+            if (deckId.length() == 0) continue;
+            bool exists = false;
+            for (JsonVariantConst value : deckIds) {
+                if (deckId == value.as<const char*>()) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists && deckIds.size() < 32) deckIds.add(deckId);
+        }
+    }
     doc["features"]["wifiProvisioning"] = true;
     doc["features"]["knownNetworks"] = true;
     doc["features"]["directWifiSync"] = true;
@@ -486,6 +483,10 @@ void LocalLinkService::provision() {
         server_.send(422, "application/json", "{\"error\":\"" + network_.lastError() + "\"}");
         return;
     }
+    provisioned_ = true;
+    Serial.printf("[local-link] perfil %s gravado; backend=%s\n",
+                  profile.ssid.c_str(),
+                  backend.length() > 0 ? backend.c_str() : "(mantido)");
     server_.send(200, "application/json", "{\"ok\":true,\"stored\":true}");
 }
 
@@ -537,6 +538,39 @@ void LocalLinkService::acknowledgeReviews() {
         return;
     }
     if (!requireMode(LocalLinkMode::DirectSync)) return;
+
+    // Confirmação seletiva: {"ids":[...]} remove só o que o app gravou.
+    // Sem corpo, mantém o comportamento antigo (apaga o outbox inteiro).
+    JsonDocument body;
+    const String raw = server_.arg("plain");
+    if (raw.length() > 0 && !deserializeJson(body, raw) && body["ids"].is<JsonArrayConst>()) {
+        std::vector<String> lines;
+        storage_.loadReviewOutboxLines(lines);
+        std::vector<String> keep;
+        uint16_t removed = 0;
+        for (const String& line : lines) {
+            JsonDocument row;
+            String id;
+            if (!deserializeJson(row, line)) id = row["id"] | "";
+            bool acknowledged = false;
+            for (JsonVariantConst value : body["ids"].as<JsonArrayConst>()) {
+                if (id.length() > 0 && id == value.as<const char*>()) {
+                    acknowledged = true;
+                    break;
+                }
+            }
+            if (acknowledged) ++removed;
+            else keep.push_back(line);
+        }
+        if (!storage_.rewriteReviewOutbox(keep)) {
+            server_.send(500, "application/json", "{\"error\":\"storage_failed\"}");
+            return;
+        }
+        server_.send(200, "application/json",
+                     "{\"ok\":true,\"removed\":" + String(removed) + ",\"pending\":" + String(keep.size()) + "}");
+        return;
+    }
+
     if (!storage_.clearReviewOutbox()) {
         server_.send(500, "application/json", "{\"error\":\"storage_failed\"}");
         return;

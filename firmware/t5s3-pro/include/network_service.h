@@ -52,6 +52,11 @@ public:
                       uint32_t syncIntervalSeconds);
     bool forgetProfile(const String& profileId);
 
+    // Credencial do backend independente do perfil Wi-Fi (console serial,
+    // ferramenta de demonstração). URL vazia + token vazio desvincula.
+    bool setBackend(const String& backendUrl, const String& deviceToken);
+    void clearBackend();
+
     void prepareProvisioning();
     void finishProvisioning();
     bool reconnect(uint32_t timeoutMs = 12000U);

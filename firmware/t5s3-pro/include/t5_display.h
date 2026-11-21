@@ -43,6 +43,8 @@ public:
         bool enabled,
         bool connected);
 
+    // Ciclos preto/branco balanceados; deixa o painel branco e
+    // sincronizado. A próxima tela é desenhada a partir do branco.
     void deepClean();
 
     void setOrientation(
@@ -189,7 +191,21 @@ private:
 
     void clearBuffer();
     void ensurePower();
-    void refreshFull();
+    void releasePower();
+
+    /*
+     * Publica o canvas no painel.
+     *
+     * screenKey identifica a tela; por padrão é o nome da função
+     * show*() chamadora. Troca de tela => transição completa com
+     * flash em todo o painel. Mesma tela com mudança pequena =>
+     * atualização parcial sem flash. Ver docs/EPD_REFRESH.md.
+     */
+    void refreshFull(
+        const char* screenKey = __builtin_FUNCTION());
+
+    // Caminho anterior (GC16 embutido), com EPD_USE_LEGACY_REFRESH.
+    void refreshLegacy();
 
     void putPixel(
         int32_t x,

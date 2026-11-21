@@ -33,6 +33,9 @@ public:
     LocalLinkMode mode() const { return mode_; }
     bool consumeLibraryUpdated();
 
+    // true uma vez depois que o app gravou rede e/ou credencial do backend.
+    bool consumeProvisioned();
+
     const String& qrPayload() const { return qrPayload_; }
     const String& ssid() const { return ssid_; }
     const String& password() const { return password_; }
@@ -56,6 +59,7 @@ private:
     bool libraryUpdated_ = false;
     bool lanTransport_ = false;
     bool radioPrepared_ = false;
+    bool provisioned_ = false;
     uint32_t startedAtMs_ = 0;
 
     String deviceId_;

@@ -4,6 +4,10 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <algorithm>
+#include <cstring>
+#include <string>
+
+#include "platform_sync_config.h"
 
 namespace {
 constexpr char LIBRARY_PATH[] = "/library.json";
@@ -18,6 +22,60 @@ constexpr char SESSION_PATH[] = "/session.json";
 constexpr char TEMP_SESSION_PATH[] = "/session.tmp";
 constexpr char SYNC_META_PATH[] = "/sync_meta.json";
 constexpr char TEMP_SYNC_META_PATH[] = "/sync_meta.tmp";
+constexpr char TEMP_REVIEW_OUTBOX_PATH[] = "/review_outbox.tmp";
+constexpr char REJECTED_REVIEWS_PATH[] = "/review_rejected.ndjson";
+constexpr char REJECTED_REVIEWS_OLD_PATH[] = "/review_rejected.old";
+
+// Extrai o valor de "id" de uma linha NDJSON sem desserializar a linha
+// inteira. Linhas são objetos planos cujo "id" é uma string sem escapes (UUID
+// ou id local). Tolera espaços em volta de ':' (linhas gravadas por outras
+// ferramentas).
+std::string lineId(const char* line, size_t length) {
+    static const char KEY[] = "\"id\"";
+    const size_t keyLength = sizeof(KEY) - 1;
+    for (size_t i = 0; i + keyLength <= length; ++i) {
+        if (memcmp(line + i, KEY, keyLength) != 0) continue;
+        size_t p = i + keyLength;
+        while (p < length && (line[p] == ' ' || line[p] == '\t')) ++p;
+        if (p >= length || line[p] != ':') continue;
+        ++p;
+        while (p < length && (line[p] == ' ' || line[p] == '\t')) ++p;
+        if (p >= length || line[p] != '"') continue;
+        const size_t start = p + 1;
+        size_t end = start;
+        while (end < length && line[end] != '"') ++end;
+        if (end >= length) return std::string();
+        return std::string(line + start, end - start);
+    }
+    return std::string();
+}
+
+std::string lineId(const String& line) {
+    return lineId(line.c_str(), line.length());
+}
+
+uint64_t idHash(const std::string& id) {
+    uint64_t hash = 14695981039346656037ULL;  // FNV-1a 64
+    for (unsigned char c : id) {
+        hash ^= c;
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+template <typename Fn>
+void forEachLine(const String& text, Fn&& fn) {
+    const char* data = text.c_str();
+    const size_t length = text.length();
+    size_t start = 0;
+    while (start < length) {
+        const char* newline = static_cast<const char*>(
+            memchr(data + start, '\n', length - start));
+        const size_t end = newline ? static_cast<size_t>(newline - data) : length;
+        if (end > start) fn(data + start, end - start);
+        start = end + 1;
+    }
+}
 }
 
 bool Storage::begin() {
@@ -360,6 +418,10 @@ bool Storage::appendReviewToPath(const char* path, const ReviewEvent& event) {
 
 bool Storage::appendReview(const ReviewEvent& event) {
     const bool historyOk = appendReviewToPath(REVIEW_HISTORY_PATH, event);
+    // Contrato §5.2: só modos que alimentam o scheduler geram revisão na
+    // conta. Prática livre continua no histórico local (métricas, replay
+    // ignora) e não sobe para app/web.
+    if (!event.affectsSchedule) return historyOk;
     const bool outboxOk = appendReviewToPath(REVIEW_OUTBOX_PATH, event);
     return historyOk && outboxOk;
 }
@@ -370,7 +432,13 @@ String Storage::readTextFile(const char* path) const {
     if (!file) return String();
     String data;
     data.reserve(file.size() + 16);
-    while (file.available()) data += static_cast<char>(file.read());
+    // Leitura em blocos: byte a byte custava segundos em históricos longos.
+    uint8_t buffer[512];
+    while (file.available()) {
+        const size_t n = file.read(buffer, sizeof(buffer));
+        if (n == 0) break;
+        data.concat(reinterpret_cast<const char*>(buffer), n);
+    }
     file.close();
     return data;
 }
@@ -385,47 +453,150 @@ bool Storage::reviewHistoryContainsId(
         return false;
     }
 
-    const String history =
-        reviewHistoryNdjson();
+    const std::string wanted(id.c_str());
+    bool found = false;
+    forEachLine(reviewHistoryNdjson(), [&](const char* line, size_t length) {
+        if (!found && lineId(line, length) == wanted) found = true;
+    });
+    return found;
+}
 
-    int start = 0;
 
-    while (
-        start <
-        static_cast<int>(history.length())
-    ) {
-        int end =
-            history.indexOf('\n', start);
+bool Storage::appendUniqueLines(
+    const char* path,
+    const std::vector<String>& lines,
+    uint16_t& inserted) {
 
-        if (end < 0) {
-            end =
-                static_cast<int>(
-                    history.length());
+    inserted = 0;
+    if (lines.empty()) return true;
+
+    // Hash de 64 bits por id num vetor ordenado: alguns milhares de revisões
+    // custam poucos kB num único bloco (vai para a PSRAM), em vez de milhares
+    // de alocações pequenas na RAM interna.
+    std::vector<uint64_t> known;
+    forEachLine(readTextFile(path), [&](const char* line, size_t length) {
+        const std::string id = lineId(line, length);
+        if (!id.empty()) known.push_back(idHash(id));
+    });
+    std::sort(known.begin(), known.end());
+
+    File file = LittleFS.open(path, "a");
+    if (!file) return false;
+
+    bool ok = true;
+    for (const String& line : lines) {
+        const std::string id = lineId(line);
+        if (id.empty()) continue;
+        const uint64_t hash = idHash(id);
+        const auto position = std::lower_bound(known.begin(), known.end(), hash);
+        if (position != known.end() && *position == hash) continue;  // já existe (retry/queda)
+        known.insert(position, hash);
+        const size_t written = file.print(line);
+        file.print('\n');
+        if (written != line.length()) {
+            ok = false;
+            break;
         }
+        ++inserted;
+    }
+    file.flush();
+    file.close();
+    return ok;
+}
 
-        const String line =
-            history.substring(start, end);
 
-        start = end + 1;
+bool Storage::appendRemoteReviewLines(
+    const std::vector<String>& lines,
+    uint16_t& inserted) {
 
-        if (line.length() == 0) {
-            continue;
+    return appendUniqueLines(REVIEW_HISTORY_PATH, lines, inserted);
+}
+
+
+bool Storage::appendRemoteProgressResetLines(
+    const std::vector<String>& lines,
+    uint16_t& inserted) {
+
+    return appendUniqueLines(PROGRESS_RESET_HISTORY_PATH, lines, inserted);
+}
+
+
+bool Storage::loadReviewOutboxLines(std::vector<String>& lines) const {
+    lines.clear();
+    forEachLine(reviewOutboxNdjson(), [&](const char* line, size_t length) {
+        String value;
+        value.concat(line, length);
+        value.trim();
+        if (value.length() > 0) lines.push_back(value);
+    });
+    return true;
+}
+
+
+bool Storage::rewriteReviewOutbox(const std::vector<String>& lines) {
+    if (lines.empty()) return clearReviewOutbox();
+
+    File file = LittleFS.open(TEMP_REVIEW_OUTBOX_PATH, "w");
+    if (!file) return false;
+    bool ok = true;
+    for (const String& line : lines) {
+        if (file.print(line) != line.length()) {
+            ok = false;
+            break;
         }
+        file.print('\n');
+    }
+    file.flush();
+    file.close();
+    if (!ok) {
+        LittleFS.remove(TEMP_REVIEW_OUTBOX_PATH);
+        return false;
+    }
+    LittleFS.remove(REVIEW_OUTBOX_PATH);
+    return LittleFS.rename(TEMP_REVIEW_OUTBOX_PATH, REVIEW_OUTBOX_PATH);
+}
 
-        JsonDocument row;
 
-        if (deserializeJson(row, line)) {
-            continue;
-        }
+bool Storage::quarantineReviewLines(
+    const std::vector<String>& lines,
+    const String& reason) {
 
-        if (
-            String(row["id"] | "") == id
-        ) {
-            return true;
+    if (lines.empty()) return true;
+
+    if (LittleFS.exists(REJECTED_REVIEWS_PATH)) {
+        File current = LittleFS.open(REJECTED_REVIEWS_PATH, "r");
+        const size_t size = current ? current.size() : 0;
+        if (current) current.close();
+        if (size > PlatformSync::REJECTED_REVIEWS_MAX_BYTES) {
+            LittleFS.remove(REJECTED_REVIEWS_OLD_PATH);
+            LittleFS.rename(REJECTED_REVIEWS_PATH, REJECTED_REVIEWS_OLD_PATH);
         }
     }
 
-    return false;
+    File file = LittleFS.open(REJECTED_REVIEWS_PATH, "a");
+    if (!file) return false;
+    for (const String& line : lines) {
+        JsonDocument wrapper;
+        wrapper["reason"] = reason;
+        JsonDocument review;
+        if (!deserializeJson(review, line)) {
+            wrapper["review"] = review.as<JsonVariantConst>();
+        } else {
+            wrapper["raw"] = line;
+        }
+        serializeJson(wrapper, file);
+        file.print('\n');
+    }
+    file.flush();
+    file.close();
+    return true;
+}
+
+
+uint16_t Storage::rejectedReviewCount() const {
+    uint16_t count = 0;
+    forEachLine(readTextFile(REJECTED_REVIEWS_PATH), [&](const char*, size_t) { ++count; });
+    return count;
 }
 
 
@@ -434,65 +605,19 @@ bool Storage::appendRemoteReviewJson(
     bool& inserted) {
 
     inserted = false;
-
-    if (line.length() == 0) {
-        return false;
-    }
+    if (line.length() == 0) return false;
 
     JsonDocument row;
+    if (deserializeJson(row, line)) return false;
+    if (String(row["schema"] | "") != "mnemos.review/v2") return false;
+    if (String(row["id"] | "").length() == 0) return false;
 
-    if (deserializeJson(row, line)) {
-        return false;
-    }
-
-    if (
-        String(row["schema"] | "") !=
-        "mnemos.review/v2"
-    ) {
-        return false;
-    }
-
-    const String id =
-        row["id"] | "";
-
-    if (id.length() == 0) {
-        return false;
-    }
-
-    // Necessário para tolerar queda de energia depois de gravar
-    // o evento e antes de persistir o cursor.
-    if (reviewHistoryContainsId(id)) {
-        return true;
-    }
-
-    File file =
-        LittleFS.open(
-            REVIEW_HISTORY_PATH,
-            "a");
-
-    if (!file) {
-        return false;
-    }
-
-    const size_t written =
-        file.print(line);
-
-    file.println();
-    file.flush();
-    file.close();
-
-    inserted =
-        written ==
-        line.length();
-
-    return inserted;
+    uint16_t count = 0;
+    const std::vector<String> lines{line};
+    if (!appendRemoteReviewLines(lines, count)) return false;
+    inserted = count > 0;
+    return true;
 }
-
-
-
-
-
-
 
 
 bool Storage::clearReviewOutbox() {
@@ -501,11 +626,15 @@ bool Storage::clearReviewOutbox() {
 }
 
 uint16_t Storage::pendingReviewCount() const {
-    const String data = reviewOutboxNdjson();
-    if (data.length() == 0) return 0;
     uint16_t count = 0;
-    for (size_t i = 0; i < data.length(); ++i) if (data[i] == '\n') ++count;
-    if (!data.endsWith("\n")) ++count;
+    forEachLine(reviewOutboxNdjson(), [&](const char* line, size_t length) {
+        for (size_t i = 0; i < length; ++i) {
+            if (line[i] != ' ' && line[i] != '\r') {
+                ++count;
+                return;
+            }
+        }
+    });
     return count;
 }
 
@@ -707,97 +836,15 @@ bool Storage::appendRemoteProgressResetJson(
     inserted = false;
 
     JsonDocument row;
+    if (deserializeJson(row, line)) return false;
+    if (String(row["schema"] | "") != "mnemos.progress-reset/v2") return false;
+    if (String(row["id"] | "").length() == 0) return false;
 
-    if (deserializeJson(row, line)) {
-        return false;
-    }
-
-    if (
-        String(row["schema"] | "") !=
-        "mnemos.progress-reset/v2"
-    ) {
-        return false;
-    }
-
-    const String id =
-        row["id"] | "";
-
-    if (id.length() == 0) {
-        return false;
-    }
-
-    // Idempotência local: importante caso haja queda de
-    // energia antes de persistir o cursor.
-    const String history =
-        readTextFile(
-            PROGRESS_RESET_HISTORY_PATH);
-
-    int start = 0;
-
-    while (
-        start <
-        static_cast<int>(
-            history.length())
-    ) {
-        int end =
-            history.indexOf('\n', start);
-
-        if (end < 0) {
-            end =
-                static_cast<int>(
-                    history.length());
-        }
-
-        const String existingLine =
-            history.substring(
-                start,
-                end);
-
-        start = end + 1;
-
-        if (existingLine.length() == 0) {
-            continue;
-        }
-
-        JsonDocument existing;
-
-        if (
-            deserializeJson(
-                existing,
-                existingLine)
-        ) {
-            continue;
-        }
-
-        if (
-            String(existing["id"] | "")
-            == id
-        ) {
-            return true;
-        }
-    }
-
-    File file =
-        LittleFS.open(
-            PROGRESS_RESET_HISTORY_PATH,
-            "a");
-
-    if (!file) {
-        return false;
-    }
-
-    const size_t written =
-        file.print(line);
-
-    file.println();
-    file.flush();
-    file.close();
-
-    inserted =
-        written ==
-        line.length();
-
-    return inserted;
+    uint16_t count = 0;
+    const std::vector<String> lines{line};
+    if (!appendRemoteProgressResetLines(lines, count)) return false;
+    inserted = count > 0;
+    return true;
 }
 
 
@@ -994,10 +1041,82 @@ bool Storage::resetAll() {
         REVIEW_HISTORY_PATH, REVIEW_OUTBOX_PATH, PROGRESS_RESET_HISTORY_PATH, LEGACY_REVIEW_LOG_PATH,
         SESSION_PATH, TEMP_SESSION_PATH,
         SYNC_META_PATH, TEMP_SYNC_META_PATH,
+        TEMP_REVIEW_OUTBOX_PATH, REJECTED_REVIEWS_PATH, REJECTED_REVIEWS_OLD_PATH,
     };
     bool ok = true;
     for (const char* path : paths) {
         if (LittleFS.exists(path)) ok &= LittleFS.remove(path);
     }
     return ok;
+}
+
+
+bool Storage::readSyncMeta(JsonDocument& doc) const {
+    doc.clear();
+    if (!LittleFS.exists(SYNC_META_PATH)) return false;
+    File file = LittleFS.open(SYNC_META_PATH, "r");
+    if (!file) return false;
+    const DeserializationError error = deserializeJson(doc, file);
+    file.close();
+    if (error) {
+        doc.clear();
+        return false;
+    }
+    return true;
+}
+
+
+bool Storage::writeSyncMeta(JsonDocument& doc) {
+    doc["schema"] = "mnemos.local-sync-meta/v2";
+    File file = LittleFS.open(TEMP_SYNC_META_PATH, "w");
+    if (!file) return false;
+    const size_t written = serializeJson(doc, file);
+    file.flush();
+    file.close();
+    if (written == 0) {
+        LittleFS.remove(TEMP_SYNC_META_PATH);
+        return false;
+    }
+    LittleFS.remove(SYNC_META_PATH);
+    return LittleFS.rename(TEMP_SYNC_META_PATH, SYNC_META_PATH);
+}
+
+
+String Storage::syncMetaString(const char* key) const {
+    JsonDocument doc;
+    if (!readSyncMeta(doc)) return String();
+    return String(doc["platform"][key] | "");
+}
+
+
+bool Storage::saveSyncMetaString(const char* key, const String& value) {
+    JsonDocument doc;
+    readSyncMeta(doc);
+    JsonObject platform = doc["platform"].as<JsonObject>();
+    if (platform.isNull()) platform = doc["platform"].to<JsonObject>();
+    if (String(platform[key] | "") == value) return true;
+    platform[key] = value;
+    return writeSyncMeta(doc);
+}
+
+
+bool Storage::libraryFromBackend() const {
+    return syncMetaString("librarySource") == "backend";
+}
+
+
+bool Storage::setLibraryFromBackend(bool value) {
+    return saveSyncMetaString("librarySource", value ? "backend" : "local");
+}
+
+
+bool Storage::resetSyncCursors() {
+    JsonDocument doc;
+    readSyncMeta(doc);
+    doc.remove("reviewsCursor");
+    JsonObject cursors = doc["cursors"].to<JsonObject>();
+    cursors["reviews"] = 0ULL;
+    cursors["progressResets"] = 0ULL;
+    cursors["userSettings"] = 0ULL;
+    return writeSyncMeta(doc);
 }

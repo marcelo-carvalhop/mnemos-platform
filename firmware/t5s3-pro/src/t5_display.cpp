@@ -6,9 +6,14 @@
 #include <memory>
 
 #include "config.h"
+#include "epd_waveform_builder.h"
 #include "hmi_layout.h"
 #include <epdiy.h>
 #include <epd_highlevel.h>
+
+#include <driver/i2c.h>
+#include <esp_heap_caps.h>
+#include <esp_timer.h>
 
 #include <qrcode.h>
 
@@ -20,18 +25,1219 @@ constexpr uint8_t MID_GRAY = 0x55;
 constexpr uint8_t LIGHT_GRAY = 0xAA;
 constexpr uint8_t WHITE = 0xFF;
 
+namespace Wf = EpdWaveformBuilder;
+
 EpdiyHighlevelState gEpdState{};
 bool gEpdReady = false;
-uint32_t gRefreshCount = 0;
-int gEpdTemperature = 20;
 
-const char* refreshModeName(
-    EpdDrawMode mode) {
+/*
+ * ---------------------------------------------------------------
+ * Motor de refresh anti-ghosting (ver docs/EPD_REFRESH.md)
+ * ---------------------------------------------------------------
+ *
+ * O GC16 embutido do epdiy só aciona a grade de linhas/colunas
+ * alteradas e não pisca pixels escuros que continuam escuros
+ * (ex.: fundo dos botões). Restos de rótulos anteriores se
+ * acumulam até a próxima limpeza profunda.
+ *
+ * Aqui o waveform é gerado em RAM a cada update:
+ *   - troca de tela: TODO pixel do painel vai ao preto e ao branco
+ *     com sobre-acionamento em cada extremo, depois ao destino;
+ *   - energia calculada a partir do período de quadro medido e da
+ *     temperatura, nunca abaixo da do GC16 anterior;
+ *   - atualização parcial sem flash só para mudanças pequenas na
+ *     mesma tela;
+ *   - balanço DC exato e quadro neutro final;
+ *   - limpeza profunda periódica e recuperação de underrun;
+ *   - EPD_USE_LEGACY_REFRESH restaura o comportamento anterior.
+ */
+
+enum class RefreshKind : uint8_t {
+    Clean,
+    Partial,
+    FromWhite,
+};
+
+const char* refreshKindName(
+    RefreshKind kind) {
+
+    switch (kind) {
+        case RefreshKind::Clean:
+            return "CLEAN";
+        case RefreshKind::Partial:
+            return "PARTIAL";
+        case RefreshKind::FromWhite:
+            return "FROM-WHITE";
+    }
+
+    return "?";
+}
+
+// Waveform gerado em RAM; um único modo (tipo GC16) com uma faixa
+// de temperatura. A tabela é reescrita antes de cada update.
+uint8_t* gLut = nullptr;
+EpdWaveformPhases gPhases{};
+const EpdWaveformPhases* gPhaseRanges[1] = {&gPhases};
+EpdWaveformMode gMode{};
+const EpdWaveformMode* gModes[1] = {&gMode};
+EpdWaveformTempInterval gTemperatureInterval{};
+EpdWaveform gWaveform{};
+
+struct EngineState {
+    // Período efetivo de um quadro (inclui o intervalo entre
+    // quadros, durante o qual o pixel segue retendo a tensão).
+    uint32_t frameUs = 14000;
+    bool frameMeasured = false;
+
+    uint8_t saturationFrames =
+        Config::EPD_MIN_SATURATION_FRAMES;
+
+    uint8_t overdriveFrames =
+        Config::EPD_MIN_OVERDRIVE_FRAMES;
+
+    int temperatureC =
+        Config::EPD_DEFAULT_TEMPERATURE_C;
+    const char* temperatureSource = "default";
+    bool temperatureRead = false;
+    uint32_t lastTemperatureMs = 0;
+    uint8_t pmicThermistorFailures = 0;
+
+    // 0 = clock padrão do epdiy (desconhecido).
+    uint8_t pixelClockMhz = 0;
+
+    bool panelWhite = false;
+    bool forceClean = false;
+    uint16_t partialsSinceClean = 0;
+    uint16_t cleansSinceDeepClean = 0;
+    uint32_t refreshCount = 0;
+
+    char lastScreen[48] = {0};
+};
+
+EngineState gEngine;
+
+constexpr short PUSH_TIME = 12;
+constexpr int PUSH_DARKEN = 0;
+constexpr int PUSH_LIGHTEN = 1;
+constexpr int PUSH_NEUTRAL = 2;
+
+constexpr uint8_t TPS65185_ADDRESS = 0x68;
+constexpr uint8_t TPS65185_REG_TMST_VALUE = 0x00;
+constexpr uint8_t TPS65185_REG_TMST1 = 0x0D;
+constexpr uint8_t TPS65185_PMIC_THERMISTOR_MAX_FAILURES = 3;
+
+// Fuel gauge BQ27220: Temperature() em 0,1 K, little-endian.
+constexpr uint8_t BQ27220_GAUGE_ADDRESS = 0x55;
+constexpr uint8_t BQ27220_REG_TEMPERATURE = 0x06;
+
+size_t panelPixels() {
+    return
+        static_cast<size_t>(epd_width()) *
+        static_cast<size_t>(epd_height());
+}
+
+size_t panelBytes() {
+    return panelPixels() / 2U;
+}
+
+bool allocateWaveform() {
+    if (gLut != nullptr) {
+        return true;
+    }
+
+    gLut =
+        static_cast<uint8_t*>(
+            heap_caps_malloc(
+                Wf::MAX_LUT_BYTES,
+                MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+
+    if (!gLut) {
+        gLut =
+            static_cast<uint8_t*>(
+                heap_caps_malloc(
+                    Wf::MAX_LUT_BYTES,
+                    MALLOC_CAP_8BIT));
+    }
+
+    if (!gLut) {
+        return false;
+    }
+
+    std::memset(
+        gLut,
+        0,
+        Wf::MAX_LUT_BYTES);
+
+    gPhases.phases = 0;
+    gPhases.luts = gLut;
+    gPhases.phase_times = nullptr;
+
+    gMode.type = MODE_GC16;
+    gMode.temp_ranges = 1;
+    gMode.range_data = gPhaseRanges;
+
+    gTemperatureInterval.min = -40;
+    gTemperatureInterval.max = 85;
+
+    gWaveform.num_modes = 1;
+    gWaveform.num_temp_ranges = 1;
+    gWaveform.mode_data = gModes;
+    gWaveform.temp_intervals = &gTemperatureInterval;
+
+    return true;
+}
+
+// ---------------------------------------------------------------
+// Temperatura
+// ---------------------------------------------------------------
+
+esp_err_t tpsWriteRegister(
+    uint8_t reg,
+    uint8_t value) {
+
+    i2c_cmd_handle_t cmd =
+        i2c_cmd_link_create();
+
+    if (!cmd) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    i2c_master_start(cmd);
+    i2c_master_write_byte(
+        cmd,
+        static_cast<uint8_t>(
+            (TPS65185_ADDRESS << 1) | I2C_MASTER_WRITE),
+        true);
+    i2c_master_write_byte(cmd, reg, true);
+    i2c_master_write_byte(cmd, value, true);
+    i2c_master_stop(cmd);
+
+    const esp_err_t err =
+        i2c_master_cmd_begin(
+            I2C_NUM_0,
+            cmd,
+            pdMS_TO_TICKS(25));
+
+    i2c_cmd_link_delete(cmd);
+    return err;
+}
+
+esp_err_t tpsReadRegister(
+    uint8_t reg,
+    uint8_t& value) {
+
+    // Mesmo protocolo do driver tps65185 do epdiy (STOP entre a
+    // escrita do registrador e a leitura), mas sem abortar em erro.
+    i2c_cmd_handle_t cmd =
+        i2c_cmd_link_create();
+
+    if (!cmd) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    i2c_master_start(cmd);
+    i2c_master_write_byte(
+        cmd,
+        static_cast<uint8_t>(
+            (TPS65185_ADDRESS << 1) | I2C_MASTER_WRITE),
+        true);
+    i2c_master_write_byte(cmd, reg, true);
+    i2c_master_stop(cmd);
+
+    esp_err_t err =
+        i2c_master_cmd_begin(
+            I2C_NUM_0,
+            cmd,
+            pdMS_TO_TICKS(25));
+
+    i2c_cmd_link_delete(cmd);
+
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    cmd = i2c_cmd_link_create();
+
+    if (!cmd) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    i2c_master_start(cmd);
+    i2c_master_write_byte(
+        cmd,
+        static_cast<uint8_t>(
+            (TPS65185_ADDRESS << 1) | I2C_MASTER_READ),
+        true);
+    i2c_master_read_byte(
+        cmd,
+        &value,
+        I2C_MASTER_NACK);
+    i2c_master_stop(cmd);
+
+    err =
+        i2c_master_cmd_begin(
+            I2C_NUM_0,
+            cmd,
+            pdMS_TO_TICKS(25));
+
+    i2c_cmd_link_delete(cmd);
+    return err;
+}
+
+// Exige o TPS65185 acordado (após epd_poweron()).
+bool readPmicThermistor(
+    int& celsius) {
+
+    if (
+        tpsWriteRegister(
+            TPS65185_REG_TMST1,
+            0x80) != ESP_OK
+    ) {
+        return false;
+    }
+
+    const int64_t deadline =
+        esp_timer_get_time() + 30000;
+
+    uint8_t status = 0;
+    bool done = false;
+
+    while (esp_timer_get_time() < deadline) {
+        if (
+            tpsReadRegister(
+                TPS65185_REG_TMST1,
+                status) != ESP_OK
+        ) {
+            return false;
+        }
+
+        if (status & 0x20U) {
+            done = true;
+            break;
+        }
+
+        delayMicroseconds(500);
+    }
+
+    if (!done) {
+        return false;
+    }
+
+    uint8_t raw = 0;
+
+    if (
+        tpsReadRegister(
+            TPS65185_REG_TMST_VALUE,
+            raw) != ESP_OK
+    ) {
+        return false;
+    }
+
+    celsius =
+        static_cast<int8_t>(raw);
+
+    // Sem NTC no pino TS a leitura fica fora de faixa.
+    return
+        celsius >= -10 &&
+        celsius <= 60;
+}
+
+/*
+ * Temperatura do BQ27220 lida diretamente no barramento I2C do
+ * sistema (o mesmo driver IDF instalado por Wire e reutilizado
+ * pelo epdiy). Não depende do BatteryService.
+ */
+bool readGaugeTemperature(
+    float& celsius) {
+
+    i2c_cmd_handle_t cmd =
+        i2c_cmd_link_create();
+
+    if (!cmd) {
+        return false;
+    }
+
+    uint8_t data[2] = {0xFF, 0xFF};
+
+    i2c_master_start(cmd);
+    i2c_master_write_byte(
+        cmd,
+        static_cast<uint8_t>(
+            (BQ27220_GAUGE_ADDRESS << 1) | I2C_MASTER_WRITE),
+        true);
+    i2c_master_write_byte(
+        cmd,
+        BQ27220_REG_TEMPERATURE,
+        true);
+    i2c_master_start(cmd);
+    i2c_master_write_byte(
+        cmd,
+        static_cast<uint8_t>(
+            (BQ27220_GAUGE_ADDRESS << 1) | I2C_MASTER_READ),
+        true);
+    i2c_master_read_byte(
+        cmd,
+        &data[0],
+        I2C_MASTER_ACK);
+    i2c_master_read_byte(
+        cmd,
+        &data[1],
+        I2C_MASTER_NACK);
+    i2c_master_stop(cmd);
+
+    const esp_err_t err =
+        i2c_master_cmd_begin(
+            I2C_NUM_0,
+            cmd,
+            pdMS_TO_TICKS(25));
+
+    i2c_cmd_link_delete(cmd);
+
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    const uint16_t raw =
+        static_cast<uint16_t>(
+            data[0] |
+            (static_cast<uint16_t>(data[1]) << 8));
+
+    if (
+        raw == 0xFFFFU ||
+        raw == 0U
+    ) {
+        return false;
+    }
+
+    celsius =
+        static_cast<float>(raw) / 10.0f -
+        273.15f;
 
     return
-        mode == MODE_GC16
-            ? "GC16"
-            : "GL16";
+        std::isfinite(celsius) &&
+        celsius >= -20.0f &&
+        celsius <= 70.0f;
+}
+
+void refreshTemperature(
+    bool force) {
+
+    const uint32_t now =
+        millis();
+
+    // Sem nenhuma fonte válida (ex.: gauge ainda inicializando no
+    // boot), tenta de novo bem antes do intervalo normal.
+    const uint32_t interval =
+        std::strcmp(
+            gEngine.temperatureSource,
+            "default") == 0
+            ? 30000U
+            : Config::EPD_TEMPERATURE_REFRESH_MS;
+
+    if (
+        !force &&
+        gEngine.temperatureRead &&
+        now - gEngine.lastTemperatureMs <
+            interval
+    ) {
+        return;
+    }
+
+    gEngine.temperatureRead = true;
+    gEngine.lastTemperatureMs = now;
+
+    const int previous =
+        gEngine.temperatureC;
+
+    int pmic = 0;
+    bool pmicValid = false;
+
+    if (
+        Config::EPD_USE_PMIC_THERMISTOR &&
+        gEngine.pmicThermistorFailures <
+            TPS65185_PMIC_THERMISTOR_MAX_FAILURES
+    ) {
+        pmicValid =
+            readPmicThermistor(
+                pmic);
+
+        if (pmicValid) {
+            gEngine.pmicThermistorFailures = 0;
+        } else if (
+            ++gEngine.pmicThermistorFailures >=
+            TPS65185_PMIC_THERMISTOR_MAX_FAILURES
+        ) {
+            Serial.println(
+                "[display] termistor TPS65185 indisponivel; "
+                "usando gauge/padrao");
+        }
+    }
+
+    float gaugeC = 0.0f;
+
+    const bool gaugeValid =
+        readGaugeTemperature(
+            gaugeC);
+
+    const int gauge =
+        static_cast<int>(
+            lroundf(
+                gaugeC));
+
+    /*
+     * Termistor ausente pode produzir um valor plausível porém
+     * fixo. Se discordar muito do gauge, confiamos no gauge.
+     */
+    if (
+        pmicValid &&
+        (
+            !gaugeValid ||
+            std::abs(pmic - gauge) <= 12
+        )
+    ) {
+        gEngine.temperatureC = pmic;
+        gEngine.temperatureSource = "pmic";
+    } else if (gaugeValid) {
+        gEngine.temperatureC = gauge;
+        gEngine.temperatureSource = "gauge";
+    } else {
+        gEngine.temperatureC =
+            Config::EPD_DEFAULT_TEMPERATURE_C;
+        gEngine.temperatureSource = "default";
+    }
+
+    if (
+        force ||
+        gEngine.temperatureC != previous
+    ) {
+        char pmicText[8] = "n/d";
+        char gaugeText[12] = "n/d";
+
+        if (pmicValid) {
+            snprintf(
+                pmicText,
+                sizeof(pmicText),
+                "%d",
+                pmic);
+        }
+
+        if (gaugeValid) {
+            snprintf(
+                gaugeText,
+                sizeof(gaugeText),
+                "%.1f",
+                static_cast<double>(
+                    gaugeC));
+        }
+
+        Serial.printf(
+            "[display] temperatura %dC fonte=%s pmic=%s gauge=%s\n",
+            gEngine.temperatureC,
+            gEngine.temperatureSource,
+            pmicText,
+            gaugeText);
+    }
+}
+
+/*
+ * Fator de acionamento pela temperatura. A mobilidade das
+ * partículas cai com o frio (viscosidade). Acima de 20 °C o fator
+ * é 1: calor nunca reduz a energia abaixo da referência.
+ */
+float driveFactorForTemperature(
+    int celsius) {
+
+    if (celsius >= 20) {
+        return 1.0f;
+    }
+
+    if (celsius >= 10) {
+        return
+            1.0f +
+            0.05f *
+                static_cast<float>(
+                    20 - celsius);
+    }
+
+    return
+        std::min(
+            3.0f,
+            1.5f +
+                0.10f *
+                static_cast<float>(
+                    10 - celsius));
+}
+
+uint8_t framesForDrive(
+    uint16_t driveMs,
+    uint8_t minimum,
+    uint8_t maximum) {
+
+    const float frameMs =
+        std::max(
+            1.0f,
+            static_cast<float>(
+                gEngine.frameUs) /
+                1000.0f);
+
+    const float frames =
+        static_cast<float>(driveMs) /
+        frameMs *
+        driveFactorForTemperature(
+            gEngine.temperatureC);
+
+    // Piso aplicado depois do fator: nunca abaixo da referência.
+    return
+        static_cast<uint8_t>(
+            std::max<int>(
+                minimum,
+                std::min<int>(
+                    maximum,
+                    static_cast<int>(
+                        std::ceil(
+                            frames)))));
+}
+
+uint8_t targetSaturationFrames() {
+    return
+        framesForDrive(
+            Config::EPD_SATURATION_DRIVE_MS,
+            std::max<uint8_t>(
+                Wf::MIN_SATURATION_FRAMES,
+                Config::EPD_MIN_SATURATION_FRAMES),
+            std::min<uint8_t>(
+                Wf::MAX_SATURATION_FRAMES,
+                Config::EPD_MAX_SATURATION_FRAMES));
+}
+
+uint8_t targetOverdriveFrames() {
+    if (Config::EPD_RAIL_OVERDRIVE_MS == 0) {
+        return 0;
+    }
+
+    return
+        framesForDrive(
+            Config::EPD_RAIL_OVERDRIVE_MS,
+            Config::EPD_MIN_OVERDRIVE_FRAMES,
+            std::min<uint8_t>(
+                Wf::MAX_OVERDRIVE_FRAMES,
+                Config::EPD_MAX_OVERDRIVE_FRAMES));
+}
+
+/*
+ * Histerese: mudar N muda a escala do balanço DC. Só aceitamos
+ * mudanças relevantes (temperatura, clock, medição inicial).
+ * X (sobre-acionamento) é balanceado dentro de cada transição e
+ * pode mudar livremente.
+ */
+void updateSaturationFrames(
+    bool force) {
+
+    const uint8_t target =
+        targetSaturationFrames();
+
+    const uint8_t overdrive =
+        targetOverdriveFrames();
+
+    const int current =
+        gEngine.saturationFrames;
+
+    const int delta =
+        std::abs(
+            static_cast<int>(target) -
+            current);
+
+    if (
+        force ||
+        delta >=
+            std::max(
+                2,
+                current / 10)
+    ) {
+        gEngine.saturationFrames = target;
+    }
+
+    if (
+        force ||
+        gEngine.saturationFrames != current ||
+        overdrive != gEngine.overdriveFrames
+    ) {
+        gEngine.overdriveFrames = overdrive;
+
+        Serial.printf(
+            "[display] acionamento N=%u X=%u quadros "
+            "(quadro=%.1fms temp=%dC)\n",
+            static_cast<unsigned>(
+                gEngine.saturationFrames),
+            static_cast<unsigned>(
+                gEngine.overdriveFrames),
+            static_cast<double>(
+                gEngine.frameUs) /
+                1000.0,
+            gEngine.temperatureC);
+    }
+}
+
+void noteFrameTiming(
+    uint32_t frames,
+    uint64_t elapsedUs) {
+
+    if (frames < 8) {
+        return;
+    }
+
+    uint64_t sample =
+        elapsedUs /
+        frames;
+
+    sample =
+        std::max<uint64_t>(
+            2000,
+            std::min<uint64_t>(
+                80000,
+                sample));
+
+    if (!gEngine.frameMeasured) {
+        gEngine.frameUs =
+            static_cast<uint32_t>(
+                sample);
+        gEngine.frameMeasured = true;
+        return;
+    }
+
+    gEngine.frameUs =
+        static_cast<uint32_t>(
+            (
+                static_cast<uint64_t>(
+                    gEngine.frameUs) *
+                    3U +
+                sample
+            ) /
+            4U);
+}
+
+// ---------------------------------------------------------------
+// Composição e diferença
+// ---------------------------------------------------------------
+
+/*
+ * Canvas lógico 540x960 (1 byte/pixel) -> framebuffer epdiy
+ * 960x540 (4 bpp), na orientação validada do produto:
+ *
+ *   physicalX = logicalY
+ *   physicalY = 539 - logicalX
+ *
+ * Transposição em blocos: leitura e escrita ficam locais no
+ * cache da PSRAM e cada byte do framebuffer é escrito uma vez.
+ * Pixel par no nibble baixo, ímpar no alto (como epd_draw_pixel).
+ */
+size_t composePhysicalFrame(
+    const uint8_t* logical,
+    uint8_t* physical) {
+
+    constexpr int32_t LOGICAL_W =
+        HmiLayout::PORTRAIT_WIDTH;
+    constexpr int32_t LOGICAL_H =
+        HmiLayout::PORTRAIT_HEIGHT;
+    constexpr int32_t PHYSICAL_H =
+        Config::DISPLAY_HEIGHT;
+    constexpr int32_t PHYSICAL_ROW_BYTES =
+        Config::DISPLAY_WIDTH / 2;
+
+    constexpr int32_t TILE_ROWS = 32;
+    constexpr int32_t TILE_COLS = 64;
+
+    static_assert(
+        LOGICAL_H % TILE_ROWS == 0,
+        "altura logica deve ser multipla do bloco");
+    static_assert(
+        LOGICAL_W == PHYSICAL_H &&
+        LOGICAL_H == Config::DISPLAY_WIDTH,
+        "canvas retrato deve transpor o painel");
+
+    size_t ink = 0;
+
+    for (
+        int32_t ly0 = 0;
+        ly0 < LOGICAL_H;
+        ly0 += TILE_ROWS
+    ) {
+        for (
+            int32_t lx0 = 0;
+            lx0 < LOGICAL_W;
+            lx0 += TILE_COLS
+        ) {
+            const int32_t lx1 =
+                std::min(
+                    lx0 + TILE_COLS,
+                    LOGICAL_W);
+
+            for (
+                int32_t lx = lx0;
+                lx < lx1;
+                ++lx
+            ) {
+                uint8_t* out =
+                    physical +
+                    static_cast<size_t>(
+                        PHYSICAL_H - 1 - lx) *
+                        PHYSICAL_ROW_BYTES +
+                    static_cast<size_t>(
+                        ly0 / 2);
+
+                const uint8_t* in =
+                    logical +
+                    static_cast<size_t>(ly0) *
+                        LOGICAL_W +
+                    static_cast<size_t>(lx);
+
+                for (
+                    int32_t k = 0;
+                    k < TILE_ROWS;
+                    k += 2
+                ) {
+                    const uint8_t even =
+                        in[static_cast<size_t>(k) * LOGICAL_W] >> 4;
+
+                    const uint8_t odd =
+                        in[static_cast<size_t>(k + 1) * LOGICAL_W] >> 4;
+
+                    ink +=
+                        static_cast<size_t>(even != 0x0F) +
+                        static_cast<size_t>(odd != 0x0F);
+
+                    out[k / 2] =
+                        static_cast<uint8_t>(
+                            even |
+                            (odd << 4));
+                }
+            }
+        }
+    }
+
+    return ink;
+}
+
+struct DiffStats {
+    uint32_t changed = 0;
+    EpdRect bounds{0, 0, 0, 0};
+    Wf::PairSet pairs;
+};
+
+/*
+ * Diferença front/back do epdiy (byte = destino<<4 | origem),
+ * linhas/colunas sujas, contagem de pixels alterados e o conjunto
+ * de pares presentes (para compactar o waveform).
+ */
+void computeDifference(
+    DiffStats& stats) {
+
+    epd_difference_image(
+        gEpdState.front_fb,
+        gEpdState.back_fb,
+        gEpdState.difference_fb,
+        gEpdState.dirty_lines,
+        gEpdState.dirty_columns);
+
+    /*
+     * Retângulo alterado a partir das máscaras. O retângulo que o
+     * epdiy retorna usa a paridade de min_x ao procurar max_x e
+     * pode subestimar (ou zerar) a largura.
+     */
+    int32_t minY = -1;
+    int32_t maxY = -1;
+
+    for (int32_t y = 0; y < epd_height(); ++y) {
+        if (gEpdState.dirty_lines[y]) {
+            if (minY < 0) {
+                minY = y;
+            }
+
+            maxY = y;
+        }
+    }
+
+    int32_t minX = -1;
+    int32_t maxX = -1;
+
+    for (int32_t b = 0; b < epd_width() / 2; ++b) {
+        const uint8_t nibbles =
+            gEpdState.dirty_columns[b];
+
+        if (nibbles == 0) {
+            continue;
+        }
+
+        const int32_t first =
+            2 * b +
+            ((nibbles & 0x0FU) ? 0 : 1);
+
+        const int32_t last =
+            2 * b +
+            ((nibbles & 0xF0U) ? 1 : 0);
+
+        if (minX < 0) {
+            minX = first;
+        }
+
+        maxX = last;
+    }
+
+    stats.bounds =
+        (minX < 0 || minY < 0)
+            ? EpdRect{0, 0, 0, 0}
+            : EpdRect{
+                  minX,
+                  minY,
+                  maxX - minX + 1,
+                  maxY - minY + 1};
+
+    stats.pairs.clear();
+    stats.changed = 0;
+
+    const uint32_t* words =
+        reinterpret_cast<const uint32_t*>(
+            gEpdState.difference_fb);
+
+    const size_t count =
+        panelPixels() / 4U;
+
+    uint32_t previous = 0;
+    uint32_t previousChanged = 0;
+    bool havePrevious = false;
+
+    for (size_t i = 0; i < count; ++i) {
+        const uint32_t word =
+            words[i];
+
+        // Fundo uniforme gera longas sequências idênticas.
+        if (
+            havePrevious &&
+            word == previous
+        ) {
+            stats.changed += previousChanged;
+            continue;
+        }
+
+        uint32_t changedHere = 0;
+
+        for (uint32_t b = 0; b < 4; ++b) {
+            const uint8_t value =
+                static_cast<uint8_t>(
+                    word >> (8U * b));
+
+            stats.pairs.add(value);
+
+            changedHere +=
+                (value >> 4) != (value & 0x0FU)
+                    ? 1U
+                    : 0U;
+        }
+
+        stats.changed += changedHere;
+        previous = word;
+        previousChanged = changedHere;
+        havePrevious = true;
+    }
+}
+
+struct DrawOutcome {
+    EpdDrawError error = EPD_DRAW_SUCCESS;
+    uint16_t phases = 0;
+    uint64_t elapsedUs = 0;
+};
+
+DrawOutcome drawTransition(
+    const Wf::Params& params,
+    const Wf::PairSet& pairs,
+    bool masked) {
+
+    DrawOutcome outcome;
+
+    const uint16_t phases =
+        Wf::build(
+            params,
+            &pairs,
+            gLut,
+            Wf::MAX_LUT_BYTES);
+
+    if (phases == 0) {
+        return outcome;
+    }
+
+    gPhases.phases = phases;
+
+    const int64_t started =
+        esp_timer_get_time();
+
+    outcome.error =
+        epd_draw_base(
+            epd_full_screen(),
+            gEpdState.difference_fb,
+            epd_full_screen(),
+            static_cast<EpdDrawMode>(
+                MODE_PACKING_1PPB_DIFFERENCE |
+                MODE_GC16),
+            gEngine.temperatureC,
+            masked
+                ? gEpdState.dirty_lines
+                : nullptr,
+            masked
+                ? gEpdState.dirty_columns
+                : nullptr,
+            &gWaveform);
+
+    outcome.elapsedUs =
+        static_cast<uint64_t>(
+            esp_timer_get_time() -
+            started);
+
+    outcome.phases = phases;
+
+    noteFrameTiming(
+        phases,
+        outcome.elapsedUs);
+
+    return outcome;
+}
+
+Wf::Params transitionParams(
+    RefreshKind kind) {
+
+    Wf::Params params;
+
+    params.saturationFrames =
+        gEngine.saturationFrames;
+
+    params.settleFrames =
+        std::min<uint8_t>(
+            Wf::MAX_SETTLE_FRAMES,
+            Config::EPD_SETTLE_FRAMES);
+
+    switch (kind) {
+        case RefreshKind::Clean:
+            params.kind = Wf::Kind::Clean;
+            params.overdriveFrames =
+                gEngine.overdriveFrames;
+            params.flashCycles =
+                std::min<uint8_t>(
+                    Wf::MAX_FLASH_CYCLES,
+                    Config::EPD_CLEAN_FLASH_CYCLES);
+            params.agitationPairs =
+                std::min<uint8_t>(
+                    Wf::MAX_AGITATION_PAIRS,
+                    Config::EPD_CLEAN_AGITATION_PAIRS);
+            break;
+
+        case RefreshKind::Partial:
+            params.kind = Wf::Kind::Direct;
+            params.agitationPairs =
+                std::min<uint8_t>(
+                    Wf::MAX_AGITATION_PAIRS,
+                    Config::EPD_PARTIAL_AGITATION_PAIRS);
+            break;
+
+        case RefreshKind::FromWhite:
+            params.kind = Wf::Kind::Direct;
+            params.agitationPairs = 0;
+            break;
+    }
+
+    /*
+     * O epdiy aceita no máximo 250 fases. Se a combinação não
+     * couber, reduz na ordem menos danosa: agitação, ciclos extras,
+     * sobre-acionamento e, por último, N.
+     */
+    while (!Wf::fits(params)) {
+        if (params.agitationPairs > 0) {
+            --params.agitationPairs;
+        } else if (params.flashCycles > 0) {
+            --params.flashCycles;
+        } else if (params.overdriveFrames > 0) {
+            --params.overdriveFrames;
+        } else if (
+            params.saturationFrames >
+            Wf::MIN_SATURATION_FRAMES
+        ) {
+            --params.saturationFrames;
+        } else {
+            break;
+        }
+    }
+
+    return params;
+}
+
+void pushFrames(
+    int color,
+    uint16_t count) {
+
+    for (uint16_t i = 0; i < count; ++i) {
+        epd_push_pixels(
+            epd_full_screen(),
+            PUSH_TIME,
+            color);
+    }
+}
+
+/*
+ * Underrun na fila de linhas: o LCD recebeu linhas vazias e a
+ * transição ficou incompleta. Reduz o clock de pixel pela metade.
+ */
+bool lowerPixelClockAfterUnderrun(
+    EpdDrawError error) {
+
+    if (!(error & EPD_DRAW_EMPTY_LINE_QUEUE)) {
+        return false;
+    }
+
+    /*
+     * Clock padrão do epdiy: o valor efetivo não é exposto (o epdiy
+     * já o reduz conforme a cache). Vamos direto ao mínimo, que é
+     * garantidamente mais lento.
+     */
+    const uint8_t current =
+        gEngine.pixelClockMhz;
+
+    const uint8_t next =
+        current == 0
+            ? Config::EPD_LCD_PIXEL_CLOCK_MIN_MHZ
+            : std::max<uint8_t>(
+                  Config::EPD_LCD_PIXEL_CLOCK_MIN_MHZ,
+                  current / 2U);
+
+    if (
+        current != 0 &&
+        next >= current
+    ) {
+        Serial.printf(
+            "[display] underrun com clock minimo %u MHz\n",
+            static_cast<unsigned>(
+                current));
+        return false;
+    }
+
+    epd_set_lcd_pixel_clock_MHz(next);
+    gEngine.pixelClockMhz = next;
+    gEngine.frameMeasured = false;
+
+    if (current == 0) {
+        Serial.printf(
+            "[display] underrun LCD: clock padrao -> %u MHz\n",
+            static_cast<unsigned>(
+                next));
+    } else {
+        Serial.printf(
+            "[display] underrun LCD: clock %u -> %u MHz\n",
+            static_cast<unsigned>(
+                current),
+            static_cast<unsigned>(
+                next));
+    }
+
+    return true;
+}
+
+/*
+ * Limpeza profunda:
+ *   1. conteúdo atual -> branco com transição balanceada
+ *      (ou saturação no branco se o conteúdo é desconhecido);
+ *   2. ciclos preto/branco em todo o painel (impulso nulo);
+ *   3. quadros neutros;
+ *   4. front/back brancos e sincronizados.
+ *
+ * Exige o painel energizado.
+ */
+void runDeepClean(
+    uint8_t cycles,
+    bool contentKnown) {
+
+    // Cada extremo recebe N + X: saturação mais sobre-acionamento.
+    const uint16_t rail =
+        static_cast<uint16_t>(
+            gEngine.saturationFrames +
+            gEngine.overdriveFrames);
+
+    if (
+        contentKnown &&
+        gLut != nullptr
+    ) {
+        epd_hl_set_all_white(
+            &gEpdState);
+
+        DiffStats stats;
+        computeDifference(stats);
+
+        if (stats.changed > 0) {
+            drawTransition(
+                transitionParams(
+                    RefreshKind::Partial),
+                stats.pairs,
+                true);
+        }
+    } else {
+        pushFrames(
+            PUSH_LIGHTEN,
+            rail);
+    }
+
+    for (uint8_t c = 0; c < cycles; ++c) {
+        pushFrames(PUSH_DARKEN, rail);
+        pushFrames(PUSH_LIGHTEN, rail);
+    }
+
+    pushFrames(
+        PUSH_NEUTRAL,
+        static_cast<uint16_t>(
+            Config::EPD_SETTLE_FRAMES + 1U));
+
+    epd_hl_set_all_white(
+        &gEpdState);
+
+    std::memset(
+        gEpdState.back_fb,
+        0xFF,
+        panelBytes());
+
+    gEngine.panelWhite = true;
+    gEngine.forceClean = false;
+    gEngine.partialsSinceClean = 0;
+    gEngine.cleansSinceDeepClean = 0;
+}
+
+bool sameScreen(
+    const char* key) {
+
+    /*
+     * Sem chave confiável, toda publicação conta como troca de tela
+     * (sempre pisca o painel inteiro). Protege contra um compilador
+     * que não resolva __builtin_FUNCTION() no chamador.
+     */
+    if (
+        !key ||
+        key[0] == '\0' ||
+        std::strcmp(key, "refreshFull") == 0
+    ) {
+        return false;
+    }
+
+    return
+        std::strncmp(
+            gEngine.lastScreen,
+            key,
+            sizeof(gEngine.lastScreen) - 1U) == 0;
+}
+
+void rememberScreen(
+    const char* key) {
+
+    std::strncpy(
+        gEngine.lastScreen,
+        key ? key : "",
+        sizeof(gEngine.lastScreen) - 1U);
+
+    gEngine.lastScreen[
+        sizeof(gEngine.lastScreen) - 1U] = '\0';
 }
 
 
@@ -100,12 +1306,27 @@ bool T5Display::begin() {
         &ED047TC1,
         EPD_LUT_64K);
 
-    epd_set_vcom(1560);
+    epd_set_vcom(
+        Config::EPD_VCOM_MV);
+
+    /*
+     * Clock de pixel explícito: o epdiy reduz o clock por conta
+     * própria quando a linha de cache da PSRAM é < 64 B (caso do
+     * Arduino), deixando o período de quadro indefinido. Fixamos
+     * um valor conhecido; o período real é medido logo abaixo.
+     */
+    if (Config::EPD_LCD_PIXEL_CLOCK_MHZ > 0) {
+        epd_set_lcd_pixel_clock_MHz(
+            Config::EPD_LCD_PIXEL_CLOCK_MHZ);
+
+        gEngine.pixelClockMhz =
+            Config::EPD_LCD_PIXEL_CLOCK_MHZ;
+    }
 
     /*
      * Não usamos a rotação interna do epdiy.
      * A conversão retrato->painel fica exclusivamente
-     * em refreshFull().
+     * em composePhysicalFrame().
      */
     epd_set_rotation(
         EPD_ROT_LANDSCAPE);
@@ -124,34 +1345,123 @@ bool T5Display::begin() {
         return false;
     }
 
+    if (
+        !Config::EPD_USE_LEGACY_REFRESH &&
+        !allocateWaveform()
+    ) {
+        Serial.println(
+            "[display] sem memoria para waveform; "
+            "usando GC16 embutido do epdiy");
+    }
+
     gEpdReady = true;
-    gRefreshCount = 0;
-    gEpdTemperature = 20;
 
     orientation_ =
         DisplayOrientation::Portrait;
 
-    /*
-     * Um clear físico é feito somente no bring-up.
-     * Trocas de tela posteriores usam o high-level
-     * front/back do epdiy e não chamam epd_clear().
-     */
-    epd_poweron();
-    epd_fullclear(
-        &gEpdState,
-        gEpdTemperature);
-    epd_poweroff();
+    if (
+        Config::EPD_USE_LEGACY_REFRESH ||
+        gLut == nullptr
+    ) {
+        // Bring-up idêntico ao firmware anterior.
+        epd_poweron();
+        epd_fullclear(
+            &gEpdState,
+            gEngine.temperatureC);
+        epd_poweroff();
 
-    powerOn_ = false;
+        powerOn_ = false;
+
+        Serial.printf(
+            "[display] T5S3 Pro pronto (refresh legado GC16) "
+            "logical=%dx%d physical=%dx%d\n",
+            HmiLayout::PORTRAIT_WIDTH,
+            HmiLayout::PORTRAIT_HEIGHT,
+            Config::DISPLAY_WIDTH,
+            Config::DISPLAY_HEIGHT);
+
+        return true;
+    }
+
+    ensurePower();
+
+    refreshTemperature(true);
+
+    /*
+     * Mede o período real de quadro empurrando quadros de
+     * clareamento (início da limpeza de boot, conteúdo
+     * desconhecido). As atualizações seguintes refinam a medida.
+     */
+    constexpr uint16_t PROBE_FRAMES = 6;
+
+    const int64_t probeStarted =
+        esp_timer_get_time();
+
+    pushFrames(
+        PUSH_LIGHTEN,
+        PROBE_FRAMES);
+
+    const uint64_t probeUs =
+        static_cast<uint64_t>(
+            esp_timer_get_time() -
+            probeStarted);
+
+    gEngine.frameUs =
+        static_cast<uint32_t>(
+            std::max<uint64_t>(
+                2000,
+                std::min<uint64_t>(
+                    80000,
+                    probeUs / PROBE_FRAMES)));
+
+    gEngine.frameMeasured = true;
+
+    updateSaturationFrames(true);
+
+    const uint32_t cleanStarted =
+        millis();
+
+    runDeepClean(
+        Config::EPD_BOOT_CLEAN_CYCLES,
+        false);
+
+    releasePower();
+
+    char clockText[12] = "padrao";
+
+    if (gEngine.pixelClockMhz > 0) {
+        snprintf(
+            clockText,
+            sizeof(clockText),
+            "%uMHz",
+            static_cast<unsigned>(
+                gEngine.pixelClockMhz));
+    }
 
     Serial.printf(
         "[display] T5S3 Pro pronto "
-        "logical=%dx%d physical=%dx%d temp=%dC\n",
+        "logical=%dx%d physical=%dx%d "
+        "clock=%s quadro=%.1fms N=%u X=%u temp=%dC(%s) "
+        "vcom=%umV limpeza=%lums\n",
         HmiLayout::PORTRAIT_WIDTH,
         HmiLayout::PORTRAIT_HEIGHT,
         Config::DISPLAY_WIDTH,
         Config::DISPLAY_HEIGHT,
-        gEpdTemperature);
+        clockText,
+        static_cast<double>(
+            gEngine.frameUs) /
+            1000.0,
+        static_cast<unsigned>(
+            gEngine.saturationFrames),
+        static_cast<unsigned>(
+            gEngine.overdriveFrames),
+        gEngine.temperatureC,
+        gEngine.temperatureSource,
+        static_cast<unsigned>(
+            Config::EPD_VCOM_MV),
+        static_cast<unsigned long>(
+            millis() -
+            cleanStarted));
 
     return true;
 }
@@ -198,58 +1508,60 @@ void T5Display::deepClean() {
     Serial.println(
         "[display] deep-clean begin");
 
+    const uint32_t started =
+        millis();
+
     ensurePower();
 
-    constexpr int CLEAN_TIME = 12;
-
-    /*
-     * Sequência baseada no firmware de fábrica H752-01:
-     * preto -> branco -> noop.
-     */
-    for (
-        uint8_t i = 0;
-        i < 10;
-        ++i
+    if (
+        Config::EPD_USE_LEGACY_REFRESH ||
+        gLut == nullptr
     ) {
-        epd_push_pixels(
-            epd_full_screen(),
-            CLEAN_TIME,
-            0);
+        // Sequência anterior: preto -> branco -> noop -> fullclear.
+        constexpr short CLEAN_TIME = 12;
+
+        for (uint8_t i = 0; i < 10; ++i) {
+            epd_push_pixels(epd_full_screen(), CLEAN_TIME, PUSH_DARKEN);
+        }
+
+        for (uint8_t i = 0; i < 10; ++i) {
+            epd_push_pixels(epd_full_screen(), CLEAN_TIME, PUSH_LIGHTEN);
+        }
+
+        for (uint8_t i = 0; i < 2; ++i) {
+            epd_push_pixels(epd_full_screen(), CLEAN_TIME, PUSH_NEUTRAL);
+        }
+
+        epd_fullclear(
+            &gEpdState,
+            gEngine.temperatureC);
+
+        epd_poweroff();
+        powerOn_ = false;
+
+        gEngine.refreshCount = 0;
+
+        Serial.println(
+            "[display] deep-clean end (legado)");
+        return;
     }
 
-    for (
-        uint8_t i = 0;
-        i < 10;
-        ++i
-    ) {
-        epd_push_pixels(
-            epd_full_screen(),
-            CLEAN_TIME,
-            1);
-    }
+    refreshTemperature(false);
+    updateSaturationFrames(false);
 
-    for (
-        uint8_t i = 0;
-        i < 2;
-        ++i
-    ) {
-        epd_push_pixels(
-            epd_full_screen(),
-            CLEAN_TIME,
-            2);
-    }
+    runDeepClean(
+        Config::EPD_DEEP_CLEAN_CYCLES,
+        true);
 
-    epd_fullclear(
-        &gEpdState,
-        gEpdTemperature);
+    releasePower();
 
-    epd_poweroff();
-    powerOn_ = false;
-
-    gRefreshCount = 0;
-
-    Serial.println(
-        "[display] deep-clean end");
+    Serial.printf(
+        "[display] deep-clean end N=%u %lums\n",
+        static_cast<unsigned>(
+            gEngine.saturationFrames),
+        static_cast<unsigned long>(
+            millis() -
+            started));
 }
 
 
@@ -295,6 +1607,18 @@ void T5Display::ensurePower() {
 
     epd_poweron();
     powerOn_ = true;
+}
+
+void T5Display::releasePower() {
+    if (
+        !powerOn_ ||
+        Config::KEEP_EPD_AUX_POWER_WHILE_AWAKE
+    ) {
+        return;
+    }
+
+    epd_poweroff();
+    powerOn_ = false;
 }
 
 void T5Display::clearBuffer() {
@@ -880,162 +2204,54 @@ int32_t T5Display::drawWrapped(
 }
 
 
-void T5Display::refreshFull() {
-    if (
-        !gEpdReady ||
-        !framebuffer_ ||
-        !physicalFramebuffer_
-    ) {
-        Serial.println(
-            "[display] refresh ignorado: estado invalido");
-        return;
-    }
-
+void T5Display::refreshLegacy() {
     const uint32_t started =
         millis();
 
-    const bool autoDeepClean =
-        Config::EPD_AUTO_DEEP_CLEAN_INTERVAL > 0 &&
-        gRefreshCount > 0 &&
+    // Comportamento anterior: limpeza profunda a cada N refreshes.
+    if (
+        Config::EPD_LEGACY_DEEP_CLEAN_INTERVAL > 0 &&
+        gEngine.refreshCount > 0 &&
         (
-            gRefreshCount %
-            Config::EPD_AUTO_DEEP_CLEAN_INTERVAL
-        ) == 0;
-
-    if (autoDeepClean) {
+            gEngine.refreshCount %
+            Config::EPD_LEGACY_DEEP_CLEAN_INTERVAL
+        ) == 0
+    ) {
         Serial.printf(
             "[display] auto-deep-clean trigger refresh=%lu\n",
             static_cast<unsigned long>(
-                gRefreshCount));
+                gEngine.refreshCount));
 
-        /*
-         * deepClean() executa exatamente a sequência física
-         * preto -> branco -> noop -> GC16 e ressincroniza
-         * o high-level framebuffer.
-         */
         deepClean();
     }
 
-    /*
-     * Canvas lógico: 540 x 960, um byte por pixel.
-     * Framebuffer epdiy: 960 x 540, 4 bpp.
-     *
-     * A orientação validada do produto é:
-     *
-     * physicalX = 959 - logicalY
-     * physicalY = logicalX
-     *
-     * epd_draw_pixel() faz o empacotamento 4-bpp e
-     * preserva exatamente os tokens 00/55/99/DD/FF.
-     */
-    epd_hl_set_all_white(
-        &gEpdState);
-
-    size_t inkPixels = 0;
-
-    for (
-        int32_t logicalY = 0;
-        logicalY <
-            HmiLayout::PORTRAIT_HEIGHT;
-        ++logicalY
-    ) {
-        const uint8_t* row =
-            framebuffer_ +
-            static_cast<size_t>(
-                logicalY) *
-            static_cast<size_t>(
-                HmiLayout::PORTRAIT_WIDTH);
-
-        for (
-            int32_t logicalX = 0;
-            logicalX <
-                HmiLayout::PORTRAIT_WIDTH;
-            ++logicalX
-        ) {
-            const uint8_t color =
-                row[logicalX];
-
-            if (color == WHITE) {
-                continue;
-            }
-
-            ++inkPixels;
-
-            const int32_t physicalX =
-                logicalY;
-
-            const int32_t physicalY =
-                Config::DISPLAY_HEIGHT -
-                logicalX -
-                1;
-
-            epd_draw_pixel(
-                physicalX,
-                physicalY,
-                color,
-                physicalFramebuffer_);
-        }
-    }
+    const size_t inkPixels =
+        composePhysicalFrame(
+            framebuffer_,
+            physicalFramebuffer_);
 
     const uint32_t composed =
         millis();
 
-    /*
-     * GL16 é a atualização normal: grayscale,
-     * sem o flash completo do GC16.
-     *
-     * GC16 é usado no primeiro redraw e
-     * periodicamente para limpar ghosting.
-     */
-    EpdDrawMode mode = MODE_GC16;
-
     ensurePower();
 
-    EpdDrawError result =
+    const EpdDrawError result =
         epd_hl_update_screen(
             &gEpdState,
-            mode,
-            gEpdTemperature);
+            MODE_GC16,
+            gEngine.temperatureC);
 
-    if (
-        result !=
-            EPD_DRAW_SUCCESS &&
-        mode != MODE_GC16
-    ) {
-        Serial.printf(
-            "[display] GL16 falhou 0x%X; "
-            "fallback GC16\n",
-            static_cast<unsigned int>(
-                result));
+    releasePower();
 
-        mode = MODE_GC16;
-
-        result =
-            epd_hl_update_screen(
-                &gEpdState,
-                mode,
-                gEpdTemperature);
-    }
-
-    if (
-        !Config::
-            KEEP_EPD_AUX_POWER_WHILE_AWAKE
-    ) {
-        epd_poweroff();
-        powerOn_ = false;
-    }
-
-    ++gRefreshCount;
+    ++gEngine.refreshCount;
 
     const uint32_t finished =
         millis();
 
     Serial.printf(
-        "[display] refresh mode=%s "
+        "[display] refresh mode=GC16-legado "
         "ink=%u compose=%lums epd=%lums total=%lums "
         "result=0x%X\n",
-        refreshModeName(
-            mode),
         static_cast<unsigned>(
             inkPixels),
         static_cast<unsigned long>(
@@ -1049,6 +2265,292 @@ void T5Display::refreshFull() {
             started),
         static_cast<unsigned int>(
             result));
+}
+
+
+void T5Display::refreshFull(
+    const char* screenKey) {
+
+    if (
+        !gEpdReady ||
+        !framebuffer_ ||
+        !physicalFramebuffer_
+    ) {
+        Serial.println(
+            "[display] refresh ignorado: estado invalido");
+        return;
+    }
+
+    if (
+        Config::EPD_USE_LEGACY_REFRESH ||
+        gLut == nullptr
+    ) {
+        refreshLegacy();
+        return;
+    }
+
+    const uint32_t started =
+        millis();
+
+    const bool screenChanged =
+        !sameScreen(
+            screenKey);
+
+    rememberScreen(
+        screenKey);
+
+    ensurePower();
+    refreshTemperature(false);
+    updateSaturationFrames(false);
+
+    /*
+     * Manutenção: limpeza profunda numa troca de tela, a cada
+     * EPD_AUTO_DEEP_CLEAN_INTERVAL transições com flash. Usa o
+     * front buffer como rascunho, por isso vem antes da composição.
+     */
+    bool deepCleaned = false;
+
+    if (
+        gLut != nullptr &&
+        screenChanged &&
+        !gEngine.panelWhite &&
+        Config::EPD_AUTO_DEEP_CLEAN_INTERVAL > 0 &&
+        gEngine.cleansSinceDeepClean >=
+            Config::EPD_AUTO_DEEP_CLEAN_INTERVAL
+    ) {
+        Serial.printf(
+            "[display] auto-deep-clean apos %u trocas\n",
+            static_cast<unsigned>(
+                gEngine.cleansSinceDeepClean));
+
+        runDeepClean(
+            Config::EPD_DEEP_CLEAN_CYCLES,
+            true);
+
+        deepCleaned = true;
+    }
+
+    const uint32_t composeStarted =
+        millis();
+
+    const size_t inkPixels =
+        composePhysicalFrame(
+            framebuffer_,
+            physicalFramebuffer_);
+
+    const uint32_t composed =
+        millis();
+
+    RefreshKind kind =
+        RefreshKind::Clean;
+    const char* reason = "screen";
+
+    DrawOutcome outcome;
+    uint32_t changedPixels = 0;
+    EpdRect bounds{0, 0, 0, 0};
+
+    DiffStats stats;
+    computeDifference(stats);
+
+    changedPixels = stats.changed;
+    bounds = stats.bounds;
+
+    if (stats.changed == 0) {
+        releasePower();
+
+        Serial.printf(
+            "[display] refresh sem mudancas screen=%s "
+            "compose=%lums total=%lums\n",
+            screenKey ? screenKey : "?",
+            static_cast<unsigned long>(
+                composed -
+                composeStarted),
+            static_cast<unsigned long>(
+                millis() -
+                started));
+        return;
+    }
+
+    const uint64_t pixels =
+        panelPixels();
+
+    const uint64_t boundsArea =
+        static_cast<uint64_t>(
+            std::max(0, bounds.width)) *
+        static_cast<uint64_t>(
+            std::max(0, bounds.height));
+
+    if (gEngine.panelWhite) {
+        // Painel branco e limpo: escurece direto, sem flash.
+        kind = RefreshKind::FromWhite;
+        reason =
+            deepCleaned
+                ? "deep-clean"
+                : "white";
+    } else if (gEngine.forceClean) {
+        kind = RefreshKind::Clean;
+        reason = "recovery";
+    } else if (screenChanged) {
+        kind = RefreshKind::Clean;
+        reason = "screen";
+    } else if (
+        gEngine.partialsSinceClean >=
+        Config::EPD_MAX_CONSECUTIVE_PARTIALS
+    ) {
+        kind = RefreshKind::Clean;
+        reason = "partial-limit";
+    } else if (
+        static_cast<uint64_t>(stats.changed) * 1000U >
+        pixels *
+            Config::EPD_PARTIAL_MAX_CHANGED_PERMILLE
+    ) {
+        kind = RefreshKind::Clean;
+        reason = "changed";
+    } else if (
+        boundsArea * 100U >
+        pixels *
+            Config::EPD_PARTIAL_MAX_AREA_PERCENT
+    ) {
+        kind = RefreshKind::Clean;
+        reason = "area";
+    } else {
+        kind = RefreshKind::Partial;
+        reason = "same-screen";
+    }
+
+    /*
+     * Clean é aplicado sem máscara: todos os pixels, inclusive
+     * os inalterados, passam pelo flash e perdem o histórico.
+     * Partial/FromWhite usam a máscara de linhas/colunas sujas.
+     */
+    const bool masked =
+        kind != RefreshKind::Clean;
+
+    outcome =
+        drawTransition(
+            transitionParams(kind),
+            stats.pairs,
+            masked);
+
+    if (
+        lowerPixelClockAfterUnderrun(
+            outcome.error)
+    ) {
+        /*
+         * O painel ficou num estado intermediário. Repetimos
+         * como Clean sem máscara: o flash ressatura todos os
+         * pixels independentemente de onde pararam.
+         */
+        updateSaturationFrames(true);
+
+        const DrawOutcome retry =
+            drawTransition(
+                transitionParams(
+                    RefreshKind::Clean),
+                stats.pairs,
+                false);
+
+        outcome.error = retry.error;
+        outcome.phases =
+            static_cast<uint16_t>(
+                outcome.phases +
+                retry.phases);
+        outcome.elapsedUs += retry.elapsedUs;
+
+        kind = RefreshKind::Clean;
+        reason = "underrun-retry";
+    }
+
+    const bool success =
+        outcome.error == EPD_DRAW_SUCCESS;
+
+    /*
+     * Back buffer = o que está no painel. Com underrun a maior
+     * parte do quadro foi aplicada; em outros erros (modo/fases)
+     * nada foi desenhado. Em ambos, a próxima atualização é Clean.
+     */
+    if (
+        success ||
+        (outcome.error & EPD_DRAW_EMPTY_LINE_QUEUE)
+    ) {
+        std::memcpy(
+            gEpdState.back_fb,
+            gEpdState.front_fb,
+            panelBytes());
+    }
+
+    gEngine.forceClean = !success;
+
+    switch (kind) {
+        case RefreshKind::Clean:
+            gEngine.partialsSinceClean = 0;
+
+            if (gEngine.cleansSinceDeepClean < 0xFFFFU) {
+                ++gEngine.cleansSinceDeepClean;
+            }
+            break;
+
+        case RefreshKind::Partial:
+            ++gEngine.partialsSinceClean;
+            break;
+
+        case RefreshKind::FromWhite:
+            gEngine.partialsSinceClean = 0;
+            break;
+    }
+
+    gEngine.panelWhite =
+        success &&
+        inkPixels == 0;
+
+    ++gEngine.refreshCount;
+
+    releasePower();
+
+    const uint32_t finished =
+        millis();
+
+    Serial.printf(
+        "[display] refresh #%lu %s reason=%s screen=%s "
+        "changed=%lu bbox=%dx%d N=%u X=%u phases=%u "
+        "quadro=%.1fms temp=%dC(%s) ink=%u "
+        "compose=%lums epd=%lums total=%lums result=0x%X\n",
+        static_cast<unsigned long>(
+            gEngine.refreshCount),
+        refreshKindName(
+            kind),
+        reason,
+        screenKey ? screenKey : "?",
+        static_cast<unsigned long>(
+            changedPixels),
+        bounds.width,
+        bounds.height,
+        static_cast<unsigned>(
+            gEngine.saturationFrames),
+        static_cast<unsigned>(
+            kind == RefreshKind::Clean
+                ? gEngine.overdriveFrames
+                : 0),
+        static_cast<unsigned>(
+            outcome.phases),
+        static_cast<double>(
+            gEngine.frameUs) /
+            1000.0,
+        gEngine.temperatureC,
+        gEngine.temperatureSource,
+        static_cast<unsigned>(
+            inkPixels),
+        static_cast<unsigned long>(
+            composed -
+            composeStarted),
+        static_cast<unsigned long>(
+            outcome.elapsedUs /
+            1000U),
+        static_cast<unsigned long>(
+            finished -
+            started),
+        static_cast<unsigned int>(
+            outcome.error));
 }
 
 
@@ -2345,7 +3847,7 @@ void T5Display::showTouchFeedback(
      * e uma etapa bloqueante antes da tela seguinte.
      *
      * A ação é despachada imediatamente; a próxima tela
-     * inicia seu update GL16 sem um redraw intermediário.
+     * é publicada por refreshFull() sem redraw intermediário.
      */
 }
 
