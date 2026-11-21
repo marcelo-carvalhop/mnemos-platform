@@ -291,13 +291,26 @@ def get_queue(job_id: str, user_id: CurrentUser, session: DbSession) -> QueueRes
 def decide(
     pending_id: str,
     body: DecisionRequest,
-    user_id: CurrentUser,
+    identity: Identity,
     session: DbSession,
 ) -> PendingCardResponse:
+    """Judging the last card of a queue adds the approved ones to the deck.
+
+    It used to wait for a separate `close`, behind a "Adicionar N cards"
+    button on a summary screen. Someone who approved twelve cards one by one
+    and left there lost all twelve, silently: a fully judged job is no longer
+    "open", so nothing brought them back. `close` remains, idempotent.
+    """
+    user_id, device_id = identity
     try:
         card = service.decide(session, user_id, pending_id, body.decision)
     except service.JobNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
+    except service.AlreadyAdded as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, "already_added") from exc
+
+    if card.decision is not None and service.undecided_count(session, user_id, card.job_id) == 0:
+        service.materialise(session, user_id, card.job_id, device_id=device_id)
 
     session.commit()
     return PendingCardResponse(
@@ -316,9 +329,12 @@ def decide(
     response_model=CloseResponse,
     summary="Approve everything still undecided",
 )
-def approve_all(job_id: str, user_id: CurrentUser, session: DbSession) -> CloseResponse:
+def approve_all(job_id: str, identity: Identity, session: DbSession) -> CloseResponse:
+    """Approves what is left, which judges the whole queue: the cards go in."""
+    user_id, device_id = identity
     _own_job(session, user_id, job_id)
     created = service.approve_remaining(session, user_id, job_id)
+    service.materialise(session, user_id, job_id, device_id=device_id)
     session.commit()
     return CloseResponse(created=created)
 
@@ -336,9 +352,12 @@ def close(job_id: str, identity: Identity, session: DbSession) -> CloseResponse:
     """
     user_id, device_id = identity
     _own_job(session, user_id, job_id)
-    created = service.materialise(session, user_id, job_id, device_id=device_id)
+    service.materialise(session, user_id, job_id, device_id=device_id)
     session.commit()
-    return CloseResponse(created=created)
+    # How many of this job's cards are in the deck — not how many this call
+    # inserted: judging the last card usually added them already, and the app
+    # says "12 cards criados" from this number.
+    return CloseResponse(created=service.added_count(session, user_id, job_id))
 
 
 # ---------------------------------------------------------------------------

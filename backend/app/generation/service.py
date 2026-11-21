@@ -293,6 +293,10 @@ def queue_for(session: Session, user_id: str, job_id: str) -> list[PendingCard]:
     )
 
 
+class AlreadyAdded(Exception):
+    """The card is already in the deck; its decision can no longer change."""
+
+
 def decide(
     session: Session,
     user_id: str,
@@ -320,10 +324,42 @@ def decide(
     if card is None:
         raise JobNotFound(pending_id)
 
+    # Once the queue was fully judged the approved cards became real cards
+    # (see `materialise`). Un-approving one now would leave a card in the
+    # deck that the queue says was discarded.
+    if decision != "approved" and session.get(Card, pending_id) is not None:
+        raise AlreadyAdded(pending_id)
+
     card.decision = decision
     card.decided_at = now if decision else None
     session.flush()
     return card
+
+
+def undecided_count(session: Session, user_id: str, job_id: str) -> int:
+    return session.execute(
+        select(func.count())
+        .select_from(PendingCard)
+        .where(
+            PendingCard.job_id == job_id,
+            PendingCard.user_id == user_id,
+            PendingCard.decision.is_(None),
+        )
+    ).scalar_one()
+
+
+def added_count(session: Session, user_id: str, job_id: str) -> int:
+    """How many of this job's approved cards are in the deck."""
+    return session.execute(
+        select(func.count())
+        .select_from(PendingCard)
+        .join(Card, Card.id == PendingCard.id)
+        .where(
+            PendingCard.job_id == job_id,
+            PendingCard.user_id == user_id,
+            PendingCard.decision == "approved",
+        )
+    ).scalar_one()
 
 
 def approve_remaining(
