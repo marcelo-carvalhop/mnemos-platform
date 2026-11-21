@@ -109,6 +109,9 @@ enum ErrorCode {
   modelRefused('model_refused'),
   networkUnavailable('network_unavailable'),
   resyncRequired('resync_required'),
+  inviteInvalid('invite_invalid'),
+  emailNotVerified('email_not_verified'),
+  accountRequired('account_required'),
   ;
 
   const ErrorCode(this.wire);

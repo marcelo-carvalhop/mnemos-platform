@@ -91,3 +91,6 @@ class ErrorCode(StrEnum):
     MODEL_REFUSED = "model_refused"
     NETWORK_UNAVAILABLE = "network_unavailable"
     RESYNC_REQUIRED = "resync_required"
+    INVITE_INVALID = "invite_invalid"
+    EMAIL_NOT_VERIFIED = "email_not_verified"
+    ACCOUNT_REQUIRED = "account_required"

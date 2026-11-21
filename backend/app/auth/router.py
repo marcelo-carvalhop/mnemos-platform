@@ -5,12 +5,22 @@ declares an explicit `operation_id` and a response model, or the generated Dart
 client is unusable (§4.3).
 """
 
-from fastapi import APIRouter, HTTPException, status
+from typing import Literal
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
 
-from app.auth import attestation, service
-from app.auth.service import AttestationRequired, AuthError, TokenReuseDetected
+from app.auth import attestation, mail, service
+from app.auth.service import (
+    AccountRequired,
+    AttestationRequired,
+    AuthError,
+    EmailNotVerified,
+    InviteInvalid,
+    TokenReuseDetected,
+)
 from app.config import get_settings
+from app.contract import ErrorCode
 from app.deps import CurrentUser, DbSession
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
@@ -60,6 +70,46 @@ class LoginRequest(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+class AuthOptionsResponse(BaseModel):
+    invite_required: bool
+    email_verification_required: bool
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    device_id: str
+    invite_code: str | None = Field(
+        default=None, description="Required when the server is invite-only."
+    )
+
+
+class RegisterResponse(BaseModel):
+    status: Literal["verification_sent", "signed_in"]
+    email: str
+    tokens: TokenResponse | None = None
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+    device_id: str | None = Field(
+        default=None, description="Signs this client in once the address is confirmed."
+    )
+
+
+class VerifyEmailResponse(BaseModel):
+    email: str
+    tokens: TokenResponse | None = None
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class ResendVerificationResponse(BaseModel):
+    status: Literal["sent_if_pending"] = "sent_if_pending"
 
 
 def _as_response(pair: service.TokenPair) -> TokenResponse:
@@ -138,10 +188,103 @@ def register_device(body: DeviceRequest, session: DbSession) -> TokenResponse:
             attested=settings.require_attestation,
             require_attestation=settings.require_attestation,
         )
+    except AccountRequired as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ErrorCode.ACCOUNT_REQUIRED.value
+        ) from exc
     except AttestationRequired as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     session.commit()
     return _as_response(pair)
+
+
+@router.get(
+    "/options",
+    operation_id="authOptions",
+    response_model=AuthOptionsResponse,
+    summary="What signing up asks for on this server",
+)
+def options() -> AuthOptionsResponse:
+    """Lets a client show the invite field only where it is needed. Says
+    nothing about the code itself."""
+    settings = get_settings()
+    return AuthOptionsResponse(
+        invite_required=settings.invite_only,
+        email_verification_required=settings.require_email_verification,
+    )
+
+
+@router.post(
+    "/register",
+    operation_id="register",
+    response_model=RegisterResponse,
+    summary="Create an account with email and password",
+)
+def register(
+    body: RegisterRequest, session: DbSession, background: BackgroundTasks
+) -> RegisterResponse:
+    """The invite-only way in. With confirmation on, nothing is signed in
+    until the emailed link is opened; the response says so."""
+    try:
+        result = service.register(
+            session,
+            email=body.email,
+            password=body.password,
+            device_id=body.device_id,
+            invite_code=body.invite_code,
+        )
+    except InviteInvalid as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ErrorCode.INVITE_INVALID.value
+        ) from exc
+    except AuthError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    session.commit()
+
+    if result.verification_token is not None:
+        # After the commit and after the response: the email carries a token
+        # that must already be valid, and SMTP latency is not the client's.
+        background.add_task(mail.send_verification, result.email, result.verification_token)
+        return RegisterResponse(status="verification_sent", email=result.email)
+    assert result.pair is not None
+    return RegisterResponse(
+        status="signed_in", email=result.email, tokens=_as_response(result.pair)
+    )
+
+
+@router.post(
+    "/verify-email",
+    operation_id="verifyEmail",
+    response_model=VerifyEmailResponse,
+    summary="Confirm the address from the emailed link",
+)
+def verify_email(body: VerifyEmailRequest, session: DbSession) -> VerifyEmailResponse:
+    try:
+        email, pair = service.verify_email(
+            session, token=body.token, device_id=body.device_id
+        )
+    except AuthError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    session.commit()
+    return VerifyEmailResponse(email=email, tokens=_as_response(pair) if pair else None)
+
+
+@router.post(
+    "/resend-verification",
+    operation_id="resendVerification",
+    response_model=ResendVerificationResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Send the confirmation link again",
+)
+def resend_verification(
+    body: ResendVerificationRequest, session: DbSession, background: BackgroundTasks
+) -> ResendVerificationResponse:
+    """The same answer whether or not the address is registered or pending."""
+    token = service.resend_verification(session, email=body.email)
+    session.commit()
+    if token is not None:
+        background.add_task(mail.send_verification, str(body.email).strip().lower(), token)
+    return ResendVerificationResponse()
 
 
 @router.post(
@@ -177,6 +320,10 @@ def login(body: LoginRequest, session: DbSession) -> TokenResponse:
         pair = service.login(
             session, email=body.email, password=body.password, device_id=body.device_id
         )
+    except EmailNotVerified as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail=ErrorCode.EMAIL_NOT_VERIFIED.value
+        ) from exc
     except AuthError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)
