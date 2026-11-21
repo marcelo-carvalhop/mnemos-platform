@@ -8,7 +8,7 @@ mudar a interface é um comando só.
 | Pasta | O quê | Como | Quantas |
 |---|---|---|---|
 | [`mobile/`](mobile/) | App Flutter (`app/mobile`) | goldens do `flutter test` | 29 |
-| [`web/`](web/) | Cliente web (`app/web/dist`) | Chrome headless | 11 |
+| [`web/`](web/) | Cliente web (`app/web/dist`) | Chrome headless | 15 |
 
 Nenhuma das duas precisa de emulador, dispositivo físico, Docker, backend ou
 conta real.
@@ -141,7 +141,7 @@ descartar), então ele não foi implementado.
 
 ### O cliente web
 
-As imagens são do web **já redesenhado** conforme o canvas `Mnemos Web.dc.html`,
+As imagens são do web no design system "Marinho" ([`docs/design/DESIGN-SYSTEM.md`](../docs/design/DESIGN-SYSTEM.md)),
 com a mesma paleta e a mesma tipografia do aplicativo.
 
 Uma ressalva sobre a branch: o código-fonte do web vive em `origin/dev`
@@ -190,9 +190,21 @@ Depois dispara o Chrome headless em cada rota. Formato: 1440×900 CSS a 2x →
 | 07 | `07-progresso.png` | `/progresso` | métricas |
 | 08 | `08-dispositivo.png` | `/dispositivo` | nenhum terminal pareado |
 | 09 | `09-configuracoes.png` | `/configuracoes` | assinatura, retenção, dados |
+| 10 | `10-baralho.png` | `/biblioteca/:deckId` | lista de cards e editor |
+| 11 | `11-gerando.png` | `/gerar/:jobId` | geração em andamento |
+| 12 | `12-aprovar.png` | `/aprovar/:jobId` | aprovar os cards gerados |
+| 13 | `13-confirmar.png` | `/confirmar` | link de confirmação de e-mail |
 
-Ficaram de fora `/biblioteca/:deckId`, `/gerar/:jobId` e `/aprovar/:jobId`: as
-três exigem um id que a captura teria de inventar.
+As rotas com id usam ids fixos que o servidor de fixture conhece: um baralho,
+uma geração rodando e outra pronta para aprovar.
+
+Para revisar o tema escuro e a largura de celular sem sobrescrever esta pasta:
+
+    MNEMOS_SCREENSHOT_SCHEME=dark MNEMOS_SCREENSHOT_OUT=/tmp/escuro tools/screenshots/capture_web.sh
+
+`MNEMOS_SCREENSHOT_SIZE=390,844` muda a janela, mas o Chrome no Windows não
+monta a página abaixo de ~500 px de largura: para medir 390 px de verdade,
+carregue a rota dentro de um `<iframe>` de 390 px.
 
 **O que o redesign do web mudou.** A troca de tokens em `src/styles.css`
 repintou o cliente inteiro de uma vez — não havia nenhuma cor fixa fora do

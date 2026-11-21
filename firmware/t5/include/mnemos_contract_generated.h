@@ -83,5 +83,8 @@ constexpr const char ERROR_PHOTO_UNREADABLE[] = "photo_unreadable";
 constexpr const char ERROR_MODEL_REFUSED[] = "model_refused";
 constexpr const char ERROR_NETWORK_UNAVAILABLE[] = "network_unavailable";
 constexpr const char ERROR_RESYNC_REQUIRED[] = "resync_required";
+constexpr const char ERROR_INVITE_INVALID[] = "invite_invalid";
+constexpr const char ERROR_EMAIL_NOT_VERIFIED[] = "email_not_verified";
+constexpr const char ERROR_ACCOUNT_REQUIRED[] = "account_required";
 
 }  // namespace MnemosContract

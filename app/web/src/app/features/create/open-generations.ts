@@ -1,6 +1,6 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Generation, type OpenGeneration } from '../../core/generation';
+import { PendingGenerations } from '../../core/open-generations';
 
 /**
  * O caminho de volta para uma geração deixada no meio (§7.8).
@@ -32,8 +32,8 @@ import { Generation, type OpenGeneration } from '../../core/generation';
       margin-bottom: 18px;
     }
     .waiting {
-      background: var(--mn-accent);
-      color: var(--mn-text-on-accent);
+      background: var(--mn-ai);
+      color: var(--mn-text-on-hero);
     }
     .running {
       background: color-mix(in srgb, var(--mn-line) 45%, transparent);
@@ -74,20 +74,12 @@ import { Generation, type OpenGeneration } from '../../core/generation';
   `,
 })
 export class OpenGenerations {
-  private readonly generation = inject(Generation);
+  private readonly open = inject(PendingGenerations);
 
-  protected readonly jobs = signal<OpenGeneration[]>([]);
+  /** O mesmo estado do atalho do cabeçalho e da barra lateral. */
+  protected readonly jobs = this.open.jobs;
 
   constructor() {
-    void this.load();
-  }
-
-  private async load(): Promise<void> {
-    try {
-      this.jobs.set(await this.generation.open());
-    } catch {
-      // Offline não é erro; o aviso simplesmente não aparece.
-      this.jobs.set([]);
-    }
+    void this.open.refresh();
   }
 }

@@ -382,7 +382,11 @@ export class Create {
 
   protected readonly spent = computed(() => this.remaining() === 0);
 
+  /** "beta": gerações sem cota para quem tem conta, enquanto o beta durar. */
+  protected readonly plan = signal<string | null>(null);
+
   protected readonly quotaLine = computed(() => {
+    if (this.plan() === 'beta') return 'Gerações ilimitadas no beta';
     const left = this.remaining();
     // Offline a resposta honesta é "não sei", e o app não pode chutar a favor
     // nem contra a pessoa.
@@ -397,7 +401,9 @@ export class Create {
 
   private async loadQuota(): Promise<void> {
     try {
-      this.remaining.set((await this.generation.quota()).remaining);
+      const quota = await this.generation.quota();
+      this.plan.set(quota.plan);
+      this.remaining.set(quota.remaining);
     } catch {
       this.remaining.set(-1);
     }

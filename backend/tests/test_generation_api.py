@@ -13,13 +13,13 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 
 from app.auth import service as auth
 from app.db import SessionLocal
 from app.generation import service as generation
 from app.main import app
-from app.models import GenerationJob
+from app.models import Card, GenerationJob
 from app.sync import service as sync
 
 NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
@@ -170,9 +170,11 @@ def test_the_whole_flow_from_request_to_real_cards(client, account: Account):
     closed = client.post(f"/v1/generation/jobs/{job_id}/close", headers=account.headers).json()
     assert closed["created"] == 2
 
-    # §7.8 — idempotent, because a card reuses its pending row's id.
+    # §7.8 — idempotent, because a card reuses its pending row's id: the same
+    # two cards, never four.
     again = client.post(f"/v1/generation/jobs/{job_id}/close", headers=account.headers).json()
-    assert again["created"] == 0
+    assert again["created"] == 2
+    assert deck_card_count(account) == 2
 
 
 def test_undo_is_a_real_state_not_a_missing_one(client, account: Account):
@@ -529,3 +531,50 @@ def test_a_ready_job_with_no_cards_is_not_owed_to_anyone(client, account: Accoun
     finish(created.json()["id"], [])
 
     assert client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"] == []
+
+
+def deck_card_count(account: Account) -> int:
+    with SessionLocal() as session:
+        return session.execute(
+            select(func.count()).select_from(Card).where(Card.deck_id == account.deck_id)
+        ).scalar_one()
+
+
+def test_judging_the_last_card_adds_the_approved_ones(client, account: Account):
+    """No "Adicionar" button standing between approval and the deck.
+
+    Reported from the web: twelve cards approved one by one, the summary
+    screen left without pressing its button, and none of them ever arrived.
+    """
+    created = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={"source_type": "topic", "target_deck_id": account.deck_id, "topic": "TCP"},
+    )
+    job_id = created.json()["id"]
+    finish(job_id, sample_cards(3))
+    queue = client.get(f"/v1/generation/jobs/{job_id}/queue", headers=account.headers).json()
+    ids = [c["id"] for c in queue["cards"]]
+
+    for pending_id, decision in zip(ids, ["approved", "discarded", "approved"], strict=True):
+        client.post(
+            f"/v1/generation/pending/{pending_id}",
+            headers=account.headers,
+            json={"decision": decision},
+        )
+
+    # No close call at all.
+    assert deck_card_count(account) == 2
+
+    # Undoing a card that is already in the deck is refused, not silently
+    # left disagreeing with the deck.
+    undo = client.post(
+        f"/v1/generation/pending/{ids[0]}", headers=account.headers, json={"decision": None}
+    )
+    assert undo.status_code == 409
+    assert undo.json()["detail"] == "already_added"
+
+    # A late close (the old client) still answers with the cards in the deck.
+    closed = client.post(f"/v1/generation/jobs/{job_id}/close", headers=account.headers).json()
+    assert closed["created"] == 2
+    assert deck_card_count(account) == 2

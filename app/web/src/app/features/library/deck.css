@@ -106,7 +106,7 @@ h1 {
   resize: vertical;
 }
 .editor textarea:focus {
-  border-color: var(--mn-accent);
+  border-color: var(--mn-highlight);
 }
 .editor small {
   display: block;
@@ -135,7 +135,7 @@ h1 {
 }
 .pf {
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 500;
 }
 .pb {
   font-size: 14.5px;
@@ -155,7 +155,7 @@ h1 {
 }
 .editor-actions button {
   padding: 11px 18px;
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   border: 1px solid var(--mn-line);
   background: none;
   font-size: 14px;
@@ -178,7 +178,7 @@ h1 {
   border-color: color-mix(in srgb, var(--mn-destructive) 40%, transparent) !important;
   background: none;
   padding: 11px 18px;
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   border: 1px solid;
   font-size: 14px;
 }
@@ -192,4 +192,8 @@ h1 {
   .split {
     grid-template-columns: 1fr;
   }
+}
+
+.danger {
+  white-space: nowrap;
 }

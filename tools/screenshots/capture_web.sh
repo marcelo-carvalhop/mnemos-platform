@@ -12,8 +12,17 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 build="$repo/app/web/dist/mnemos-web/browser"
-out="$repo/screenshots/web"
+out="${MNEMOS_SCREENSHOT_OUT:-$repo/screenshots/web}"
 port="${MNEMOS_SCREENSHOT_PORT:-4600}"
+# Variantes para revisão, fora da pasta documentada:
+#   MNEMOS_SCREENSHOT_SCHEME=dark       tema escuro (prefers-color-scheme)
+#   MNEMOS_SCREENSHOT_SIZE=390,844      largura de celular
+#   MNEMOS_SCREENSHOT_OUT=/outra/pasta  para não sobrescrever screenshots/web
+size="${MNEMOS_SCREENSHOT_SIZE:-1440,900}"
+scheme_flag=()
+if [ "${MNEMOS_SCREENSHOT_SCHEME:-light}" = "dark" ]; then
+  scheme_flag=(--blink-settings=preferredColorScheme=0)
+fi
 
 chrome="${1:-/c/Program Files/Google/Chrome/Application/chrome.exe}"
 [ -x "$chrome" ] || chrome="$(command -v google-chrome || command -v chromium || true)"
@@ -45,7 +54,7 @@ mkdir -p "$out"
 # tela do dispositivo saiu vazia mesmo com o terminal presente no DOM.
 shot() { # url profile filename
   "$chrome" --headless=new --disable-gpu --hide-scrollbars --no-first-run \
-    --user-data-dir="$work/$2-${3%.png}" --window-size=1440,900 \
+    --user-data-dir="$work/$2-${3%.png}" --window-size="$size" "${scheme_flag[@]}" \
     --force-device-scale-factor=2 --virtual-time-budget=20000 \
     --screenshot="$out/$3" "$1" >/dev/null 2>&1
   echo "  $3"
@@ -69,5 +78,11 @@ shot "$base/estudar"       auth "06-estudar.png"
 shot "$base/progresso"     auth "07-progresso.png"
 shot "$base/dispositivo"   auth "08-dispositivo.png"
 shot "$base/configuracoes" auth "09-configuracoes.png"
+# Ids fixos do servidor de fixture: um baralho, uma geração rodando e outra
+# pronta para aprovar.
+shot "$base/biblioteca/01927f01-0000-7000-8000-000000000001" auth "10-baralho.png"
+shot "$base/gerar/01927f01-0000-7000-8000-00000000a001"      auth "11-gerando.png"
+shot "$base/aprovar/01927f01-0000-7000-8000-00000000a002"    auth "12-aprovar.png"
+shot "$base/confirmar?token=exemplo&anon=1"                 anon "13-confirmar.png"
 
-echo "Wrote 11 screenshots to $out"
+echo "Wrote 15 screenshots to $out"

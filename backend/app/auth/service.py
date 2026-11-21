@@ -49,10 +49,30 @@ class TokenReuseDetected(AuthError):
     """
 
 
+class InviteInvalid(AuthError):
+    """Invite-only mode, and the code given is not the one configured."""
+
+
+class EmailNotVerified(AuthError):
+    """The password is right but the address never answered the link."""
+
+
+class AccountRequired(AuthError):
+    """Invite-only mode refuses anonymous accounts: only someone who signed up
+    with the invite code and an email address gets in."""
+
+
 class AttestationRequired(AuthError):
     """§8.1 — with one free generation per lifetime, a reinstall doubles the
     entire free allocation. The device token is the only thing in the way, so
     attestation is what makes that identity survive a reinstall."""
+
+
+# A confirmation link outlives a weekend away from the inbox, and no more.
+VERIFICATION_TTL = timedelta(days=7)
+# Asking for the link again sooner than this sends nothing: a button pressed
+# five times should not be five emails.
+RESEND_INTERVAL = timedelta(seconds=60)
 
 
 @dataclass(frozen=True)
@@ -163,6 +183,9 @@ def register_device(
     """First launch: a real user with no credentials, plus the device (§8.1)."""
     now = now or datetime.now(UTC)
 
+    if get_settings().invite_only:
+        raise AccountRequired("this server only admits invited accounts")
+
     if require_attestation and not attested:
         raise AttestationRequired(
             "device attestation is required before an anonymous quota is granted"
@@ -267,8 +290,155 @@ def login(
         raise AuthError("invalid credentials")
     if not verify_password(password, user.password_hash):
         raise AuthError("invalid credentials")
+    # After the password, never before: refusing an unconfirmed address
+    # earlier would tell anyone which addresses are registered.
+    if get_settings().require_email_verification and user.email_verified_at is None:
+        raise EmailNotVerified("email not confirmed")
 
     return _issue_pair(session, user.id, device_id, now)
+
+
+@dataclass(frozen=True)
+class Registration:
+    """What `register` produced: a session when no confirmation is needed, or
+    the raw link token to email when it is. Never both."""
+
+    email: str
+    pair: TokenPair | None
+    verification_token: str | None
+
+
+def invite_matches(given: str | None) -> bool:
+    configured = get_settings().invite_code.strip().lower()
+    if not configured:
+        return True
+    return hmac.compare_digest((given or "").strip().lower().encode(), configured.encode())
+
+
+def _new_verification(user: User, now: datetime) -> str:
+    token = secrets.token_urlsafe(32)
+    user.email_verification_hash = _hash_token(token)
+    user.email_verification_sent_at = now
+    return token
+
+
+def register(
+    session: Session,
+    *,
+    email: str,
+    password: str,
+    device_id: str,
+    invite_code: str | None,
+    now: datetime | None = None,
+) -> Registration:
+    """A new account with credentials from the start.
+
+    The anonymous-first path (§8.1) stays for open servers; an invite-only
+    server admits nobody without the code and an address, so the account is
+    born with both. No device row: login never needed one, and the free
+    allowance that devices guard is a per-account grant here, behind the
+    invite.
+    """
+    now = now or datetime.now(UTC)
+    settings = get_settings()
+    email = email.strip().lower()
+
+    # The invite first: without it, the endpoint answers nothing about which
+    # addresses exist.
+    if not invite_matches(invite_code):
+        raise InviteInvalid("invalid invite code")
+
+    user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if user is not None:
+        if not settings.require_email_verification or user.email_verified_at is not None:
+            raise AuthError("email already registered")
+        # Signed up before and never confirmed — typically a lost email or a
+        # mistyped password. Take the new password and send a fresh link; the
+        # old link stops working, so only the latest attempt can be confirmed.
+        user.password_hash = hash_password(password)
+        token = _new_verification(user, now)
+        session.flush()
+        return Registration(email=email, pair=None, verification_token=token)
+
+    user = User(
+        id=secrets.token_hex(18),
+        email=email,
+        password_hash=hash_password(password),
+        email_verified_at=None if settings.require_email_verification else now,
+    )
+    session.add(user)
+    token = _new_verification(user, now) if settings.require_email_verification else None
+    try:
+        with session.begin_nested():
+            session.flush()
+    except IntegrityError as exc:
+        # The same address registering twice at once.
+        raise AuthError("email already registered") from exc
+
+    if token is not None:
+        return Registration(email=email, pair=None, verification_token=token)
+    return Registration(
+        email=email, pair=_issue_pair(session, user.id, device_id, now), verification_token=None
+    )
+
+
+def verify_email(
+    session: Session,
+    *,
+    token: str,
+    device_id: str | None = None,
+    now: datetime | None = None,
+) -> tuple[str, TokenPair | None]:
+    """Confirms the address behind a link. With a `device_id`, the browser
+    that opened the link is signed in too — the link is proof of the inbox,
+    and the inbox is what a password reset would trust anyway."""
+    now = now or datetime.now(UTC)
+    user = session.execute(
+        select(User).where(User.email_verification_hash == _hash_token(token))
+    ).scalar_one_or_none()
+    if user is None or user.email is None:
+        raise AuthError("invalid or already used link")
+    sent = user.email_verification_sent_at
+    if sent is None or sent + VERIFICATION_TTL <= now:
+        raise AuthError("link expired")
+
+    user.email_verified_at = now
+    user.email_verification_hash = None
+    session.flush()
+    pair = _issue_pair(session, user.id, device_id, now) if device_id else None
+    return user.email, pair
+
+
+def resend_verification(
+    session: Session, *, email: str, now: datetime | None = None
+) -> str | None:
+    """A fresh link for an unconfirmed address, or None. The caller answers
+    the same either way, so this does not reveal who is registered."""
+    now = now or datetime.now(UTC)
+    user = session.execute(
+        select(User).where(User.email == email.strip().lower())
+    ).scalar_one_or_none()
+    if user is None or user.email_verified_at is not None:
+        return None
+    sent = user.email_verification_sent_at
+    if sent is not None and now - sent < RESEND_INTERVAL:
+        return None
+    token = _new_verification(user, now)
+    session.flush()
+    return token
+
+
+def require_member(session: Session, user_id: str) -> None:
+    """Invite-only mode: an account must have an email, confirmed when
+    confirmation is on. Anonymous accounts from before the switch stop here."""
+    settings = get_settings()
+    if not settings.invite_only:
+        return
+    user = session.get(User, user_id)
+    if user is None or user.email is None:
+        raise AccountRequired("an invited account is required")
+    if settings.require_email_verification and user.email_verified_at is None:
+        raise AccountRequired("an invited account is required")
 
 
 def refresh(

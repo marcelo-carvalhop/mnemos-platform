@@ -28,7 +28,7 @@ textarea {
   resize: vertical;
 }
 textarea:focus {
-  border-color: var(--mn-accent);
+  border-color: var(--mn-highlight);
 }
 
 .examples {
@@ -42,7 +42,7 @@ textarea:focus {
 .examples button {
   border: 1px solid var(--mn-line);
   background: none;
-  border-radius: var(--mn-radius-lg);
+  border-radius: var(--mn-radius-pill);
   padding: 6px 14px;
   font-size: 13.5px;
   color: var(--mn-text-muted);
@@ -58,10 +58,10 @@ textarea:focus {
   justify-content: center;
   width: 100%;
   padding: 16px;
-  background: var(--mn-accent);
-  color: var(--mn-text-on-accent);
+  background: var(--mn-ai);
+  color: var(--mn-text-on-hero);
   border: 0;
-  border-radius: var(--mn-radius-lg);
+  border-radius: var(--mn-radius-pill);
   font-size: 16px;
   font-weight: 600;
   text-decoration: none;
@@ -74,8 +74,8 @@ textarea:focus {
  * tela era o que não funciona. Na App Store o "OBTER" indisponível perde a
  * cor, não ganha um preenchimento novo. */
 .primary:disabled {
-  background: color-mix(in srgb, var(--mn-accent) 30%, transparent);
-  color: color-mix(in srgb, var(--mn-text-on-accent) 60%, transparent);
+  opacity: 0.4;
+
   cursor: not-allowed;
 }
 
@@ -148,7 +148,7 @@ textarea:focus {
   color: var(--mn-text-muted);
   font-size: 14px;
   padding: 10px 0;
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
 }
 .counts button.on {
   background: var(--mn-accent);
@@ -226,7 +226,7 @@ textarea:focus {
   opacity: 0;
 }
 .drop .name {
-  font-family: var(--mn-font-content);
+  font-family: var(--mn-font-ui);
   font-size: 17px;
   color: var(--mn-text);
 }
@@ -260,7 +260,7 @@ textarea:focus {
 .actions .secondary {
   border: 1px solid var(--mn-outline);
   background: none;
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   padding: 16px 22px;
   font-size: 16px;
   font-weight: 600;
@@ -304,7 +304,7 @@ textarea:focus {
   margin: 0;
   font-family: var(--mn-font-content);
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.35;
 }
 .preview .back {
@@ -323,5 +323,15 @@ textarea:focus {
 @media (max-width: 1000px) {
   .split {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Celular: quantidade e nível em linhas próprias, cada uma com a largura toda. */
+@media (max-width: 520px) {
+  .refine {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .counts button {
+    white-space: nowrap;
   }
 }

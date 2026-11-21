@@ -1,0 +1,186 @@
+<header class="top">
+  <div class="top-row">
+    <a class="brand" routerLink="/">
+      <svg class="mark" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="6" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.8" />
+        <rect x="7" y="2" width="14" height="14" rx="3" fill="var(--mn-highlight)" />
+      </svg>
+      Mnemos
+    </a>
+    <a class="other" routerLink="/termos">Termos de uso</a>
+  </div>
+</header>
+
+<main class="doc">
+  <p class="kicker">Privacidade</p>
+  <h1>Política de privacidade</h1>
+  <p class="meta">Vigente a partir de 21 de novembro de 2026.</p>
+
+  <section class="summary" aria-label="Resumo">
+    <p>Em resumo</p>
+    <ul>
+      <li>
+        Guardamos o que você cria (baralhos, cards, revisões) para sincronizar seus aparelhos.
+      </li>
+      <li>Não vendemos dados, não mostramos anúncios e não usamos rastreadores.</li>
+      <li>O que você manda para a IA gerar cards é usado só para isso e apagado em seguida.</li>
+      <li>Você exporta tudo ou apaga a conta quando quiser, dentro do próprio app.</li>
+    </ul>
+  </section>
+
+  <h2>1. Quem cuida dos seus dados</h2>
+  <p>
+    O controlador dos dados pessoais tratados no Mnemos é
+    <span class="fill">[NOME OU RAZÃO SOCIAL]</span>, inscrito sob o
+    <span class="fill">[CPF OU CNPJ]</span>, com endereço em <span class="fill">[CIDADE/UF]</span>.
+    Para qualquer assunto de privacidade, inclusive o exercício dos seus direitos, escreva para
+    <span class="fill">[E-MAIL DE CONTATO]</span>.
+  </p>
+
+  <h2>2. O que coletamos e para quê</h2>
+  <div class="table">
+    <table>
+      <thead>
+        <tr>
+          <th>Dado</th>
+          <th>Para quê</th>
+          <th>Base legal (LGPD, art. 7º)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>E-mail e senha</td>
+          <td>
+            Criar e acessar a conta, confirmar o e-mail. A senha é guardada só como hash (PBKDF2),
+            nunca em texto.
+          </td>
+          <td>Execução de contrato</td>
+        </tr>
+        <tr>
+          <td>Baralhos, cards, etiquetas, revisões e configurações de estudo</td>
+          <td>
+            Calcular quando cada card volta e sincronizar entre celular, navegador e terminal.
+          </td>
+          <td>Execução de contrato</td>
+        </tr>
+        <tr>
+          <td>Identificador do aparelho e plataforma</td>
+          <td>Manter a sessão de cada aparelho e resolver conflitos de sincronização.</td>
+          <td>Execução de contrato</td>
+        </tr>
+        <tr>
+          <td>
+            Dados do terminal Mnemos T5 (identificador, firmware, nome da rede Wi-Fi, horário da
+            última sincronização)
+          </td>
+          <td>Parear o terminal e mostrar o estado dele no app.</td>
+          <td>Execução de contrato</td>
+        </tr>
+        <tr>
+          <td>Material enviado para gerar cards (assunto, texto, PDF ou foto)</td>
+          <td>Gerar a proposta de cards que você aprova um por um.</td>
+          <td>Execução de contrato</td>
+        </tr>
+        <tr>
+          <td>Registros de acesso (endereço IP, data e hora)</td>
+          <td>Segurança do serviço e cumprimento do Marco Civil da Internet.</td>
+          <td>Obrigação legal</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    Não coletamos dados sensíveis de propósito. O conteúdo dos cards é seu: se você escrever dados
+    sensíveis neles, eles serão tratados apenas para o estudo, como o resto do conteúdo.
+  </p>
+
+  <h2>3. Com quem compartilhamos</h2>
+  <p>Não vendemos nem alugamos dados. Usamos estes operadores, cada um só para a sua parte:</p>
+  <ul>
+    <li>
+      <strong>Amazon Web Services</strong>: hospedagem do servidor, do banco de dados e dos
+      arquivos, nos Estados Unidos.
+    </li>
+    <li>
+      <strong>Anthropic</strong>: o modelo de IA que gera cards, nos Estados Unidos. Recebe apenas o
+      material que você envia ao pedir uma geração.
+    </li>
+    <li>
+      <strong>Google</strong>: envio dos e-mails de confirmação (Gmail) e entrega das fontes
+      tipográficas do site.
+    </li>
+  </ul>
+  <p>
+    Esses serviços ficam fora do Brasil. A transferência internacional se apoia nas cláusulas
+    contratuais e garantias oferecidas por cada operador, como prevê o art. 33 da LGPD. Também
+    podemos compartilhar dados quando a lei ou uma ordem judicial exigir.
+  </p>
+
+  <h2>4. Por quanto tempo guardamos</h2>
+  <ul>
+    <li>
+      <strong>Conta, cards e histórico</strong>: enquanto a conta existir. Apagar a conta apaga tudo
+      do servidor na hora.
+    </li>
+    <li>
+      <strong>Material enviado para a IA</strong>: apagado assim que a geração termina, com sucesso
+      ou não.
+    </li>
+    <li>
+      <strong>Cópias de segurança</strong>: o banco é copiado uma vez por dia e cada cópia é
+      descartada em até 30 dias. Um dado apagado pode sobreviver nelas até esse prazo, sem uso.
+    </li>
+    <li>
+      <strong>Registros de acesso</strong>: 6 meses, como exige o art. 15 do Marco Civil da
+      Internet.
+    </li>
+    <li><strong>Link de confirmação de e-mail</strong>: vale 7 dias e só funciona uma vez.</li>
+  </ul>
+
+  <h2>5. Seus direitos</h2>
+  <p>Pela LGPD (art. 18) você pode, a qualquer momento:</p>
+  <ul>
+    <li>
+      confirmar que tratamos seus dados e ter acesso a eles — <strong>Exportar tudo</strong>, em
+      Configurações, entrega um arquivo com baralhos, cards e todo o histórico;
+    </li>
+    <li>corrigir dados incompletos ou errados — os cards você edita no próprio app;</li>
+    <li>
+      pedir a eliminação — <strong>Apagar a conta</strong>, em Configurações, apaga no servidor e no
+      aparelho;
+    </li>
+    <li>levar seus dados para outro serviço — o arquivo exportado serve para isso;</li>
+    <li>saber com quem compartilhamos (seção 3) e revogar consentimentos, quando houver.</li>
+  </ul>
+  <p>
+    O que não estiver no app, peça por <span class="fill">[E-MAIL DE CONTATO]</span>. Respondemos em
+    até 15 dias. Você também pode reclamar à Autoridade Nacional de Proteção de Dados (ANPD).
+  </p>
+
+  <h2>6. Cookies e armazenamento local</h2>
+  <p>
+    Não usamos cookies de rastreamento, analytics de terceiros nem anúncios. O navegador guarda a
+    sua sessão no armazenamento local do próprio site; o app guarda seus cards no aparelho, que é o
+    que permite estudar sem internet.
+  </p>
+
+  <h2>7. Segurança</h2>
+  <p>
+    A comunicação é sempre criptografada (HTTPS), senhas são guardadas só como hash, cada pedido
+    confere se os dados pertencem a quem pede, e o acesso ao servidor é restrito. Nenhum sistema é
+    infalível: se houver um incidente que possa trazer risco a você, avisaremos e comunicaremos a
+    ANPD.
+  </p>
+
+  <h2>8. Crianças e adolescentes</h2>
+  <p>
+    O Mnemos não é destinado a menores de 13 anos. Entre 13 e 18 anos, o uso deve ter o
+    consentimento de um responsável.
+  </p>
+
+  <h2>9. Mudanças</h2>
+  <p>
+    Se esta política mudar de forma relevante, avisaremos no app ou por e-mail antes de a mudança
+    valer. A data no topo indica a versão em vigor.
+  </p>
+</main>

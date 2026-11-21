@@ -71,7 +71,7 @@ export type ReviewSource = 'standard' | 'multiple_choice';
 export type CardStatus = 'active' | 'suspended' | 'buried';
 
 /** §10 — the client maps codes to copy; it never shows server prose. */
-export type ErrorCode = 'quota_exhausted' | 'topic_too_vague' | 'material_insufficient' | 'file_too_large' | 'page_limit_exceeded' | 'photo_unreadable' | 'model_refused' | 'network_unavailable' | 'resync_required';
+export type ErrorCode = 'quota_exhausted' | 'topic_too_vague' | 'material_insufficient' | 'file_too_large' | 'page_limit_exceeded' | 'photo_unreadable' | 'model_refused' | 'network_unavailable' | 'resync_required' | 'invite_invalid' | 'email_not_verified' | 'account_required';
 
 const ERROR_CODES: readonly string[] = [
   'quota_exhausted',
@@ -83,6 +83,9 @@ const ERROR_CODES: readonly string[] = [
   'model_refused',
   'network_unavailable',
   'resync_required',
+  'invite_invalid',
+  'email_not_verified',
+  'account_required',
 ];
 
 /**

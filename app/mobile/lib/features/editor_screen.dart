@@ -215,11 +215,11 @@ class _Field extends StatelessWidget {
           // aqui".
           decoration: InputDecoration(
             filled: true,
-            fillColor: over ? const Color(0xFFFEFBFB) : MnemosColors.raised,
+            fillColor: over ? MnemosColors.dueSurface : MnemosColors.raised,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(MnemosRadii.control),
               borderSide: BorderSide(
-                color: over ? const Color(0xFFE8B4AE) : MnemosColors.hairline,
+                color: over ? MnemosColors.dueLine : MnemosColors.hairline,
                 width: over ? 1.6 : 1,
               ),
             ),

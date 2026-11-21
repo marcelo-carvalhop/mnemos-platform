@@ -4,16 +4,17 @@ import 'tokens.dart';
 
 /// As três famílias do design, e nada além delas.
 abstract final class MnemosFonts {
-  /// Títulos e numerais. É a assinatura da identidade — um número grande em
-  /// Literata é reconhecivelmente Mnemos; o mesmo número em sans não é.
+  /// **Só o conteúdo do card** — a pergunta, a resposta, a prévia. O card é
+  /// algo para ler; a serifa marca o que é conteúdo e não interface.
   static const serif = 'Literata';
 
-  /// Corpo e rótulos de interface.
-  static const sans = 'Public Sans';
+  /// Interface, títulos e numerais. Títulos em peso médio com tracking
+  /// negativo; numerais em peso normal, grandes e apertados.
+  static const sans = 'Geist';
 
   /// Sobrancelhas e dados tabulares, onde o avanço fixo é o ponto: `3/12` e
   /// `28 d` precisam alinhar entre linhas.
-  static const mono = 'JetBrains Mono';
+  static const mono = 'Geist Mono';
 }
 
 /// Os estilos do design, nomeados pelo papel.
@@ -27,110 +28,118 @@ abstract final class MnemosFonts {
 /// pixels no tamanho de cada estilo, que é como o Flutter mede.
 abstract final class MnemosText {
   // -------------------------------------------------------------------------
-  // Títulos — Literata
+  // Títulos — Geist
   // -------------------------------------------------------------------------
 
   /// A primeira linha de uma tela de aba: "Hoje", "Biblioteca", "Progresso".
   static const screenTitle = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontSize: 28,
-    fontWeight: FontWeight.w600,
-    letterSpacing: -0.3,
+    fontWeight: FontWeight.w500,
+    letterSpacing: -0.84,
     color: MnemosColors.ink,
   );
 
   /// Título de tela que ocupa duas linhas — o nome de um baralho.
   static const screenTitleWrapped = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontSize: 22,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     height: 1.15,
     color: MnemosColors.ink,
+    letterSpacing: -0.6,
   );
 
   /// A promessa do onboarding e o convite da assinatura: texto que é a tela.
   static const display = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontSize: 34,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     height: 1.1,
-    letterSpacing: -0.9,
+    letterSpacing: -1.2,
     color: MnemosColors.ink,
   );
 
   static const displaySmall = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontSize: 28,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     height: 1.2,
     color: MnemosColors.ink,
+    letterSpacing: -0.84,
   );
 
   /// "Seus baralhos", "O que vem por aí".
   static const sectionTitle = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontSize: 17,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     color: MnemosColors.ink,
+    letterSpacing: -0.25,
   );
 
   /// O nome de um baralho dentro do seu card.
   static const cardTitle = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontSize: 19,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     color: MnemosColors.ink,
+    letterSpacing: -0.3,
   );
 
   /// A frente de um card em revisão — o objeto central daquela tela.
   static const prompt = TextStyle(
     fontFamily: MnemosFonts.serif,
     fontSize: 22,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     height: 1.35,
     color: MnemosColors.ink,
   );
 
   // -------------------------------------------------------------------------
-  // Numerais — Literata, porque o número é o conteúdo
+  // Numerais — Geist, grandes e apertados
   // -------------------------------------------------------------------------
 
   /// O número do bloco-herói: quantos cards vencem agora.
   static const heroNumeral = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontFeatures: [FontFeature.tabularFigures()],
     fontSize: 44,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w400,
     height: 1,
     color: MnemosColors.onDark,
+    letterSpacing: -1.5,
   );
 
   /// "1 mês" de memória acumulada.
   static const numeralLarge = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontFeatures: [FontFeature.tabularFigures()],
     fontSize: 28,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w400,
     height: 1,
     color: MnemosColors.ink,
+    letterSpacing: -0.9,
   );
 
   /// O número de um ladrilho de estatística.
   static const numeral = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontFeatures: [FontFeature.tabularFigures()],
     fontSize: 28,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w400,
     color: MnemosColors.ink,
+    letterSpacing: -0.9,
   );
 
   /// Números lado a lado numa linha de três — cards, vencendo, dias médios.
   static const numeralSmall = TextStyle(
-    fontFamily: MnemosFonts.serif,
+    fontFamily: MnemosFonts.sans,
     fontFeatures: [FontFeature.tabularFigures()],
     fontSize: 22,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w400,
     color: MnemosColors.ink,
+    letterSpacing: -0.6,
   );
 
   /// A unidade que acompanha um numeral: "mês", "dias", "%".
@@ -144,13 +153,13 @@ abstract final class MnemosText {
   static const numeralUnit = TextStyle(
     fontFamily: MnemosFonts.sans,
     fontSize: 15,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.6,
+    fontWeight: FontWeight.w500,
+    letterSpacing: 0,
     color: MnemosColors.faint,
   );
 
   // -------------------------------------------------------------------------
-  // Sobrancelhas e dados — JetBrains Mono
+  // Sobrancelhas e dados — Geist Mono
   // -------------------------------------------------------------------------
 
   /// `VENCENDO AGORA`, `SEQUÊNCIA`, `FRENTE`. Sempre em caixa alta — quem
@@ -196,7 +205,7 @@ abstract final class MnemosText {
   );
 
   // -------------------------------------------------------------------------
-  // Corpo e rótulos — Public Sans
+  // Corpo e rótulos — Geist
   // -------------------------------------------------------------------------
 
   /// O texto padrão do app.
@@ -234,7 +243,7 @@ abstract final class MnemosText {
   static const itemTitle = TextStyle(
     fontFamily: MnemosFonts.sans,
     fontSize: 15,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     color: MnemosColors.ink,
   );
 
@@ -243,7 +252,7 @@ abstract final class MnemosText {
   static const itemPrompt = TextStyle(
     fontFamily: MnemosFonts.sans,
     fontSize: 13,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
     height: 1.35,
     color: MnemosColors.ink,
   );
@@ -252,14 +261,14 @@ abstract final class MnemosText {
   static const label = TextStyle(
     fontFamily: MnemosFonts.sans,
     fontSize: 15,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
   );
 
   /// O botão de ação principal, no rodapé de uma tela.
   static const labelLarge = TextStyle(
     fontFamily: MnemosFonts.sans,
     fontSize: 15,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w500,
   );
 
   /// Botões dentro de blocos e chips.

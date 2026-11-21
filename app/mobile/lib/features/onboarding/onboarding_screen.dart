@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:store/store.dart';
 
 import '../../providers.dart';
+import '../../providers_sync.dart';
 import '../../theme/tokens.dart';
 import '../../theme/typography.dart';
 import '../../ui/ui.dart';
 import '../create/create_screen.dart';
+import '../sign_in_screen.dart';
 
 /// Screens `13`–`16` — §5.1.
 ///
@@ -52,10 +54,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   void _next() {
-    _controller.nextPage(
-      duration: const Duration(milliseconds: 240),
-      curve: Curves.easeOut,
-    );
+    _controller.nextPage(duration: const Duration(milliseconds: 240), curve: Curves.easeOut);
   }
 
   /// Writes what the four steps collected, then hands over.
@@ -69,23 +68,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final deviceId = await ref.read(deviceIdProvider.future);
 
     final name = _subject.text.trim().isEmpty ? 'Meu primeiro baralho' : _subject.text.trim();
-    final deckId = await AuthoringService(db, deviceId: deviceId).createDeck(
-      name: name,
-      at: now,
-    );
+    final deckId = await AuthoringService(db, deviceId: deviceId).createDeck(name: name, at: now);
 
-    await db.into(db.goalHistory).insert(
+    await db
+        .into(db.goalHistory)
+        .insert(
           GoalHistoryCompanion.insert(
             id: Uuid7.generate(now: now),
-            effectiveFromLocalDate:
-                const DayBucket(timezoneName: 'America/Sao_Paulo').today(now),
+            effectiveFromLocalDate: const DayBucket(timezoneName: 'America/Sao_Paulo').today(now),
             dailyGoal: _goal,
             createdAt: now.millisecondsSinceEpoch,
             deviceId: deviceId,
           ),
         );
 
-    await db.into(db.userSettings).insert(
+    await db
+        .into(db.userSettings)
+        .insert(
           UserSettingsCompanion.insert(
             key: 'timezone',
             value: 'America/Sao_Paulo',
@@ -109,10 +108,47 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
     widget.onDone();
     if (generate) {
-      await Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => CreateScreen(deckId: deckId),
-      ));
+      // CreateScreen é o corpo de uma aba: o Scaffold e a área segura vêm do
+      // AppShell. Aberta sozinha numa rota ela ficava sem Material por baixo —
+      // fundo preto, texto sublinhado de amarelo e o título sob a barra de
+      // status.
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (route) => Scaffold(
+            appBar: AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Fechar',
+                onPressed: () => Navigator.of(route).pop(),
+              ),
+            ),
+            body: SafeArea(
+              top: false,
+              child: CreateScreen(deckId: deckId, initialTopic: _subject.text),
+            ),
+          ),
+        ),
+      );
     }
+  }
+
+  /// "Já tenho conta": entrar traz os baralhos, a meta e o histórico da
+  /// conta, então não há primeiro baralho nem meta para perguntar.
+  Future<void> _signIn() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (route) => SignInScreen(
+          onCancel: () => Navigator.of(route).pop(),
+          onSignedIn: () async {
+            await markOnboardingDone(ref.read(databaseProvider));
+            ref.read(syncControllerProvider.notifier).syncNow();
+            ref.invalidate(quotaProvider);
+            if (route.mounted) Navigator.of(route).pop();
+            if (mounted) widget.onDone();
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -121,22 +157,28 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-              child: Row(
-                children: [
-                  for (var i = 0; i < 4; i++)
-                    Expanded(
-                      child: Container(
-                        height: 3,
-                        margin: EdgeInsets.only(right: i == 3 ? 0 : 6),
-                        decoration: ShapeDecoration(
-        color: i <= _page ? MnemosColors.primary : MnemosColors.hairline,
-        shape: squircle(2),
-      ),
+            // A boas-vindas é a capa, não o passo 1 de 4: a barra entra na
+            // segunda tela. Opacidade, e não remoção, para o conteúdo não pular.
+            AnimatedOpacity(
+              opacity: _page == 0 ? 0 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+                child: Row(
+                  children: [
+                    for (var i = 0; i < 4; i++)
+                      Expanded(
+                        child: Container(
+                          height: 3,
+                          margin: EdgeInsets.only(right: i == 3 ? 0 : 6),
+                          decoration: ShapeDecoration(
+                            color: i <= _page ? MnemosColors.primary : MnemosColors.hairline,
+                            shape: squircle(2),
+                          ),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
             Expanded(
@@ -145,18 +187,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (i) => setState(() => _page = i),
                 children: [
-                  _Welcome(onNext: _next),
+                  _Welcome(onNext: _next, onHaveAccount: _signIn),
                   _Subject(
                     controller: _subject,
                     suggestions: _suggestions,
                     onPick: (s) => setState(() => _subject.text = s),
                     onNext: _next,
                   ),
-                  _Goal(
-                    value: _goal,
-                    onChanged: (v) => setState(() => _goal = v),
-                    onNext: _next,
-                  ),
+                  _Goal(value: _goal, onChanged: (v) => setState(() => _goal = v), onNext: _next),
                   _FreeGeneration(
                     subject: _subject.text.trim(),
                     busy: _finishing,
@@ -178,99 +216,272 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 // ---------------------------------------------------------------------------
 
 class _Welcome extends StatelessWidget {
-  const _Welcome({required this.onNext});
+  const _Welcome({required this.onNext, required this.onHaveAccount});
 
   final VoidCallback onNext;
+  final VoidCallback onHaveAccount;
 
   @override
   Widget build(BuildContext context) {
-    return _Page(
+    // Opção A do canvas "Mnemos Boas-vindas": o card vem antes de qualquer
+    // frase. Quem nunca ouviu falar de repetição espaçada entende o produto
+    // vendo uma pergunta e os quatro graus — a frase só confirma.
+    return Stack(
       children: [
-        const Spacer(),
-        const Eyebrow('mnemos'),
-        const SizedBox(height: MnemosSpacing.lg),
-        const Text(
-          'Estude menos.\nLembre por\nanos.',
-          style: MnemosText.display,
-        ),
-        const SizedBox(height: MnemosSpacing.xl),
-        Text(
-          'Cards curtos, revisados na hora certa. Estude aqui pelo app, '
-          'ou no terminal Mnemos quando quiser ler sem distrações.',
-          style: MnemosText.bodyLong.copyWith(fontSize: 16, color: MnemosColors.muted),
-        ),
-        const SizedBox(height: MnemosSpacing.xl),
-        const _TerminalTeaser(),
-        const Spacer(),
-        FilledButton(onPressed: onNext, child: const Text('Começar')),
-        const SizedBox(height: MnemosSpacing.md),
-        TextButton(
-          onPressed: onNext,
-          child: const Text('Já tenho conta'),
+        const Positioned.fill(child: _GridBackdrop()),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Row(
+                children: [
+                  BrandMark(size: 22),
+                  SizedBox(width: 9),
+                  Text(
+                    'Mnemos',
+                    style: TextStyle(
+                      fontFamily: MnemosFonts.sans,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.36,
+                      color: MnemosColors.ink,
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(flex: 2),
+              const _CardStack(),
+              const Spacer(flex: 3),
+              Text.rich(
+                const TextSpan(
+                  children: [
+                    TextSpan(text: 'O que você aprendeu,\n'),
+                    TextSpan(
+                      text: 'de volta na hora certa.',
+                      style: TextStyle(color: MnemosColors.quiet),
+                    ),
+                  ],
+                ),
+                style: MnemosText.display.copyWith(fontSize: 32, height: 1.06, letterSpacing: -1.1),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Cada card volta pouco antes de você esquecer. Você estuda menos '
+                'e lembra por anos.',
+                style: MnemosText.bodyLong.copyWith(fontSize: 15.5, color: MnemosColors.faint),
+              ),
+              const Spacer(flex: 2),
+              FilledButton(onPressed: onNext, child: const Text('Começar')),
+              const SizedBox(height: 10),
+              OutlinedButton(
+                onPressed: onHaveAccount,
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: MnemosColors.raised,
+                  foregroundColor: MnemosColors.ink,
+                  side: const BorderSide(color: MnemosColors.line),
+                ),
+                child: const Text('Já tenho conta'),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
-/// O desenho do T5 ao lado da frase que explica o que ele é.
-///
-/// O aparelho é a parte do produto que ninguém adivinha por um ícone: mostrar
-/// um card na tela dele diz em dois segundos o que um parágrafo não diria.
-class _TerminalTeaser extends StatelessWidget {
-  const _TerminalTeaser();
+/// A grade de 32 px que esmaece para as bordas, como no herói da landing.
+class _GridBackdrop extends StatelessWidget {
+  const _GridBackdrop();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Container(
-          width: 96,
-          height: 132,
-          padding: const EdgeInsets.all(MnemosSpacing.md),
-          decoration: ShapeDecoration(
-        color: MnemosColors.raised,
-        shape: squircle(10, side: BorderSide(color: MnemosColors.line)),
+    return IgnorePointer(
+      child: ShaderMask(
+        blendMode: BlendMode.dstIn,
+        shaderCallback: (bounds) => const RadialGradient(
+          center: Alignment(0, -0.45),
+          radius: 1.1,
+          colors: [Color(0xFF000000), Color(0x00000000)],
+          stops: [0.15, 1],
+        ).createShader(bounds),
+        child: const CustomPaint(painter: _GridPainter(), size: Size.infinite),
       ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    );
+  }
+}
+
+class _GridPainter extends CustomPainter {
+  const _GridPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = MnemosColors.hairline
+      ..strokeWidth = 1;
+    for (var x = 0.0; x <= size.width; x += 32) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (var y = 0.0; y <= size.height; y += 32) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Um card de estudo de verdade, com dois outros empilhados atrás.
+class _CardStack extends StatelessWidget {
+  const _CardStack();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget behind(double angle, Offset offset, Color color) => Positioned.fill(
+      child: Transform.translate(
+        offset: offset,
+        child: Transform.rotate(
+          angle: angle,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: color,
+              border: Border.all(color: MnemosColors.line),
+              borderRadius: BorderRadius.circular(MnemosRadii.card),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return ExcludeSemantics(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: SizedBox(
+          height: 272,
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              Text(
-                'T5',
-                style: MnemosText.eyebrowSmall.copyWith(
-                  fontSize: 9,
-                  color: MnemosColors.fainter,
-                ),
-              ),
-              Text(
-                'O que o TCP garante?',
-                style: MnemosText.cardTitle.copyWith(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  height: 1.3,
-                ),
-              ),
-              Text(
-                '3/12',
-                style: MnemosText.monoSmall.copyWith(
-                  fontSize: 9,
-                  color: MnemosColors.fainter,
+              behind(0.052, const Offset(6, 10), MnemosColors.soft),
+              behind(0.026, const Offset(3, 5), MnemosColors.sunken),
+              Positioned.fill(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+                  decoration: BoxDecoration(
+                    color: MnemosColors.raised,
+                    border: Border.all(color: MnemosColors.line),
+                    borderRadius: BorderRadius.circular(MnemosRadii.card),
+                    boxShadow: const [
+                      BoxShadow(color: Color(0x1A0F1C3D), blurRadius: 32, offset: Offset(0, 8)),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'REDES DE COMPUTADORES',
+                              style: MnemosText.eyebrowSmall.copyWith(fontSize: 11),
+                            ),
+                          ),
+                          Text('3 / 12', style: MnemosText.monoSmall.copyWith(fontSize: 11)),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'O que o TCP garante que o UDP não garante?',
+                        style: MnemosText.prompt.copyWith(fontSize: 21, height: 1.36),
+                      ),
+                      const Spacer(),
+                      const Divider(height: 1, color: MnemosColors.hairline),
+                      const SizedBox(height: 12),
+                      const Row(
+                        children: [
+                          _GradeChip(
+                            'Errei',
+                            '10 min',
+                            MnemosColors.again,
+                            MnemosColors.againSurface,
+                            MnemosColors.dueLine,
+                          ),
+                          SizedBox(width: 6),
+                          _GradeChip(
+                            'Difícil',
+                            '2 d',
+                            MnemosColors.hard,
+                            MnemosColors.hardSurface,
+                            MnemosColors.line,
+                          ),
+                          SizedBox(width: 6),
+                          _GradeChip(
+                            'Bom',
+                            '5 d',
+                            MnemosColors.good,
+                            MnemosColors.goodSurface,
+                            MnemosColors.goodLine,
+                          ),
+                          SizedBox(width: 6),
+                          _GradeChip(
+                            'Fácil',
+                            '12 d',
+                            MnemosColors.easy,
+                            MnemosColors.easySurface,
+                            MnemosColors.easyLine,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: MnemosSpacing.lg),
-        Expanded(
-          child: Text(
-            'Um aparelho de tinta eletrônica que só faz uma coisa: te perguntar '
-            'a coisa certa na hora certa.',
-            style: MnemosText.bodySmall.copyWith(fontSize: 13.5, height: 1.6),
-          ),
+      ),
+    );
+  }
+}
+
+class _GradeChip extends StatelessWidget {
+  const _GradeChip(this.label, this.interval, this.ink, this.fill, this.border);
+
+  final String label;
+  final String interval;
+  final Color ink;
+  final Color fill;
+  final Color border;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: fill,
+          border: Border.all(color: border),
+          borderRadius: BorderRadius.circular(MnemosRadii.card),
         ),
-      ],
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: MnemosFonts.sans,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: ink,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              interval,
+              style: TextStyle(fontFamily: MnemosFonts.mono, fontSize: 10.5, color: ink),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -297,8 +508,7 @@ class _Subject extends StatelessWidget {
     return _Page(
       children: [
         const SizedBox(height: 30),
-        const Text('O que você quer estudar?',
-            style: MnemosText.screenTitleWrapped),
+        const Text('O que você quer estudar?', style: MnemosText.screenTitleWrapped),
         const SizedBox(height: 10),
         Text(
           'Pode ser uma matéria ou um assunto específico que você queira memorizar.',
@@ -325,7 +535,6 @@ class _Subject extends StatelessWidget {
                 label: Text(s),
                 onPressed: () => onPick(s),
                 backgroundColor: MnemosColors.raised,
-                side: BorderSide.none,
               ),
           ],
         ),
@@ -362,11 +571,12 @@ class _Goal extends StatelessWidget {
     return _Page(
       children: [
         const SizedBox(height: 30),
-        const Text('Quanto por dia?',
-            style: MnemosText.screenTitleWrapped),
+        const Text('Quanto por dia?', style: MnemosText.screenTitleWrapped),
         const SizedBox(height: 10),
-        Text('Dá para mudar depois, a qualquer momento.',
-            style: MnemosText.bodyLong.copyWith(fontSize: 15, color: MnemosColors.muted)),
+        Text(
+          'Dá para mudar depois, a qualquer momento.',
+          style: MnemosText.bodyLong.copyWith(fontSize: 15, color: MnemosColors.muted),
+        ),
         const SizedBox(height: 26),
         for (final (goal, title, detail) in _options) ...[
           _Option(
@@ -418,11 +628,9 @@ class _Option extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: MnemosText.itemTitle.copyWith(fontSize: 16)),
+                  Text(title, style: MnemosText.itemTitle.copyWith(fontSize: 16)),
                   const SizedBox(height: 3),
-                  Text(detail,
-                      style: MnemosText.caption),
+                  Text(detail, style: MnemosText.caption),
                 ],
               ),
             ),
@@ -438,7 +646,7 @@ class _Option extends StatelessWidget {
 // 16 — a geração grátis
 // ---------------------------------------------------------------------------
 
-class _FreeGeneration extends StatelessWidget {
+class _FreeGeneration extends ConsumerWidget {
   const _FreeGeneration({
     required this.subject,
     required this.busy,
@@ -452,27 +660,29 @@ class _FreeGeneration extends StatelessWidget {
   final VoidCallback onSkip;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Beta: quem tem conta gera sem cota. Falar em "uma geração" aqui seria
+    // ensinar uma regra que não vale.
+    final beta = ref.watch(quotaProvider).valueOrNull?.plan == 'beta';
     return _Page(
       children: [
         const SizedBox(height: 30),
-        const Text('Sua geração grátis',
+        Text(beta ? 'Gerações à vontade' : 'Sua geração grátis',
             style: MnemosText.screenTitleWrapped),
         const SizedBox(height: 12),
         // §7.7.1 — it is one per lifetime, and it does not expire. Spending it
         // without saying so is taking something the user did not know they
         // had.
         Text(
-          'Você tem uma geração por IA para usar quando quiser. Ela não expira.',
+          beta
+              ? 'Durante o beta, você gera cards por IA sem limite. Comece por aqui.'
+              : 'Você tem uma geração por IA para usar quando quiser. Ela não expira.',
           style: MnemosText.bodyLong.copyWith(fontSize: 15, color: MnemosColors.muted),
         ),
         const SizedBox(height: 26),
         Container(
           padding: const EdgeInsets.all(16),
-          decoration: ShapeDecoration(
-        color: MnemosColors.raised,
-        shape: squircle(14),
-      ),
+          decoration: ShapeDecoration(color: MnemosColors.raised, shape: squircle(14)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -489,12 +699,15 @@ class _FreeGeneration extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 14),
-        const Text(
-          'Ou guarde para fotografar seu caderno depois — costuma impressionar mais.',
+        Text(
+          beta
+              ? 'Depois, dá para gerar também de um texto, de um PDF ou da foto do caderno.'
+              : 'Ou guarde para fotografar seu caderno depois — costuma impressionar mais.',
           style: TextStyle(fontSize: 12.5, height: 1.5, color: MnemosColors.faint),
         ),
         const Spacer(),
-        FilledButton(
+        // Ação da IA: o gradiente dela, como o "Gerar" da tela Criar.
+        AiButton(
           onPressed: busy ? null : onGenerate,
           child: const Text('Gerar meu primeiro baralho'),
         ),
@@ -502,7 +715,7 @@ class _FreeGeneration extends StatelessWidget {
         // A real second option, given the same weight the copy claims it has.
         OutlinedButton(
           onPressed: busy ? null : onSkip,
-          child: const Text('Guardar para depois'),
+          child: Text(beta ? 'Agora não' : 'Guardar para depois'),
         ),
         const SizedBox(height: 6),
         const Center(

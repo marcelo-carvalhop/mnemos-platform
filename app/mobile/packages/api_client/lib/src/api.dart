@@ -34,6 +34,11 @@ class Api {
   /// the user back to sign-in, and only the app knows how.
   void Function()? onAuthenticationLost;
 
+  /// Called when an invite-only server refuses this account (403
+  /// `account_required`): an anonymous account from before the switch, or
+  /// none at all. The tokens are cleared first; the app shows sign-in.
+  void Function()? onAccountRequired;
+
   Future<Map<String, Object?>> get(String path, {Map<String, String>? query}) =>
       _send('GET', path, query: query);
 
@@ -83,7 +88,14 @@ class Api {
       }
     }
 
-    if (response.statusCode >= 400) throw _asException(response);
+    if (response.statusCode >= 400) {
+      final failure = _asException(response);
+      if (failure.isAccountRequired) {
+        await tokens.clear();
+        onAccountRequired?.call();
+      }
+      throw failure;
+    }
 
     if (response.body.isEmpty) return const {};
     return jsonDecode(response.body) as Map<String, Object?>;

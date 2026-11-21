@@ -138,7 +138,7 @@ class HeroCard extends StatelessWidget {
       width: double.infinity,
       padding: padding ?? const EdgeInsets.all(MnemosSpacing.xl),
       decoration: ShapeDecoration(
-        color: MnemosColors.primary,
+        gradient: MnemosGradients.hero,
         shape: squircle(MnemosRadii.card),
       ),
       child: child,
@@ -540,4 +540,52 @@ Future<bool> confirmDiscard(BuildContext context) async {
     ),
   );
   return leave ?? false;
+}
+
+/// O símbolo do Mnemos: dois cards sobrepostos, o da frente em azul.
+///
+/// O mesmo desenho do `<svg class="mark">` da web, em 24 unidades: um card
+/// contornado embaixo, um preenchido por cima, deslocado para cima e para a
+/// direita — um card que volta.
+class BrandMark extends StatelessWidget {
+  const BrandMark({super.key, this.size = 22});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: size,
+      child: const CustomPaint(painter: _BrandMarkPainter()),
+    );
+  }
+}
+
+class _BrandMarkPainter extends CustomPainter {
+  const _BrandMarkPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final u = size.width / 24;
+    final back = RRect.fromRectAndRadius(
+      Rect.fromLTWH(3 * u, 6 * u, 14 * u, 14 * u),
+      Radius.circular(3 * u),
+    );
+    final front = RRect.fromRectAndRadius(
+      Rect.fromLTWH(7 * u, 2 * u, 14 * u, 14 * u),
+      Radius.circular(3 * u),
+    );
+    canvas
+      ..drawRRect(
+        back,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8 * u
+          ..color = MnemosColors.ink,
+      )
+      ..drawRRect(front, Paint()..color = MnemosColors.highlight);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

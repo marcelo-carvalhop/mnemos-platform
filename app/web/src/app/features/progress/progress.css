@@ -28,9 +28,9 @@ h2 {
   margin-bottom: 18px;
 }
 .big {
-  font-family: var(--mn-font-content);
+  font-family: var(--mn-font-display);
   font-size: 40px;
-  font-weight: 600;
+  font-weight: 400;
   margin: 6px 0 4px;
   letter-spacing: -0.02em;
 }
@@ -83,7 +83,7 @@ h2 {
 .bar {
   width: 100%;
   min-height: 3px;
-  background: var(--mn-accent);
+  background: var(--mn-highlight);
   border-radius: 2px 2px 0 0;
 }
 /* Dia sem revisão: a cor do trilho. Um zero desenhado na cor da barra parece
@@ -187,7 +187,7 @@ h2 {
   color: var(--mn-text-muted);
   font-size: 13px;
   padding: 8px 14px;
-  border-radius: var(--mn-radius-lg);
+  border-radius: var(--mn-radius-pill);
 }
 .chips button.on {
   background: var(--mn-accent);
@@ -199,16 +199,16 @@ h2 {
 /* O primeiro cartão da fileira é o bloco-âncora: a métrica que o produto
  * promete, separada por cor das que só descrevem esforço. */
 .cards .anchor {
-  background: var(--mn-accent);
-  border-color: var(--mn-accent);
-  color: var(--mn-text-on-accent);
+  background: var(--mn-hero);
+  border-color: transparent;
+  color: var(--mn-text-on-hero);
 }
 .cards .anchor .eyebrow {
   margin: 0;
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--mn-accent-soft);
+  color: var(--mn-text-on-hero-muted);
 }
 .cards .anchor .figure {
   display: flex;
@@ -217,20 +217,20 @@ h2 {
   margin: 8px 0 0;
 }
 .cards .anchor .figure .n {
-  font-family: var(--mn-font-content);
+  font-family: var(--mn-font-display);
   font-size: 34px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1;
 }
 .cards .anchor .figure .unit {
-  font-family: var(--mn-font-content);
+  font-family: var(--mn-font-ui);
   font-size: 20px;
 }
 .cards .anchor .note {
   margin: 8px 0 0;
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--mn-accent-soft);
+  color: var(--mn-text-on-hero-muted);
 }
 .cards .n.good {
   color: var(--mn-good);
@@ -287,11 +287,23 @@ h2.spaced {
 .maturity .fill {
   display: block;
   height: 8px;
-  background: var(--mn-accent);
+  background: var(--mn-highlight);
 }
 
 @media (max-width: 1000px) {
   .split {
     grid-template-columns: 1fr;
+  }
+}
+
+/* O período nunca quebra no meio ("30 / dias"): a fileira desce inteira. */
+.chips button {
+  white-space: nowrap;
+}
+@media (max-width: 520px) {
+  .head {
+    flex-wrap: wrap;
+    row-gap: var(--mn-gap-4);
+    margin-bottom: var(--mn-gap-4);
   }
 }

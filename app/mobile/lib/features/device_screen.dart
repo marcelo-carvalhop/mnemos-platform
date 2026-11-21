@@ -282,7 +282,7 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
         bottom: false,
         child: ScreenBody(
           children: [
-            BackHeader(label: 'Hoje', onMenu: _openConnection),
+            BackHeader(label: 'Voltar', onMenu: _openConnection),
             const SizedBox(height: MnemosSpacing.md),
             Text(terminal.model, style: MnemosText.screenTitle),
             const SizedBox(height: 6),
@@ -435,7 +435,7 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: MnemosSpacing.screen),
-              child: BackHeader(label: 'Hoje'),
+              child: BackHeader(label: 'Voltar'),
             ),
             // Centrado no que sobra da tela: empilhado no topo, o conteúdo
             // acabava em y≈650 de 1760 e o resto era branco morto.

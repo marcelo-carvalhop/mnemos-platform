@@ -181,6 +181,28 @@ void main() {
     expect(sut.state.phase, SyncPhase.idle, reason: 'the second pass succeeded');
   });
 
+  test('rows from the server tell the screens to read again', () async {
+    // The screens cache what they read from SQLite. A pull that wrote rows
+    // they cannot see left a freshly signed-in phone on an empty home.
+    var revisions = 0;
+    final sut = SyncController(
+      _Pulls(db, api, pulled: 12),
+      isSignedIn: () async => true,
+      onPulled: () => revisions++,
+    );
+
+    await sut.syncNow();
+    expect(revisions, 1);
+
+    final quiet = SyncController(
+      _Pulls(db, api, pulled: 0),
+      isSignedIn: () async => true,
+      onPulled: () => revisions++,
+    );
+    await quiet.syncNow();
+    expect(revisions, 1, reason: 'nothing came in, nothing to recompute');
+  });
+
   test('a count read while syncing does not overwrite the result', () async {
     // Both fire at the end of a session. Whichever finished second used to
     // win, and a count read before the push landed claimed changes were
@@ -251,6 +273,9 @@ class _ResyncOnce implements SyncClient {
 
   @override
   Future<int> pullAll() async => 0;
+
+  @override
+  Future<bool> adoptAccount(String userId) async => false;
 }
 
 
@@ -279,6 +304,8 @@ class _GatedDepth implements SyncClient {
   @override
   int get chunkSize => _inner.chunkSize;
   @override
+  Future<bool> adoptAccount(String userId) => _inner.adoptAccount(userId);
+  @override
   Future<({int pushed, int pulled})> syncNow() => _inner.syncNow();
   @override
   Future<int> cursorFor(String table) => _inner.cursorFor(table);
@@ -286,4 +313,30 @@ class _GatedDepth implements SyncClient {
   Future<int> pushAll() => _inner.pushAll();
   @override
   Future<int> pullAll() => _inner.pullAll();
+}
+
+/// A sync that reports how many rows it pulled and touches nothing.
+class _Pulls implements SyncClient {
+  _Pulls(this.db, this.api, {required this.pulled});
+
+  @override
+  final AppDatabase db;
+  @override
+  final SyncApi api;
+  final int pulled;
+
+  @override
+  int get chunkSize => 200;
+  @override
+  Future<({int pushed, int pulled})> syncNow() async => (pushed: 0, pulled: pulled);
+  @override
+  Future<int> outboxDepth() async => 0;
+  @override
+  Future<int> cursorFor(String table) async => 0;
+  @override
+  Future<int> pushAll() async => 0;
+  @override
+  Future<int> pullAll() async => pulled;
+  @override
+  Future<bool> adoptAccount(String userId) async => false;
 }

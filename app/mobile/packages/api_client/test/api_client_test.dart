@@ -48,6 +48,71 @@ void main() {
   // Tokens
   // -------------------------------------------------------------------------
 
+  group('invite-only accounts', () {
+    test('register with confirmation pending stores no session', () async {
+      final tokens = MemoryTokenStore();
+      final fake = FakeHttp((_) => ok({'status': 'verification_sent', 'email': 'a@b.c'}));
+      final auth = AuthApi(apiWith(fake, tokens: tokens), tokens);
+
+      final result = await auth.register(
+        email: 'a@b.c',
+        password: 'senha-forte',
+        deviceId: 'd1',
+        inviteCode: '  CODIGO ',
+      );
+
+      expect(result.outcome, RegisterOutcome.verificationSent);
+      expect(result.userId, isNull);
+      expect(await tokens.readAccess(), isNull);
+      final sent = jsonDecode(fake.requests.single.body) as Map<String, Object?>;
+      expect(sent['invite_code'], 'CODIGO');
+      expect(fake.requests.single.headers.containsKey('authorization'), isFalse);
+    });
+
+    test('register on an open server signs in', () async {
+      final tokens = MemoryTokenStore();
+      final fake = FakeHttp((_) => ok({
+            'status': 'signed_in',
+            'email': 'a@b.c',
+            'tokens': {'access_token': 'a', 'refresh_token': 'r', 'user_id': 'u'},
+          }));
+      final auth = AuthApi(apiWith(fake, tokens: tokens), tokens);
+
+      final result = await auth.register(email: 'a@b.c', password: 'senha-forte', deviceId: 'd');
+
+      expect(result.outcome, RegisterOutcome.signedIn);
+      expect(result.userId, 'u');
+      expect(await tokens.readAccess(), 'a');
+    });
+
+    test('account_required clears the session and tells the app', () async {
+      final tokens = MemoryTokenStore();
+      await tokens.write(access: 'anon', refresh: 'r');
+      final api = apiWith(FakeHttp((_) => fail(403, detail: 'account_required')), tokens: tokens);
+      var told = 0;
+      api.onAccountRequired = () => told++;
+
+      await expectLater(
+        api.get('/v1/quota/'),
+        throwsA(isA<ApiException>().having((e) => e.isAccountRequired, 'isAccountRequired', true)),
+      );
+      expect(told, 1);
+      expect(await tokens.readAccess(), isNull);
+    });
+
+    test('another 403 leaves the session alone', () async {
+      final tokens = MemoryTokenStore();
+      await tokens.write(access: 'ok', refresh: 'r');
+      final api = apiWith(FakeHttp((_) => fail(403, detail: 'nope')), tokens: tokens);
+      var told = 0;
+      api.onAccountRequired = () => told++;
+
+      await expectLater(api.get('/v1/x'), throwsA(isA<ApiException>()));
+      expect(told, 0);
+      expect(await tokens.readAccess(), 'ok');
+    });
+  });
+
   group('authentication', () {
     test('a bearer token is attached when there is one', () async {
       final tokens = MemoryTokenStore();

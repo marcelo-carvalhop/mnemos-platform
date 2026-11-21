@@ -98,3 +98,7 @@ error_codes:
   - model_refused
   - network_unavailable
   - resync_required
+  # Invite-only accounts with email confirmation.
+  - invite_invalid
+  - email_not_verified
+  - account_required

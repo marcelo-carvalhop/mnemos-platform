@@ -43,6 +43,19 @@ class User(Base):
     # first launch, it simply has no way to sign in yet.
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Null until the address answers the link we sent. With
+    # REQUIRE_EMAIL_VERIFICATION on, login refuses until then; accounts that
+    # had an email before confirmation existed were marked confirmed (0012).
+    email_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # SHA-256 of the one outstanding link, like refresh tokens: the raw token
+    # only ever exists in the email.
+    email_verification_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    email_verification_sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

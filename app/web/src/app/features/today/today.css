@@ -30,7 +30,7 @@
 .primary {
   background: var(--mn-accent);
   color: var(--mn-text-on-accent);
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   padding: 11px 18px;
   font-size: 14px;
   font-weight: 600;
@@ -72,13 +72,13 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  background: var(--mn-accent);
-  color: var(--mn-text-on-accent);
+  background: var(--mn-hero);
+  color: var(--mn-text-on-hero);
   border-radius: var(--mn-radius-xl);
   padding: var(--mn-gap-5);
 }
 .anchor .eyebrow {
-  color: var(--mn-accent-soft);
+  color: var(--mn-text-on-hero-muted);
 }
 .figure {
   display: flex;
@@ -87,20 +87,20 @@
   margin: 10px 0 0;
 }
 .figure .n {
-  font-family: var(--mn-font-content);
+  font-family: var(--mn-font-display);
   font-size: 64px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1;
 }
 .figure .unit {
   font-size: 17px;
-  color: var(--mn-accent-soft);
+  color: var(--mn-text-on-hero-muted);
 }
 .anchor .prose {
   margin: var(--mn-gap-4) 0 0;
   font-size: 14.5px;
   line-height: 1.55;
-  color: var(--mn-accent-soft);
+  color: var(--mn-text-on-hero-muted);
   max-width: 46ch;
 }
 
@@ -113,7 +113,7 @@
 .split-bar span {
   height: 8px;
   border-radius: 4px;
-  background: var(--mn-surface);
+  background: var(--mn-text-on-hero);
 }
 .split-bar span.second {
   background: var(--mn-accent-60);
@@ -124,15 +124,15 @@
   flex-wrap: wrap;
   margin: 12px 0 0;
   font-size: 13.5px;
-  color: var(--mn-accent-soft);
+  color: var(--mn-text-on-hero-muted);
 }
 
 .onDark {
   display: inline-block;
   margin-top: var(--mn-gap-4);
-  background: var(--mn-surface);
-  color: var(--mn-accent-hover);
-  border-radius: var(--mn-radius);
+  background: var(--mn-text-on-hero);
+  color: var(--mn-hero-ink);
+  border-radius: var(--mn-radius-pill);
   padding: 11px 18px;
   font-size: 14px;
   font-weight: 600;
@@ -191,7 +191,7 @@
   background: var(--mn-accent-soft);
 }
 .week .bar.met {
-  background: var(--mn-accent);
+  background: var(--mn-highlight);
 }
 /* Hoje em menta: é a única meta do gráfico que ainda pode mudar. */
 .week .bar.met.today {
@@ -262,12 +262,12 @@
   font-size: 12px;
   font-weight: 600;
   padding: 5px 11px;
-  border-radius: var(--mn-radius-lg);
+  border-radius: var(--mn-radius-pill);
   white-space: nowrap;
 }
 .decks .ghost {
   border: 1px solid var(--mn-outline);
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
@@ -304,7 +304,7 @@
 }
 /* O pico é a informação: é o dia que dói. */
 .forecast .bar.peak {
-  background: var(--mn-accent);
+  background: var(--mn-highlight);
 }
 /* Dia sem vencimento: o trilho, não a barra. Um dia zerado na cor da barra
  * lê como um dia com um card. */

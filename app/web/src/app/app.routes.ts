@@ -20,6 +20,17 @@ const signedOut: CanMatchFn = () => {
 // Tudo em lazy: quem chega na landing não deve baixar a tela de estudo, e é o
 // que mantém o primeiro carregamento pequeno.
 export const routes: Routes = [
+  // Públicas, com ou sem sessão: são lidas antes de criar a conta e depois.
+  // Antes das rotas vazias de propósito: a guarda de quem não entrou manda
+  // quem tem sessão para /hoje, e ela roda antes de qualquer rota abaixo dela.
+  {
+    path: 'privacidade',
+    loadComponent: () => import('./features/legal/legal').then((m) => m.Privacy),
+  },
+  {
+    path: 'termos',
+    loadComponent: () => import('./features/legal/legal').then((m) => m.Terms),
+  },
   {
     path: '',
     canMatch: [signedIn],
@@ -73,6 +84,12 @@ export const routes: Routes = [
   {
     path: 'entrar',
     loadComponent: () => import('./features/landing/sign-in').then((m) => m.SignIn),
+  },
+  {
+    // O link do e-mail de confirmação. Sem guarda: quem abre pode já ter sessão
+    // (outro login neste navegador) e o link ainda precisa valer.
+    path: 'confirmar',
+    loadComponent: () => import('./features/landing/confirm').then((m) => m.Confirm),
   },
   // Uma URL desconhecida volta para a raiz, e a raiz já decide entre a landing
   // e o aplicativo pelos `canMatch` acima.

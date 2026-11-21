@@ -5,6 +5,8 @@ Without them the generated Dart client gets names derived from paths and types
 half the API as `dynamic`.
 """
 
+import logging
+
 from fastapi import FastAPI, Response, status
 from pydantic import BaseModel, Field
 
@@ -22,6 +24,16 @@ settings = get_settings()
 
 # Fails the boot rather than serving forgeable tokens (§8.2).
 settings.validate_for_production()
+
+# Uvicorn configures only its own loggers, so `app.*` had no handler and
+# anything below WARNING vanished: "confirmation email sent" never showed,
+# and a send that went nowhere looked exactly like one that worked.
+_app_log = logging.getLogger("app")
+if not _app_log.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    _app_log.addHandler(_handler)
+    _app_log.setLevel(get_settings().log_level)
 
 app = FastAPI(
     title="Mnemos API",

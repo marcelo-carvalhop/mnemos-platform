@@ -19,6 +19,9 @@ class ApiException implements Exception {
   /// and this particular thing is not allowed.
   bool get isUnauthenticated => statusCode == 401;
 
+  /// An invite-only server that wants a real account, not this one.
+  bool get isAccountRequired => statusCode == 403 && detail == 'account_required';
+
   /// Worth retrying: the server is having a moment, the request was not
   /// wrong.
   bool get isTransient => statusCode >= 500 || statusCode == 429;

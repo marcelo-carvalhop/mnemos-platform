@@ -15,10 +15,18 @@ from sqlalchemy import select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.contract import FREE_GENERATIONS_LIFETIME, MAX_JOBS_IN_FLIGHT
-from app.models import QuotaReservation, QuotaUsage
+from app.models import QuotaReservation, QuotaUsage, User
 
 LIFETIME = "lifetime"
+
+# The beta plan: no quota for accounts with an email while
+# BETA_UNLIMITED_GENERATION is on. Monthly buckets like a paid plan, with a
+# ceiling far above any real use: it exists to stop a runaway client, not
+# to ration anyone. MAX_JOBS_IN_FLIGHT still applies.
+BETA = "beta"
+BETA_MONTHLY_CEILING = 10_000
 
 # §7.7 — a worker that dies between enqueue and start would otherwise leak the
 # reservation forever, silently costing the user quota they never spent.
@@ -38,6 +46,18 @@ class Reservation:
     id: str
     period_key: str
     amount: int
+
+
+def plan_for(session: Session, user_id: str) -> str:
+    """The plan a reservation is made under. No billing yet: "beta" or "free"."""
+    if not get_settings().beta_unlimited_generation:
+        return "free"
+    email = session.execute(select(User.email).where(User.id == user_id)).scalar_one_or_none()
+    return BETA if email else "free"
+
+
+def limit_for(plan: str) -> int:
+    return BETA_MONTHLY_CEILING if plan == BETA else FREE_GENERATIONS_LIFETIME
 
 
 def period_key_for(plan: str, at: datetime, timezone_name: str) -> str:
@@ -232,7 +252,7 @@ def remaining(
         )
     ).scalar_one_or_none()
     if row is None:
-        return FREE_GENERATIONS_LIFETIME if plan == "free" else 0
+        return limit_for(plan) if plan in ("free", BETA) else 0
     return max(0, row.limit_count - row.used - row.reserved)
 
 

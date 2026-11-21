@@ -12,13 +12,30 @@
   min-height: 100dvh;
 }
 
+/* A promessa num painel marinho, como a seção escura da landing. As cores
+ * são as "sobre o herói" e não as da tela: o painel é escuro nos dois temas. */
 .pitch {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 48px;
   padding: 40px 56px;
-  background: var(--mn-surface-sunken);
-  border-right: 1px solid var(--mn-line);
+  background: var(--mn-hero-ink);
+  color: var(--mn-text-on-hero);
+}
+.pitch::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(-62deg, rgba(47, 91, 166, 0.55) 1%, rgba(15, 28, 61, 0) 60%),
+    linear-gradient(rgba(250, 251, 252, 0.05) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, rgba(250, 251, 252, 0.05) 1px, transparent 1px) 0 0 / 56px 56px;
+}
+.pitch > * {
+  position: relative;
 }
 
 .brand {
@@ -26,56 +43,129 @@
   align-items: center;
   gap: 10px;
   align-self: flex-start;
-  font-family: var(--mn-font-content);
-  font-size: 21px;
+  font-family: var(--mn-font-display);
+  font-size: 20px;
   font-weight: 600;
-  color: var(--mn-text);
+  letter-spacing: -0.02em;
+  color: inherit;
   text-decoration: none;
 }
 .mark {
-  width: 10px;
-  height: 10px;
-  background: var(--mn-accent);
-  border-radius: 2px;
+  flex: none;
+  color: inherit;
 }
 
 .pitch-body {
   margin: auto 0;
-  max-width: 440px;
+  max-width: 460px;
+}
+.eyebrow {
+  margin: 0 0 18px;
+  font-family: var(--mn-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mn-text-on-hero-muted);
 }
 .claim {
-  font-family: var(--mn-font-content);
-  font-size: 34px;
-  line-height: 1.15;
-  font-weight: 600;
-  color: var(--mn-text);
   margin: 0 0 36px;
+  font-family: var(--mn-font-display);
+  font-size: clamp(30px, 3vw, 40px);
+  line-height: 1.06;
+  font-weight: 500;
+  letter-spacing: -0.035em;
 }
-.pitch ul {
+.claim .quiet {
+  color: #9baec0;
+}
+
+/* Um card de verdade, no formato que o app mostra. Valores fixos do tema
+ * claro, e não tokens: o card de exemplo é claro também no tema escuro. */
+.sample {
+  margin: 0 0 40px;
+  padding: 20px 22px 18px;
+  border-radius: var(--mn-radius-lg);
+  background: #fafbfc;
+  color: #0f1c3d;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
+}
+.sample-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  font-family: var(--mn-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #53687b;
+}
+.sample-front {
+  margin: 0 0 18px;
+  font-family: var(--mn-font-content);
+  font-size: 19px;
+  line-height: 1.38;
+}
+.sample-grades {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: center;
+}
+.sample-grades span {
+  padding: 8px 0;
+  border-radius: var(--mn-radius);
+}
+.sample-grades .again {
+  background: #fcf3ef;
+  color: #a2432a;
+}
+.sample-grades .hard {
+  background: #f5f7f9;
+  color: #39445f;
+}
+.sample-grades .good {
+  background: #eef7f2;
+  color: #2e6b50;
+}
+.sample-grades .easy {
+  background: #eff3fa;
+  color: #2f5ba6;
+}
+
+.pitch ol {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 22px;
+  border-top: 1px solid rgba(250, 251, 252, 0.14);
 }
 .pitch li {
-  border-left: 2px solid var(--mn-accent);
-  padding-left: 16px;
-  font-size: 14.5px;
-  line-height: 1.6;
-  color: var(--mn-text-muted);
+  display: flex;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(250, 251, 252, 0.14);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--mn-text-on-hero-muted);
+}
+.pitch li .n {
+  flex: none;
+  padding-top: 2px;
+  font-family: var(--mn-font-mono);
+  font-size: 11.5px;
+  color: #9baec0;
 }
 .pitch li strong {
-  display: block;
-  color: var(--mn-text);
-  font-size: 15.5px;
-  margin-bottom: 2px;
+  color: var(--mn-text-on-hero);
+  font-weight: 500;
 }
 
 .fine {
   margin: 0;
-  font-size: 12.5px;
-  color: var(--mn-text-faint);
+  font-family: var(--mn-font-mono);
+  font-size: 11.5px;
+  color: #9baec0;
 }
 
 .panel {
@@ -89,9 +179,18 @@ form {
   max-width: 400px;
 }
 
+.kicker {
+  margin: 0 0 14px;
+  font-family: var(--mn-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mn-highlight);
+}
 h1 {
-  font-size: 32px;
-  margin-bottom: 8px;
+  font-size: 40px;
+  line-height: 1.05;
+  margin-bottom: 12px;
 }
 .lede {
   margin: 0 0 30px;
@@ -121,7 +220,7 @@ input {
   color: var(--mn-text);
 }
 input:focus {
-  border-color: var(--mn-accent);
+  border-color: var(--mn-highlight);
 }
 small {
   display: block;
@@ -137,7 +236,7 @@ small {
   background: var(--mn-accent);
   color: var(--mn-text-on-accent);
   border: 0;
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   font-size: 15.5px;
   font-weight: 600;
 }
@@ -162,7 +261,7 @@ small {
   padding: 0;
   font: inherit;
   font-weight: 600;
-  color: var(--mn-accent);
+  color: var(--mn-highlight);
   cursor: pointer;
 }
 
@@ -183,7 +282,10 @@ small {
   .pitch {
     padding: 20px 20px;
     background: none;
-    border-right: 0;
+    color: var(--mn-text);
+  }
+  .pitch::before {
+    display: none;
   }
   .pitch-body,
   .fine {
@@ -193,4 +295,51 @@ small {
     place-items: start center;
     padding: 24px 20px 40px;
   }
+}
+
+/* Depois de criar a conta: o painel vira "confira seu e-mail". */
+.sent {
+  width: 100%;
+  max-width: 400px;
+}
+.sent strong {
+  color: var(--mn-text);
+  word-break: break-all;
+}
+.hint {
+  margin: -14px 0 24px;
+  font-size: 13.5px;
+  color: var(--mn-text-faint);
+}
+.notice {
+  margin: 0 0 16px;
+  padding: 11px 14px;
+  background: var(--mn-surface-sunken);
+  color: var(--mn-text-muted);
+  border-radius: var(--mn-radius);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+.problem .inline {
+  display: block;
+  margin-top: 6px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.consent {
+  margin: 14px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--mn-text-faint);
+}
+.consent a {
+  color: var(--mn-highlight);
 }

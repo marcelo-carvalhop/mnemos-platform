@@ -1,0 +1,633 @@
+<div class="notice">
+  <span class="mono notice-tag">Beta</span>
+  @if (inviteOnly()) {
+    O Mnemos está aberto só para convidados. Recebeu um código? Crie sua conta.
+  } @else {
+    O Mnemos está aberto para todos. Comece grátis.
+  }
+</div>
+
+<header class="nav">
+  <nav aria-label="Principal" class="wrap nav-row">
+    <a class="brand" href="#topo">
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="6" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.8" />
+        <rect x="7" y="2" width="14" height="14" rx="3" class="mark-fill" />
+      </svg>
+      Mnemos
+    </a>
+    <div class="nav-links">
+      <a href="#como-funciona">Como funciona</a>
+      <a href="#superficies">Superfícies</a>
+      <a href="#para-quem">Para quem</a>
+      <a href="#planos">Planos</a>
+      <a href="#perguntas">Perguntas</a>
+    </div>
+    <div class="nav-actions">
+      <a class="pill ghost" routerLink="/entrar">Entrar</a>
+      <a class="pill dark" routerLink="/entrar">{{ ctaShort() }}</a>
+    </div>
+  </nav>
+</header>
+
+<main id="topo">
+  <!-- Herói -->
+  <section class="hero">
+    <div class="grid-bg" aria-hidden="true"></div>
+    <div class="wrap hero-row">
+      <div class="hero-copy">
+        <p class="eyebrow muted">
+          <span class="dot" aria-hidden="true"></span>Repetição espaçada · celular, web e tinta
+          eletrônica
+        </p>
+        <h1 class="display">
+          O que você aprendeu,<br /><span class="quiet">de volta na hora certa.</span>
+        </h1>
+        <p class="lead">
+          O Mnemos traz cada ideia de volta pouco antes de você esquecer. Cards curtos, uma ideia
+          cada, revisados onde você estiver.
+        </p>
+        <div class="row">
+          <a class="pill dark lg" routerLink="/entrar">
+            {{ ctaLong() }}
+            <svg
+              aria-hidden="true"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12h14" />
+              <path d="m13 6 6 6-6 6" />
+            </svg>
+          </a>
+          <a class="pill outline lg" href="#como-funciona">Ver como funciona</a>
+        </div>
+        <p class="fine">Estudar e escrever cards é grátis. A IA que escreve por você é paga.</p>
+      </div>
+
+      <div class="hero-shot">
+        <div class="shot">
+          <article class="study" aria-label="Exemplo de revisão" aria-live="polite">
+            <div class="study-head">
+              <span class="eyebrow">{{ card().deck }}</span>
+              <span class="mono faint">{{ position() }} / 3</span>
+            </div>
+            <p class="front">{{ card().front }}</p>
+            @if (!shown()) {
+              <div class="study-foot">
+                <button type="button" class="pill dark block" (click)="reveal()">
+                  Mostrar resposta
+                </button>
+                <p class="hint">Tente lembrar antes de virar. É o esforço que fixa.</p>
+              </div>
+            } @else {
+              <div class="study-foot">
+                <p class="back">{{ card().back }}</p>
+                <div class="grades">
+                  @for (g of grades; track g.label) {
+                    <button type="button" [class]="'grade ' + g.tone" (click)="grade()">
+                      <span>{{ g.label }}</span>
+                      <span class="mono">{{ g.interval }}</span>
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </article>
+          <div class="shot-foot mono">
+            <span>Experimente: vire e responda</span>
+            <span>próxima revisão calculada na hora</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Números -->
+  <section class="numbers" aria-label="Em números">
+    <div class="wrap numbers-row">
+      <div>
+        <p class="figure">1</p>
+        <p>ideia por card. Curto o bastante para responder sem pensar no formato.</p>
+      </div>
+      <div>
+        <p class="figure">0</p>
+        <p>cards entram sem você. A IA propõe; você aprova cada um.</p>
+      </div>
+      <div>
+        <p class="figure">100<span class="unit">%</span></p>
+        <p>do estudo funciona offline. Sincroniza quando a rede voltar.</p>
+      </div>
+      <div>
+        <p class="figure">3</p>
+        <p>superfícies, um histórico só. Responda num e os outros já sabem.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Como funciona -->
+  <section id="como-funciona" class="wrap section">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow accent">Como funciona</p>
+        <h2 class="title">
+          Do material que você já tem<br /><span class="quiet">a uma memória que dura.</span>
+        </h2>
+      </div>
+      <p class="section-lead">
+        Três etapas, e só a terceira se repete. O intervalo de cada card sai de como você respondeu
+        da última vez.
+      </p>
+    </div>
+
+    <div class="stages">
+      <article class="stage">
+        <div class="stage-head">
+          <span class="num">1</span><span class="eyebrow">Trazer</span
+          ><span class="meter m1" aria-hidden="true"></span>
+        </div>
+        <div class="stage-shot">
+          <div class="chips">
+            <span class="chip on">Assunto</span><span class="chip">Texto</span
+            ><span class="chip">Foto</span><span class="chip">PDF</span>
+          </div>
+          <div class="field">
+            Controle de constitucionalidade: ADI, ADC e ADPF, quem pode propor e efeitos da decisão
+          </div>
+          <div class="between small muted">
+            <span>ou escreva o card à mão</span>
+            <span class="ai-pill">Gerar cards</span>
+          </div>
+        </div>
+        <div class="stage-body">
+          <h3>Escreva, cole ou descreva</h3>
+          <p>
+            Escreva seus cards, ou dê à IA um assunto, um texto, a foto de uma página ou um PDF. Ela
+            propõe cards curtos, uma ideia cada.
+          </p>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="num">2</span><span class="eyebrow">Aprovar</span
+          ><span class="meter m2" aria-hidden="true"></span>
+        </div>
+        <div class="stage-shot">
+          <div class="item">
+            <p>Quem pode propor uma ADI?</p>
+            <span class="tag good">aprovado</span>
+          </div>
+          <div class="item">
+            <p>Qual o efeito da decisão em ADC?</p>
+            <span class="tag easy">editado</span>
+          </div>
+          <div class="item gone">
+            <p>História do STF desde 1891</p>
+            <span class="tag again">descartado</span>
+          </div>
+        </div>
+        <div class="stage-body">
+          <h3>Aprove um por um</h3>
+          <p>
+            Nenhum card entra no baralho sem passar por você. Edite o que quiser, descarte o que não
+            serve. O que fica é seu.
+          </p>
+        </div>
+      </article>
+
+      <article class="stage">
+        <div class="stage-head">
+          <span class="num solid">3</span><span class="eyebrow ink">Revisar · todo dia</span
+          ><span class="meter m3" aria-hidden="true"></span>
+        </div>
+        <div class="stage-shot hero-block">
+          <p class="eyebrow on-dark">Vencendo agora</p>
+          <p class="due"><span class="due-n">12</span><span>cards em 2 baralhos</span></p>
+          <div class="between due-foot">
+            <span>cerca de 6 minutos</span>
+            <span class="light-pill">Estudar</span>
+          </div>
+        </div>
+        <div class="stage-body">
+          <h3>Revise só o que vence hoje</h3>
+          <p>
+            Cada card volta pouco antes de você esquecer. O que você já sabe aparece cada vez menos;
+            o que custa a entrar, mais vezes.
+          </p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Métrica -->
+  <section class="wrap section-tight">
+    <div class="metric">
+      <div class="metric-copy">
+        <p class="eyebrow good-text">Uma métrica só</p>
+        <h2 class="title sm">
+          Não contamos cards digitados.<br /><span class="quiet">Medimos memória.</span>
+        </h2>
+        <p class="body">
+          O que importa é quanto tempo o que você sabe fica de pé sem revisão. A cada resposta certa
+          no dia certo, a curva do esquecimento fica mais lenta e o próximo intervalo, mais longo.
+        </p>
+        <div class="stats">
+          <div>
+            <p class="eyebrow">Retenção 90 d</p>
+            <p class="figure good-text">87<span class="unit">%</span></p>
+          </div>
+          <div>
+            <p class="eyebrow">Cards maduros</p>
+            <p class="figure">214</p>
+          </div>
+        </div>
+        <p class="fine faint">Exemplo da tela de progresso.</p>
+      </div>
+      <figure class="metric-chart">
+        <svg
+          role="img"
+          aria-label="Curvas de esquecimento: depois de cada revisão a lembrança cai mais devagar"
+          viewBox="0 0 560 320"
+        >
+          <line x1="40" y1="20" x2="40" y2="270" class="axis" />
+          <line x1="40" y1="270" x2="540" y2="270" class="axis" />
+          <line x1="40" y1="70" x2="540" y2="70" class="axis" stroke-dasharray="3 5" />
+          <text x="34" y="74" text-anchor="end">90%</text>
+          <path d="M40 30 C 70 120, 95 200, 130 240" class="c1" />
+          <path d="M80 30 C 120 90, 160 140, 210 170" class="c2" />
+          <path d="M160 30 C 230 70, 290 100, 360 118" class="c3" />
+          <path d="M300 30 C 390 50, 460 64, 540 74" class="c4" />
+          <circle cx="80" cy="30" r="5" class="p" />
+          <circle cx="160" cy="30" r="5" class="p" />
+          <circle cx="300" cy="30" r="5" class="p last" />
+          <text x="80" y="292" text-anchor="middle">1 d</text>
+          <text x="160" y="292" text-anchor="middle">4 d</text>
+          <text x="300" y="292" text-anchor="middle">12 d</text>
+          <text x="540" y="292" text-anchor="end">tempo</text>
+        </svg>
+        <figcaption>Cada revisão no momento certo deixa a curva seguinte mais lenta.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- Superfícies -->
+  <section id="superficies" class="dark">
+    <div class="wrap section">
+      <p class="eyebrow on-dark">Três superfícies, um histórico</p>
+      <h2 class="title on-dark-title">
+        Responda num.<br /><span class="quiet-dark">Os outros já sabem.</span>
+      </h2>
+
+      <div class="surfaces">
+        <div class="tabs" role="tablist" aria-label="Superfícies">
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.on]="surface() === 'phone'"
+            [attr.aria-selected]="surface() === 'phone'"
+            (click)="surface.set('phone')"
+          >
+            <span class="tab-title"><span class="mono">01</span>No celular</span>
+            @if (surface() === 'phone') {
+              <span class="tab-body"
+                >Para os minutos soltos do dia. Funciona offline e lembra você uma vez por dia, no
+                horário que escolher.</span
+              >
+            }
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.on]="surface() === 'web'"
+            [attr.aria-selected]="surface() === 'web'"
+            (click)="surface.set('web')"
+          >
+            <span class="tab-title"><span class="mono">02</span>No navegador</span>
+            @if (surface() === 'web') {
+              <span class="tab-body"
+                >Para escrever cards com teclado de verdade e organizar a biblioteca. Nada a
+                instalar.</span
+              >
+            }
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="tab"
+            [class.on]="surface() === 'ink'"
+            [attr.aria-selected]="surface() === 'ink'"
+            (click)="surface.set('ink')"
+          >
+            <span class="tab-title"
+              ><span class="mono">03</span>No terminal de tinta eletrônica</span
+            >
+            @if (surface() === 'ink') {
+              <span class="tab-body"
+                >Uma tela na mesa, sem notificações e sem rede social a um toque. Os cards do dia
+                chegam pelo Wi-Fi; as respostas voltam para o seu histórico.</span
+              >
+            }
+          </button>
+          <p class="tabs-note mono">
+            Mesmos cards, mesmo cronograma. O que você revisou no ônibus não volta de novo na mesa.
+          </p>
+        </div>
+
+        <div class="stage-dark" aria-hidden="true">
+          @switch (surface()) {
+            @case ('phone') {
+              <div class="phone">
+                <div class="phone-screen">
+                  <p class="mono tiny faint">SÁBADO, 21 DE NOVEMBRO</p>
+                  <p class="phone-title">Hoje</p>
+                  <div class="phone-hero">
+                    <p class="mono tiny">VENCENDO AGORA</p>
+                    <p class="phone-n">4 <span>cards em 2 baralhos</span></p>
+                  </div>
+                  <div class="phone-stats">
+                    <div>
+                      <p class="mono tiny faint">SEQUÊNCIA</p>
+                      <p>18</p>
+                    </div>
+                    <div>
+                      <p class="mono tiny faint">RETENÇÃO</p>
+                      <p class="good-text">87%</p>
+                    </div>
+                  </div>
+                  <div class="phone-row">
+                    <span>Redes de Computadores</span><span class="mono again-text">2</span>
+                  </div>
+                  <div class="phone-row">
+                    <span>Direito Constitucional</span><span class="mono again-text">2</span>
+                  </div>
+                </div>
+              </div>
+            }
+            @case ('web') {
+              <div class="browser">
+                <div class="browser-bar"><i></i><i></i><i></i><b></b></div>
+                <div class="browser-body">
+                  <div class="browser-side">
+                    <strong>Mnemos</strong><span class="on">Hoje</span><span>Biblioteca</span
+                    ><span>Criar</span><span>Progresso</span>
+                  </div>
+                  <div class="browser-main">
+                    <div class="browser-card">
+                      <p class="mono tiny faint">REDES DE COMPUTADORES · 2 / 4</p>
+                      <p class="front-sm">Em que camada do modelo OSI opera um roteador?</p>
+                    </div>
+                    <div class="mini-grades">
+                      <span class="again">Errei</span><span class="hard">Difícil</span
+                      ><span class="good">Bom</span><span class="easy">Fácil</span>
+                    </div>
+                    <p class="mono tiny faint">atalhos: 1 2 3 4 · espaço vira</p>
+                  </div>
+                </div>
+              </div>
+            }
+            @case ('ink') {
+              <div class="ink">
+                <div class="ink-screen">
+                  <p class="mono">BIOQUÍMICA · 3 DE 9</p>
+                  <p class="ink-front">Qual organela produz a maior parte do ATP da célula?</p>
+                  <div class="ink-grades">
+                    <span>Errei</span><span>Difícil</span><span class="on">Bom</span
+                    ><span>Fácil</span>
+                  </div>
+                </div>
+              </div>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Para quem -->
+  <section id="para-quem" class="wrap section">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow accent">Para quem</p>
+        <h2 class="title">Memória não é só<br /><span class="quiet">coisa de vestibular.</span></h2>
+      </div>
+      <p class="section-lead">
+        Serve para tudo que precisa estar na ponta da língua no dia que importa, seja a prova, o
+        plantão ou a reunião.
+      </p>
+    </div>
+    <div class="audiences">
+      <article class="audience">
+        <p class="eyebrow">Concursos</p>
+        <h3>Lei seca, súmulas e prazos sem reler o edital inteiro.</h3>
+        <p class="sample">Qual o prazo para interpor recurso extraordinário?</p>
+      </article>
+      <article class="audience">
+        <p class="eyebrow">Medicina e saúde</p>
+        <h3>Doses, vias e mecanismos que precisam vir na hora.</h3>
+        <p class="sample">Qual o antídoto da intoxicação por paracetamol?</p>
+      </article>
+      <article class="audience">
+        <p class="eyebrow">Idiomas</p>
+        <h3>Vocabulário que fica, em vez de lista que some.</h3>
+        <p class="sample">Como se diz “prazo de entrega” em inglês?</p>
+      </article>
+      <article class="audience">
+        <p class="eyebrow">Tecnologia</p>
+        <h3>Protocolos, comandos e certificações sem decoreba de véspera.</h3>
+        <p class="sample">Em que camada do modelo OSI opera um roteador?</p>
+      </article>
+    </div>
+  </section>
+
+  <!-- Confiança -->
+  <section class="wrap section-tight">
+    <div class="trust">
+      <div class="trust-head">
+        <div>
+          <p class="eyebrow accent">Feito para durar</p>
+          <h2 class="title sm">
+            Anos de estudo merecem<br /><span class="quiet">mais que um app de modinha.</span>
+          </h2>
+        </div>
+        <div class="badges">
+          <span>LGPD</span><span>Offline primeiro</span><span>Exportação completa</span
+          ><span>Sem anúncios</span>
+        </div>
+      </div>
+      <div class="trust-grid">
+        <div>
+          <h3>O aparelho é a fonte da verdade</h3>
+          <p>
+            Tudo funciona sem internet. O servidor é cópia de segurança e ponto de encontro entre os
+            seus aparelhos.
+          </p>
+        </div>
+        <div>
+          <h3>Exportar é um botão</h3>
+          <p>
+            Baralhos, cards e todo o histórico num arquivo só. Dá para reconstruir tudo, mesmo se
+            você parar de pagar.
+          </p>
+        </div>
+        <div>
+          <h3>Apagar também</h3>
+          <p>
+            Apagar a conta apaga no servidor e no aparelho, sem cópia guardada. Seus direitos pela
+            LGPD, a dois toques.
+          </p>
+        </div>
+        <div>
+          <h3>Sem cobrança de presença</h3>
+          <p>
+            Um lembrete por dia, no horário que você escolher. Nada de notificação insistente para
+            prender você no app.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Planos -->
+  <section id="planos" class="wrap section-tight">
+    <p class="eyebrow accent">Planos</p>
+    <h2 class="title plans-title">
+      Estudar é grátis.<br /><span class="quiet">A IA é opcional.</span>
+    </h2>
+    <div class="plans">
+      <article class="plan">
+        <p class="eyebrow">Grátis</p>
+        <p class="price">R$ 0</p>
+        <p class="muted">Para sempre, para estudar.</p>
+        <ul>
+          <li>Cards e baralhos sem limite, escritos por você</li>
+          <li>Revisão com cronograma no celular e no navegador</li>
+          <li>Uma geração por IA para experimentar</li>
+          <li>Exportar e apagar seus dados, sempre</li>
+        </ul>
+      </article>
+      <article class="plan-ai">
+        <div class="plan ai">
+          <p class="eyebrow ai-text">Com IA</p>
+          <p class="price">Em breve</p>
+          <p class="muted">Quando o beta acabar.</p>
+          <ul>
+            <li>Tudo do plano grátis</li>
+            <li>Cards gerados de assunto, texto, foto ou PDF</li>
+            <li>Mais gerações por mês</li>
+            <li>Uma geração que falha não conta</li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- Perguntas -->
+  <section id="perguntas" class="wrap section-tight faq">
+    <div class="faq-head">
+      <p class="eyebrow accent">Perguntas</p>
+      <h2 class="title sm">O que costumam<br /><span class="quiet">perguntar.</span></h2>
+    </div>
+    <div class="faq-list">
+      @if (inviteOnly()) {
+        <details>
+          <summary>Como consigo um convite?<span class="plus" aria-hidden="true">+</span></summary>
+          <p>
+            Durante o beta, o Mnemos está aberto só para convidados. Quem convida passa um código;
+            com ele você cria a conta e confirma o e-mail pelo link que mandamos.
+          </p>
+        </details>
+      }
+      <details>
+        <summary>O que é repetição espaçada?<span class="plus" aria-hidden="true">+</span></summary>
+        <p>
+          É revisar cada coisa pouco antes de esquecê-la. Cada lembrança bem-sucedida dura mais que
+          a anterior, então os intervalos crescem: um dia, quatro dias, duas semanas, meses. Você
+          estuda menos e lembra mais.
+        </p>
+      </details>
+      <details>
+        <summary>A IA pode errar?<span class="plus" aria-hidden="true">+</span></summary>
+        <p>
+          Pode, e é por isso que nada entra sem a sua aprovação. A IA propõe; você lê, edita ou
+          descarta cada card antes de ele ir para o baralho.
+        </p>
+      </details>
+      <details>
+        <summary>
+          Preciso do terminal de tinta eletrônica?<span class="plus" aria-hidden="true">+</span>
+        </summary>
+        <p>
+          Não. O celular e o navegador fazem tudo. O terminal é para quem quer estudar longe do
+          telefone, com uma tela que não brilha e não distrai.
+        </p>
+      </details>
+      <details>
+        <summary>E se eu ficar sem internet?<span class="plus" aria-hidden="true">+</span></summary>
+        <p>
+          Continue estudando. Tudo fica no aparelho e sincroniza quando a conexão voltar. Só a
+          geração por IA precisa de rede.
+        </p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Chamada final -->
+  <section class="wrap final-wrap">
+    <div class="final">
+      <div class="final-copy">
+        @if (inviteOnly()) {
+          <h2>Recebeu um convite?</h2>
+          <p>
+            Crie sua conta com o código, confirme o e-mail e traga o primeiro assunto. Em dez
+            minutos você está revisando.
+          </p>
+        } @else {
+          <h2>Comece pelo que você já estuda.</h2>
+          <p>Crie sua conta, traga o primeiro assunto e em dez minutos você está revisando.</p>
+        }
+      </div>
+      <a class="pill light lg" routerLink="/entrar">
+        {{ ctaLong() }}
+        <svg
+          aria-hidden="true"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M5 12h14" />
+          <path d="m13 6 6 6-6 6" />
+        </svg>
+      </a>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-row">
+    <span class="brand small-brand">
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
+        <rect x="3" y="6" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.8" />
+        <rect x="7" y="2" width="14" height="14" rx="3" class="mark-fill" />
+      </svg>
+      Mnemos
+    </span>
+    <a href="#perguntas">Perguntas</a>
+    <a routerLink="/privacidade">Privacidade</a>
+    <a routerLink="/termos">Termos</a>
+    <a routerLink="/entrar">Entrar</a>
+    <span class="mono faint">Feito no Brasil</span>
+  </div>
+</footer>

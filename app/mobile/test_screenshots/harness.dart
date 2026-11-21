@@ -96,18 +96,18 @@ Future<void> _loadBundledFonts() async {
     if (added > 0) await loader.load();
   }
 
+  await family('Geist', const [
+    'Geist-Regular.ttf',
+    'Geist-Medium.ttf',
+    'Geist-SemiBold.ttf',
+  ]);
+  await family('Geist Mono', const [
+    'GeistMono-Regular.ttf',
+    'GeistMono-Medium.ttf',
+  ]);
   await family('Literata', const [
     'Literata-Regular.ttf',
-    'Literata-SemiBold.ttf',
-  ]);
-  await family('Public Sans', const [
-    'PublicSans-Regular.ttf',
-    'PublicSans-Medium.ttf',
-    'PublicSans-SemiBold.ttf',
-  ]);
-  await family('JetBrains Mono', const [
-    'JetBrainsMono-Regular.ttf',
-    'JetBrainsMono-Medium.ttf',
+    'Literata-Medium.ttf',
   ]);
 }
 

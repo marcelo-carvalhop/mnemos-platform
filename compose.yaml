@@ -111,6 +111,17 @@ services:
       ENABLE_DOCS: ${ENABLE_DOCS:-true}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Invite-only signup with email confirmation. Empty = open server, as
+      # before. Without SMTP_HOST the confirmation link goes to the log.
+      INVITE_CODE: ${INVITE_CODE:-}
+      BETA_UNLIMITED_GENERATION: ${BETA_UNLIMITED_GENERATION:-false}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-false}
+      PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-http://localhost:4200}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     ports:
       - "${SERVER_PORT:-8000}:8000"
     volumes:

@@ -99,7 +99,7 @@ h3 {
   transform: translateX(18px);
 }
 .decks .switch:focus-visible {
-  outline: 2px solid var(--mn-accent);
+  outline: 2px solid var(--mn-highlight);
   outline-offset: 2px;
 }
 
@@ -208,9 +208,9 @@ h3 {
   margin: 0;
 }
 .frame .figure .n {
-  font-family: var(--mn-font-content);
+  font-family: var(--mn-font-display);
   font-size: 40px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1;
 }
 .frame .figure .unit {

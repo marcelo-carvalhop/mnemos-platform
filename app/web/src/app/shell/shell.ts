@@ -1,13 +1,23 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
+import { PendingGenerations } from '../core/open-generations';
 import { Session } from '../core/session';
 import { Store } from '../core/store';
 import { Sync } from '../core/sync';
 
 /**
- * A moldura do aplicativo: navegação à esquerda, tela à direita.
+ * A moldura do aplicativo: navegação à esquerda, tela à direita — e, no
+ * celular, o menu do aplicativo: abas na base e "Mais" numa folha.
  *
  * O telefone usa quatro abas na base porque o polegar chega lá. Na web a mesma
  * navegação vira uma coluna fixa — a largura existe, e esconder a estrutura
@@ -33,7 +43,25 @@ import { Sync } from '../core/sync';
       @if (!focus()) {
         <nav class="rail" aria-label="Seções">
           <a class="brand" routerLink="/hoje">
-            <span class="mark" aria-hidden="true"></span>
+            <svg
+              class="mark"
+              aria-hidden="true"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <rect
+                x="3"
+                y="6"
+                width="14"
+                height="14"
+                rx="3"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <rect x="7" y="2" width="14" height="14" rx="3" fill="var(--mn-highlight)" />
+            </svg>
             <span class="name">Mnemos</span>
           </a>
 
@@ -61,6 +89,19 @@ import { Sync } from '../core/sync';
             <span>Criar</span>
             <kbd class="mn-mono">N</kbd>
           </a>
+
+          <!-- O caminho de volta para uma geração, em qualquer tela. -->
+          @if (gens.target(); as target) {
+            <a class="gen" [class.waiting]="gens.pending() > 0" [routerLink]="target">
+              @if (gens.pending() > 0) {
+                <strong>{{ gens.pending() }} para aprovar</strong>
+                <span>Cards da IA esperando você</span>
+              } @else {
+                <strong>Gerando cards…</strong>
+                <span>Pode continuar; avisamos aqui.</span>
+              }
+            </a>
+          }
 
           <div class="spacer"></div>
 
@@ -101,6 +142,218 @@ import { Sync } from '../core/sync';
           >
           <button class="quiet" type="button" (click)="leave()">Sair</button>
         </nav>
+
+        <!-- Celular: o mesmo menu do aplicativo. Cabeçalho curto em cima,
+             abas na base, onde o polegar alcança. A coluna acima some. -->
+        <header class="topbar">
+          <a class="brand-sm" routerLink="/hoje" aria-label="Mnemos, ir para Hoje">
+            <svg
+              class="mark"
+              aria-hidden="true"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <rect
+                x="3"
+                y="6"
+                width="14"
+                height="14"
+                rx="3"
+                stroke="currentColor"
+                stroke-width="1.8"
+              />
+              <rect x="7" y="2" width="14" height="14" rx="3" fill="var(--mn-highlight)" />
+            </svg>
+            Mnemos
+          </a>
+          @if (gens.target(); as target) {
+            <a class="gen-pill" [class.waiting]="gens.pending() > 0" [routerLink]="target">
+              {{ gens.pending() > 0 ? gens.pending() + ' para aprovar' : 'Gerando…' }}
+            </a>
+          }
+          <button class="sync-chip" type="button" (click)="more.showModal()">
+            <span class="dot" [class]="'dot ' + syncTone()" aria-hidden="true"></span>
+            {{ syncShort() }}
+          </button>
+        </header>
+
+        <nav class="tabbar" aria-label="Seções">
+          <a routerLink="/hoje" routerLinkActive="on" class="tab">
+            <span class="icon">
+              <svg
+                aria-hidden="true"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+                <path d="M3.5 10h17M8 3v4M16 3v4" />
+              </svg>
+              @if (dueCount() > 0) {
+                <span class="tab-badge">{{ dueCount() > 99 ? '99+' : dueCount() }}</span>
+              }
+            </span>
+            Hoje
+          </a>
+          <a routerLink="/biblioteca" routerLinkActive="on" class="tab">
+            <span class="icon">
+              <svg
+                aria-hidden="true"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <rect x="7" y="3.5" width="13.5" height="17" rx="2.5" />
+                <path d="M4 7v11.5A2.5 2.5 0 0 0 6.5 21H16M11 9h6M11 13h6" />
+              </svg>
+            </span>
+            Biblioteca
+          </a>
+          <a routerLink="/criar" routerLinkActive="on" class="tab create" aria-label="Criar cards">
+            <span class="icon plus">
+              <svg
+                aria-hidden="true"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.2"
+                stroke-linecap="round"
+              >
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </span>
+            Criar
+          </a>
+          <a routerLink="/progresso" routerLinkActive="on" class="tab">
+            <span class="icon">
+              <svg
+                aria-hidden="true"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+              </svg>
+            </span>
+            Progresso
+          </a>
+          <button type="button" class="tab" [class.on]="inMore()" (click)="more.showModal()">
+            <span class="icon">
+              <svg
+                aria-hidden="true"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <circle cx="5" cy="12" r="1.8" />
+                <circle cx="12" cy="12" r="1.8" />
+                <circle cx="19" cy="12" r="1.8" />
+              </svg>
+            </span>
+            Mais
+          </button>
+        </nav>
+
+        <dialog
+          #more
+          class="sheet"
+          aria-label="Mais opções"
+          (click)="closeOnBackdrop($event, more)"
+        >
+          <div class="sheet-body" tabindex="-1" autofocus>
+            <span class="grabber" aria-hidden="true"></span>
+            <div class="sheet-status">
+              <p class="eyebrow mn-mono">Sincronização</p>
+              <p class="line">
+                <span [class]="'dot ' + syncTone()" aria-hidden="true"></span>
+                {{ syncLong() }}
+              </p>
+            </div>
+            <ul class="sheet-list">
+              <li>
+                <a routerLink="/dispositivo" (click)="more.close()">
+                  <svg
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <rect x="3" y="5" width="18" height="12" rx="2" />
+                    <path d="M8 21h8M12 17v4" />
+                  </svg>
+                  Dispositivo
+                  <span class="chev" aria-hidden="true">›</span>
+                </a>
+              </li>
+              <li>
+                <a routerLink="/configuracoes" (click)="more.close()">
+                  <svg
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                      d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h0a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v0a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"
+                    />
+                  </svg>
+                  Configurações
+                  <span class="chev" aria-hidden="true">›</span>
+                </a>
+              </li>
+              <li>
+                <button type="button" class="out" (click)="more.close(); leave()">
+                  <svg
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+                  </svg>
+                  Sair
+                </button>
+              </li>
+            </ul>
+            <button type="button" class="sheet-close" (click)="more.close()">Fechar</button>
+          </div>
+        </dialog>
       }
 
       <main id="conteudo" class="content">
@@ -114,6 +367,7 @@ export class Shell {
   private readonly router = inject(Router);
   protected readonly store = inject(Store);
   protected readonly sync = inject(Sync);
+  protected readonly gens = inject(PendingGenerations);
 
   protected readonly sections = [
     { path: '/hoje', label: 'Hoje' },
@@ -154,7 +408,38 @@ export class Shell {
     );
   });
 
+  /** "Mais" fica marcado quando a tela aberta mora dentro dele. */
+  protected readonly inMore = computed(() =>
+    ['/dispositivo', '/configuracoes'].some((p) => this.route().startsWith(p)),
+  );
+
+  /** O estado da sincronização, nas três formas que as duas barras usam. */
+  protected readonly syncTone = computed(() =>
+    this.pending() > 0 ? 'pending' : this.sync.phase() === 'offline' ? 'offline' : 'ok',
+  );
+  protected readonly syncShort = computed(() => {
+    const n = this.pending();
+    if (n > 0) return `${n} para enviar`;
+    return this.sync.phase() === 'offline' ? 'Sem conexão' : 'Sincronizado';
+  });
+  protected readonly syncLong = computed(() => {
+    const n = this.pending();
+    if (n > 0) return `${n} ${n === 1 ? 'mudança' : 'mudanças'} para enviar`;
+    return this.sync.phase() === 'offline' ? 'Sem conexão. Nada foi perdido.' : 'Tudo enviado';
+  });
+
+  /** Um toque fora da folha fecha a folha: o `<dialog>` recebe o clique no fundo. */
+  protected closeOnBackdrop(event: MouseEvent, dialog: HTMLDialogElement): void {
+    if (event.target === dialog) dialog.close();
+  }
+
   private readonly started = signal(false);
+
+  /** A cada troca de tela, pergunta de novo o que o servidor ainda deve. */
+  private readonly refreshGenerations = effect(() => {
+    this.route();
+    untracked(() => void this.gens.refresh());
+  });
 
   constructor() {
     // Uma sincronia ao abrir. É o momento em que as mudanças de outro aparelho

@@ -62,6 +62,34 @@ class Settings(BaseSettings):
     app_attest_app_id: str = ""
     app_attest_root_pem: str = ""
 
+    # Invite-only. When set, a new account needs this code and an email
+    # address: anonymous device accounts are refused, and so is any request
+    # from an account without one. Compared case-insensitively.
+    invite_code: str = ""
+    # Beta: accounts with an email generate without a quota (plan "beta").
+    # Spend is capped outside the app, in the Anthropic console; a monthly
+    # ceiling per account still stops a runaway client.
+    beta_unlimited_generation: bool = False
+
+    # Login waits for the address to answer the link we send. Off in tests and
+    # local development, where the link is only logged.
+    require_email_verification: bool = False
+
+    # Where the confirmation link points: the web app's /confirmar route.
+    public_web_url: str = "http://localhost:4200"
+
+    # Outgoing mail. Without SMTP_HOST the link is written to the log instead,
+    # which is what local development wants.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    mail_from: str = ""
+
+    @property
+    def invite_only(self) -> bool:
+        return bool(self.invite_code.strip())
+
     def google_credentials(self) -> dict:
         import json
 

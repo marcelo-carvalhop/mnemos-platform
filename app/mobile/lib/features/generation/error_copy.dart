@@ -77,6 +77,20 @@ class GenerationFailure {
           detail: 'Este aparelho ficou muito tempo sem sincronizar.',
           canRetry: true,
         ),
+      // Account codes. A generation never fails with them, but the switch is
+      // exhaustive on purpose, so they get a sentence too.
+      ErrorCode.inviteInvalid => const GenerationFailure(
+          title: 'Código de convite inválido',
+          detail: 'Confira o código que você recebeu.',
+        ),
+      ErrorCode.emailNotVerified => const GenerationFailure(
+          title: 'Falta confirmar o e-mail',
+          detail: 'Abra o link que mandamos quando você criou a conta.',
+        ),
+      ErrorCode.accountRequired => const GenerationFailure(
+          title: 'Entre na sua conta',
+          detail: 'O Mnemos está aberto só para convidados.',
+        ),
       // A code this build does not know is still a failure, and §5.3 says a
       // client several versions behind is normal — so there is a sentence for
       // it rather than a blank screen.

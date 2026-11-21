@@ -75,6 +75,26 @@ const COPY: Record<ErrorCode, GenerationFailure> = {
     canRetry: true,
     showsPaywall: false,
   },
+  // Códigos de conta. Não saem de uma geração, mas o mapa é por código e
+  // uma frase faltando aqui é uma tela em branco se um dia saírem.
+  invite_invalid: {
+    title: 'Código de convite inválido',
+    detail: 'Confira o código que você recebeu.',
+    canRetry: false,
+    showsPaywall: false,
+  },
+  email_not_verified: {
+    title: 'Falta confirmar o e-mail',
+    detail: 'Abra o link que mandamos quando você criou a conta.',
+    canRetry: false,
+    showsPaywall: false,
+  },
+  account_required: {
+    title: 'Entre na sua conta',
+    detail: 'O Mnemos está aberto só para convidados.',
+    canRetry: false,
+    showsPaywall: false,
+  },
 };
 
 /**

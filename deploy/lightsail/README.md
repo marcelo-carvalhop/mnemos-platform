@@ -23,6 +23,18 @@ Endereço: `https://mnemos.<ip-com-hífens>.sslip.io`. O `sslip.io` resolve o no
 
 Roda como `ENVIRONMENT=staging`. Produção recusa iniciar sem attestation de dispositivo (§8.1), que o app ainda não implementa. Por isso a geração por IA fica desligada (`ANTHROPIC_API_KEY` vazio): sem attestation, qualquer um cria contas anônimas, e cada uma teria uma geração grátis na chave. Swagger desligado.
 
+### Só para convidados
+
+Com `INVITE_CODE` preenchido, o servidor fecha:
+
+- criar conta (`POST /v1/auth/register`, na web e no app) exige o código de convite, sem diferenciar maiúsculas;
+- contas anônimas de aparelho são recusadas (`403 account_required`), e as que já existiam deixam de funcionar: o app e a web mostram a tela de entrar;
+- com `REQUIRE_EMAIL_VERIFICATION=true`, o login espera a pessoa abrir o link mandado por e-mail (`/confirmar?token=…`, válido por 7 dias). Abrir o link já entra naquele navegador.
+
+Os e-mails saem por SMTP. No Gmail: ative a verificação em duas etapas, crie uma senha de app em myaccount.google.com/apppasswords e preencha `SMTP_USER` (o endereço) e `SMTP_PASSWORD` (a senha de app). O Gmail envia até ~500 e-mails por dia. Sem `SMTP_HOST`, o link só aparece no log do `server` (`docker compose logs server | grep confirmar`).
+
+Trocar o código: edite `INVITE_CODE` no `.env` e rode `docker compose up -d server worker`. Quem já tem conta não é afetado.
+
 O `.env` existe só no servidor (`/opt/mnemos/deploy/lightsail/.env`, modo 600). Para recriá-lo, use `.env.example`; senhas com `openssl rand`.
 
 ## Deploy automático da `main`
@@ -65,6 +77,14 @@ aws lightsail put-instance-public-ports --instance-name mnemos-1 --profile mnemo
 
 ```bash
 gunzip -c mnemos-<data>.sql.gz | docker compose exec -T postgres psql -U mnemos -d mnemos
+```
+
+## Registros de acesso
+
+O Caddy grava um registro por requisição em `/data/logs/access.log`, no volume `caddy-data`. Os arquivos giram a cada 50 MB e são apagados depois de 6 meses: é o que o Marco Civil (art. 15) exige e o que a política de privacidade (`/privacidade`) promete. Cabeçalhos de autorização e cookies saem mascarados, e o token do link de confirmação também.
+
+```bash
+docker compose exec caddy tail -f /data/logs/access.log
 ```
 
 ## Terminal (firmware)

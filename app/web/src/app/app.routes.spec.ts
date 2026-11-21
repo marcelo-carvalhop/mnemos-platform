@@ -77,6 +77,21 @@ describe('rotas', () => {
     expect(router.url).toBe('/entrar');
   });
 
+  it('privacidade e termos abrem com ou sem sessão', async () => {
+    // São lidos antes de criar a conta (o aviso no formulário aponta para
+    // eles) e depois, por quem já está dentro.
+    await router.navigateByUrl('/privacidade');
+    expect(router.url).toBe('/privacidade');
+    await router.navigateByUrl('/termos');
+    expect(router.url).toBe('/termos');
+
+    session['store']({ access_token: 'a', refresh_token: 'r', user_id: 'u' });
+    await router.navigateByUrl('/privacidade');
+    expect(router.url).toBe('/privacidade');
+    await router.navigateByUrl('/termos');
+    expect(router.url).toBe('/termos');
+  });
+
   it('toda tela do aplicativo carrega', async () => {
     // Um `loadComponent` com caminho errado só falha quando alguém navega até
     // lá. Aqui todos falham de uma vez, no CI.

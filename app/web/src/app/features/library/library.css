@@ -16,9 +16,9 @@ h1 {
 
 .create {
   padding: 11px 20px;
-  background: var(--mn-accent);
-  color: var(--mn-text-on-accent);
-  border-radius: var(--mn-radius);
+  background: var(--mn-ai);
+  color: var(--mn-text-on-hero);
+  border-radius: var(--mn-radius-pill);
   text-decoration: none;
   font-size: 14.5px;
   font-weight: 600;
@@ -44,7 +44,7 @@ h1 {
   margin-bottom: 26px;
 }
 .search:focus {
-  border-color: var(--mn-accent);
+  border-color: var(--mn-highlight);
 }
 
 /* Duas colunas onde a largura existe: uma lista de baralhos num monitor é uma
@@ -53,7 +53,8 @@ h1 {
 .results {
   list-style: none;
   padding: 0;
-  margin: 0;
+  /* A mesma distância da barra de busca que a grade de baralhos tem. */
+  margin: var(--mn-gap-5) 0 0;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 14px;
@@ -127,6 +128,7 @@ h1 {
 }
 
 .empty {
+  margin-top: var(--mn-gap-5);
   text-align: center;
   padding: 50px 24px;
   border: 1px solid var(--mn-line);
@@ -170,7 +172,7 @@ h1 {
   color: var(--mn-text-muted);
   font-size: 13px;
   padding: 9px 15px;
-  border-radius: var(--mn-radius-lg);
+  border-radius: var(--mn-radius-pill);
 }
 .chips button.on {
   background: var(--mn-accent);
@@ -214,7 +216,7 @@ h1 {
   background: var(--mn-terracotta);
 }
 .decks .bar .mature {
-  background: var(--mn-accent);
+  background: var(--mn-highlight);
 }
 .decks .bar .rest {
   background: var(--mn-accent-soft);
@@ -247,7 +249,7 @@ h1 {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--mn-accent);
+  background: var(--mn-highlight);
 }
 .decks .meta .due .dot {
   background: var(--mn-terracotta);
@@ -263,7 +265,7 @@ h1 {
   padding-top: 18px;
 }
 .actions a {
-  border-radius: var(--mn-radius);
+  border-radius: var(--mn-radius-pill);
   font-size: 13.5px;
   font-weight: 600;
   padding: 10px 14px;
