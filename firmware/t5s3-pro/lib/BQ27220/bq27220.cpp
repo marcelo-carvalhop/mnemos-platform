@@ -7,7 +7,7 @@
 #define BQ27220_MAC_WRITE_DELAY_US (250u)
 
 /** Delay between we ask chip to load data to MAC and it become valid. Fails at ~500us. */
-#define BQ27220_SELECT_DELAY_US (1000u)
+#define BQ27220_SELECT_DELAY_US (15000u)
 
 /** Delay between 2 control operations(like unseal or full access). Fails at ~2500us.*/
 #define BQ27220_MAGIC_DELAY_US (5000u)
@@ -71,7 +71,7 @@ bool BQ27220::parameterCheck(uint16_t address, uint32_t value, size_t size, bool
             buffer[0] = checksum;
             // 2 bytes address, `size` bytes data, 1 byte check sum, 1 byte length
             buffer[1] = 2 + size + 1 + 1;
-            if(!i2cWriteBytes(CommandMACDataSum, buffer, size + 2)) {
+            if(!i2cWriteBytes(CommandMACDataSum, buffer, 2)) {
                 Serial.printf("(%d) CRC write failed\n", __LINE__);
                 break;
             }
@@ -109,173 +109,404 @@ bool BQ27220::parameterCheck(uint16_t address, uint32_t value, size_t size, bool
     return ret;
 }
 
-bool BQ27220::dateMemoryCheck(const BQ27220DMData *data_memory, bool update)
+bool BQ27220::dateMemoryCheck(
+    const BQ27220DMData *data_memory,
+    bool update)
 {
-    if(update) {
-        const uint16_t cfg_request = Control_ENTER_CFG_UPDATE;
-        if(!i2cWriteBytes(CommandSelectSubclass, (uint8_t*)&cfg_request, sizeof(cfg_request))) {
-            Serial.printf("(%d) ENTER_CFG_UPDATE command failed", __LINE__);
+    if (update) {
+        /*
+         * TI BQ27220 TRM: ENTER_CFG_UPDATE is a Control()
+         * subcommand (0x0090). Do not send it to 0x3E.
+         *
+         * Device must already be UNSEALED/FULL ACCESS.
+         */
+        if (
+            !controlSubCmd(
+                Control_ENTER_CFG_UPDATE)
+        ) {
+            Serial.println(
+                "[bq27220] ENTER_CFG_UPDATE write failed");
             return false;
         }
 
-        // Wait for enter CFG update mode
-        uint32_t timeout = BQ27220_TIMEOUT(BQ27220_TIMEOUT_COMMON_US);
-        BQ27220OperationStatus operation_status;
-        while(--timeout > 0) {
-            if(!getOperationStatus(&operation_status)) {
-                Serial.printf("(%d) Failed to get operation status, retries left %lu", __LINE__, timeout);
-            } else if(operation_status.reg.CFGUPDATE) {
+        /*
+         * TI allows up to ~1 s to enter CFGUPDATE.
+         * Poll for up to 2 s with a small initial settling delay.
+         */
+        delay(20);
+
+        uint32_t timeout =
+            BQ27220_TIMEOUT(
+                BQ27220_TIMEOUT_COMMON_US);
+
+        BQ27220OperationStatus operation_status = {};
+
+        while (--timeout > 0) {
+            if (
+                getOperationStatus(
+                    &operation_status)
+                &&
+                operation_status.reg.CFGUPDATE
+            ) {
                 break;
-            };
-            delayMicroseconds(BQ27220_TIMEOUT_CYCLE_INTERVAL_US);
+            }
+
+            delayMicroseconds(
+                BQ27220_TIMEOUT_CYCLE_INTERVAL_US);
         }
 
-        if(timeout == 0) {
+        if (timeout == 0) {
             Serial.printf(
-                "(%d) Enter CFGUPDATE mode failed, CFG %u, SEC %u", __LINE__,
+                "[bq27220] ENTER_CFG_UPDATE timeout "
+                "CFG=%u SEC=%u\n",
                 operation_status.reg.CFGUPDATE,
                 operation_status.reg.SEC);
             return false;
         }
+
+        Serial.printf(
+            "[bq27220] CFGUPDATE entered SEC=%u\n",
+            operation_status.reg.SEC);
     }
 
-    // Process data memory records
     bool result = true;
-    while (data_memory->type != BQ27220DMTypeEnd)
-    {
-        if(data_memory->type == BQ27220DMTypeWait) {
-            delayMicroseconds(data_memory->value.u32);
-        } else if(data_memory->type == BQ27220DMTypeU8) {
-            result &= parameterCheck(data_memory->address, data_memory->value.u8, 1, update);
-        } else if(data_memory->type == BQ27220DMTypeU16) {
-            result &= parameterCheck(data_memory->address, data_memory->value.u16, 2, update);
-        } else if(data_memory->type == BQ27220DMTypeU32) {
-            result &= parameterCheck(data_memory->address, data_memory->value.u32, 4, update);
-        } else if(data_memory->type == BQ27220DMTypeI8) {
-            result &= parameterCheck(data_memory->address, data_memory->value.i8, 1, update);
-        } else if(data_memory->type == BQ27220DMTypeI16) {
-            result &= parameterCheck(data_memory->address, data_memory->value.i16, 2, update);
-        } else if(data_memory->type == BQ27220DMTypeI32) {
-            result &= parameterCheck(data_memory->address, data_memory->value.i32, 4, update);
-        } else if(data_memory->type == BQ27220DMTypeF32) {
-            result &= parameterCheck(data_memory->address, data_memory->value.u32, 4, update);
-        } else if(data_memory->type == BQ27220DMTypePtr8) {
-            result &= parameterCheck(data_memory->address, *(uint8_t*)data_memory->value.u32, 1, update);
-        } else if(data_memory->type == BQ27220DMTypePtr16) {
-            result &= parameterCheck(data_memory->address, *(uint16_t*)data_memory->value.u32, 2, update);
-        } else if(data_memory->type == BQ27220DMTypePtr32) {
-            result &= parameterCheck(data_memory->address, *(uint32_t*)data_memory->value.u32, 4, update);
+
+    while (
+        data_memory->type !=
+        BQ27220DMTypeEnd
+    ) {
+        bool itemResult = true;
+
+        if (
+            data_memory->type ==
+            BQ27220DMTypeWait
+        ) {
+            delayMicroseconds(
+                data_memory->value.u32);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypeU8
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    data_memory->value.u8,
+                    1,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypeU16
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    data_memory->value.u16,
+                    2,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypeU32
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    data_memory->value.u32,
+                    4,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypeI8
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    static_cast<uint32_t>(
+                        data_memory->value.i8),
+                    1,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypeI16
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    static_cast<uint32_t>(
+                        static_cast<uint16_t>(
+                            data_memory->value.i16)),
+                    2,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypeI32
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    static_cast<uint32_t>(
+                        data_memory->value.i32),
+                    4,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypeF32
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    data_memory->value.u32,
+                    4,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypePtr8
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    *reinterpret_cast<uint8_t *>(
+                        data_memory->value.u32),
+                    1,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypePtr16
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    *reinterpret_cast<uint16_t *>(
+                        data_memory->value.u32),
+                    2,
+                    update);
+        } else if (
+            data_memory->type ==
+            BQ27220DMTypePtr32
+        ) {
+            itemResult =
+                parameterCheck(
+                    data_memory->address,
+                    *reinterpret_cast<uint32_t *>(
+                        data_memory->value.u32),
+                    4,
+                    update);
         } else {
-            Serial.printf("(%d) Invalid DM Type\n", __LINE__);
+            Serial.println(
+                "[bq27220] invalid Data Memory type");
+            itemResult = false;
         }
+
+        result =
+            result &&
+            itemResult;
+
         data_memory++;
     }
 
-    // Finalize configuration update
-    if(update && result) {
-        controlSubCmd(Control_EXIT_CFG_UPDATE_REINIT);
-
-        // Wait for gauge to apply new configuration
-        delayMicroseconds(BQ27220_CONFIG_APPLY_US);
-
-        // ensure that we exited config update mode
-        uint32_t timeout = BQ27220_TIMEOUT(BQ27220_TIMEOUT_COMMON_US);
-        BQ27220OperationStatus operation_status;
-        while(--timeout > 0) {
-            if(!getOperationStatus(&operation_status)) {
-                Serial.printf("(%d) Failed to get operation status, retries left %lu\n", __LINE__, timeout);
-            } else if(operation_status.reg.CFGUPDATE != true) {
-                break;
-            }
-            delayMicroseconds(BQ27220_TIMEOUT_CYCLE_INTERVAL_US);
-        }
-
-        // Check timeout
-        if(timeout == 0) {
-            Serial.printf("(%d) Exit CFGUPDATE mode failed\n", __LINE__);
+    if (update) {
+        /*
+         * Even if one item failed, leave CFGUPDATE cleanly.
+         */
+        if (
+            !controlSubCmd(
+                Control_EXIT_CFG_UPDATE_REINIT)
+        ) {
+            Serial.println(
+                "[bq27220] EXIT_CFG_UPDATE_REINIT "
+                "write failed");
             return false;
         }
+
+        delayMicroseconds(
+            BQ27220_CONFIG_APPLY_US);
+
+        uint32_t timeout =
+            BQ27220_TIMEOUT(
+                BQ27220_TIMEOUT_COMMON_US);
+
+        BQ27220OperationStatus operation_status = {};
+
+        while (--timeout > 0) {
+            if (
+                getOperationStatus(
+                    &operation_status)
+                &&
+                !operation_status.reg.CFGUPDATE
+                &&
+                operation_status.reg.INITCOMP
+            ) {
+                break;
+            }
+
+            delayMicroseconds(
+                BQ27220_TIMEOUT_CYCLE_INTERVAL_US);
+        }
+
+        if (timeout == 0) {
+            Serial.printf(
+                "[bq27220] exit CFGUPDATE timeout "
+                "INITCOMP=%u CFG=%u SEC=%u\n",
+                operation_status.reg.INITCOMP,
+                operation_status.reg.CFGUPDATE,
+                operation_status.reg.SEC);
+            return false;
+        }
+
+        Serial.printf(
+            "[bq27220] CFGUPDATE exited "
+            "INITCOMP=%u SEC=%u\n",
+            operation_status.reg.INITCOMP,
+            operation_status.reg.SEC);
     }
+
     return result;
 }
 
-bool BQ27220::init(const BQ27220DMData *data_memory)
+bool BQ27220::init(
+    const BQ27220DMData *data_memory)
 {
-    bool result = false;
-    bool reset_and_provisioning_required = false;
+    const uint16_t deviceNumber =
+        getDeviceNumber();
 
-    do{
-        uint16_t data = getDeviceNumber();
-        if(data != BQ27220_ID) {
-            Serial.printf("(%d) Invalid Device Number %04x != 0x0220\n", __LINE__, data);
-            break;
-        }
+    if (
+        deviceNumber !=
+        BQ27220_ID
+    ) {
+        Serial.printf(
+            "[bq27220] invalid device 0x%04X "
+            "expected=0x0220\n",
+            deviceNumber);
+        return false;
+    }
 
-        // Unseal device since we are going to read protected configuration
-        if(!unsealAccess()) {
-            break;
-        }
+    /*
+     * RESET is intentionally NOT part of profile provisioning.
+     *
+     * The TI Data Memory update procedure is:
+     * UNSEAL -> FULL ACCESS -> ENTER_CFG_UPDATE ->
+     * write/verify DM -> EXIT_CFG_UPDATE_REINIT -> SEAL.
+     *
+     * Resetting here can change the security state between
+     * validation and provisioning and is unnecessary.
+     */
+    BQ27220OperationStatus operationStatus = {};
 
-        // Try to recover gauge from forever init
-        BQ27220OperationStatus operat;
-        if(!getOperationStatus(&operat)) {
-            break;
-        }
-        if(!operat.reg.INITCOMP || operat.reg.CFGUPDATE) {
-            Serial.printf("(%d) Incorrect state, reset needed\n", __LINE__);
-            reset_and_provisioning_required = true;
-        }
+    if (
+        !getOperationStatus(
+            &operationStatus)
+    ) {
+        Serial.println(
+            "[bq27220] operation status unavailable");
+        return false;
+    }
 
-        // Ensure correct profile is selected
-        Serial.printf("(%d) Checking chosen profile\n", __LINE__);
-        BQ27220ControlStatus control_status;
-        if(!getControlStatus(&control_status)) {
-            Serial.printf("(%d) Failed to get control status\n", __LINE__);
-            break;
-        }
-        if(control_status.reg.BATT_ID != 0) {
-            Serial.printf("(%d) Incorrect profile, reset needed\n", __LINE__);
-            reset_and_provisioning_required = true;
-        }
+    if (
+        !operationStatus.reg.INITCOMP ||
+        operationStatus.reg.CFGUPDATE
+    ) {
+        Serial.printf(
+            "[bq27220] unsafe initial state "
+            "INITCOMP=%u CFG=%u SEC=%u\n",
+            operationStatus.reg.INITCOMP,
+            operationStatus.reg.CFGUPDATE,
+            operationStatus.reg.SEC);
+        return false;
+    }
 
-        // Ensure correct configuration loaded into gauge DataMemory
-        // Only if reset is not required, otherwise we don't
-        if(!reset_and_provisioning_required) {
-            Serial.printf("(%d) Checking data memory\n", __LINE__);
-            if(!dateMemoryCheck(data_memory, false)) {
-                Serial.printf("(%d) Incorrect configuration data, reset needed\n", __LINE__);
-                reset_and_provisioning_required = true;
-            }
-        }
+    if (!unsealAccess()) {
+        Serial.println(
+            "[bq27220] unseal failed");
+        return false;
+    }
 
-        // Reset needed
-        if(reset_and_provisioning_required) {
-            if(!reset()) {
-                Serial.printf("(%d) Failed to reset device\n", __LINE__);
-            }
+    BQ27220ControlStatus controlStatus = {};
 
-            // Get full access to read and modify parameters
-            // Also it looks like this step is totally unnecessary
-            if(!fullAccess()) {
-                break;
-            }
+    if (
+        !getControlStatus(
+            &controlStatus)
+    ) {
+        Serial.println(
+            "[bq27220] control status unavailable");
+        sealAccess();
+        return false;
+    }
 
-            // Update memory
-            Serial.printf("(%d) Updating data memory\n", __LINE__);
-            dateMemoryCheck(data_memory, true);
-            if(!dateMemoryCheck(data_memory, false)) {
-                Serial.printf("(%d) Data memory update failed\n", __LINE__);
-                break;
-            }
-        }
+    if (
+        controlStatus.reg.BATT_ID !=
+        0
+    ) {
+        Serial.printf(
+            "[bq27220] unexpected CEDV profile "
+            "BATT_ID=%u\n",
+            controlStatus.reg.BATT_ID);
+        sealAccess();
+        return false;
+    }
 
-        if(!sealAccess()) {
-            Serial.printf("(%d) Seal failed\n", __LINE__);
-            break;
-        }
-        result = true;
-    } while(0);
-    return result;
+    Serial.println(
+        "[bq27220] validating Data Memory");
+
+    if (
+        dateMemoryCheck(
+            data_memory,
+            false)
+    ) {
+        const bool sealed =
+            sealAccess();
+
+        Serial.printf(
+            "[bq27220] profile already valid "
+            "seal=%d\n",
+            sealed ? 1 : 0);
+
+        return sealed;
+    }
+
+    Serial.println(
+        "[bq27220] profile mismatch; "
+        "provisioning Data Memory");
+
+    if (!fullAccess()) {
+        Serial.println(
+            "[bq27220] full access failed");
+        sealAccess();
+        return false;
+    }
+
+    if (
+        !dateMemoryCheck(
+            data_memory,
+            true)
+    ) {
+        Serial.println(
+            "[bq27220] Data Memory write failed");
+        sealAccess();
+        return false;
+    }
+
+    Serial.println(
+        "[bq27220] verifying Data Memory");
+
+    if (
+        !dateMemoryCheck(
+            data_memory,
+            false)
+    ) {
+        Serial.println(
+            "[bq27220] Data Memory verify failed");
+        sealAccess();
+        return false;
+    }
+
+    const bool sealed =
+        sealAccess();
+
+    Serial.printf(
+        "[bq27220] profile provisioned "
+        "seal=%d\n",
+        sealed ? 1 : 0);
+
+    return sealed;
 }
 
 bool BQ27220::reset(void)
@@ -312,7 +543,10 @@ bool BQ27220::sealAccess(void)
     bool result = false;
     BQ27220OperationStatus operat = {0};
     do{
-        getOperationStatus(&operat);
+        if(!getOperationStatus(&operat)) {
+            Serial.println("Seal: status query failed");
+            break;
+        }
         if(operat.reg.SEC == Bq27220OperationStatusSecSealed)
         {
             result = true;
@@ -323,7 +557,10 @@ bool BQ27220::sealAccess(void)
         // delay(10);
         delayMicroseconds(BQ27220_SELECT_DELAY_US);
 
-        getOperationStatus(&operat);
+        if(!getOperationStatus(&operat)) {
+            Serial.println("Seal: status query failed");
+            break;
+        }
         if(operat.reg.SEC != Bq27220OperationStatusSecSealed)
         {
             Serial.printf("Seal failed %u\n", operat.reg.SEC);
@@ -340,7 +577,10 @@ bool BQ27220::unsealAccess(void)
     bool result = false;
     BQ27220OperationStatus operat = {0};
     do{
-        getOperationStatus(&operat);
+        if(!getOperationStatus(&operat)) {
+            Serial.println("Unseal: status query failed");
+            break;
+        }
         if(operat.reg.SEC != Bq27220OperationStatusSecSealed)
         {
             result = true;
@@ -352,7 +592,10 @@ bool BQ27220::unsealAccess(void)
         controlSubCmd(UnsealKey2);
         delayMicroseconds(BQ27220_MAGIC_DELAY_US);  // delay(10);
 
-        getOperationStatus(&operat);
+        if(!getOperationStatus(&operat)) {
+            Serial.println("Unseal: status query failed");
+            break;
+        }
         if(operat.reg.SEC != Bq27220OperationStatusSecUnsealed)
         {
             Serial.printf("Unseal failed %u\n", operat.reg.SEC);
@@ -378,6 +621,7 @@ bool BQ27220::fullAccess(void)
             }else {
                 break;
             }
+            delayMicroseconds(BQ27220_TIMEOUT_CYCLE_INTERVAL_US);
         }
         if(timeout == 0) {
             Serial.println("Failed to get operation status");
@@ -416,17 +660,68 @@ bool BQ27220::fullAccess(void)
 
 uint16_t BQ27220::getDeviceNumber(void)
 {
-    uint16_t devid = 0;
-    // Request device number(chip PN)
-    controlSubCmd(Control_DEVICE_NUMBER);
-    // Enterprise wait(MAC read fails if less than 500us)
-    // bqstudio uses ~15ms
-    delayMicroseconds(BQ27220_SELECT_DELAY_US); // delay(15);
-    // Read id data from MAC scratch space
-    i2cReadBytes(CommandMACData, (uint8_t *)&devid, 2);
+    for (
+        uint8_t attempt = 0;
+        attempt < 3;
+        ++attempt
+    ) {
+        if (
+            !controlSubCmd(
+                Control_DEVICE_NUMBER)
+        ) {
+            delay(5);
+            continue;
+        }
 
-    // Serial.printf("device number:0x%x\n", devid);
-    return devid;
+        delayMicroseconds(
+            BQ27220_SELECT_DELAY_US);
+
+        uint8_t response[4] = {
+            0xFF,
+            0xFF,
+            0xFF,
+            0xFF
+        };
+
+        if (
+            !i2cReadBytes(
+                CommandSelectSubclass,
+                response,
+                sizeof(response))
+        ) {
+            delay(5);
+            continue;
+        }
+
+        const uint16_t echoedSubcommand =
+            static_cast<uint16_t>(
+                response[0]) |
+            (
+                static_cast<uint16_t>(
+                    response[1])
+                << 8
+            );
+
+        const uint16_t deviceNumber =
+            static_cast<uint16_t>(
+                response[2]) |
+            (
+                static_cast<uint16_t>(
+                    response[3])
+                << 8
+            );
+
+        if (
+            echoedSubcommand ==
+            Control_DEVICE_NUMBER
+        ) {
+            return deviceNumber;
+        }
+
+        delay(5);
+    }
+
+    return 0xFFFFU;
 }
 
 uint16_t BQ27220::getVoltage(void)
@@ -439,27 +734,45 @@ int16_t BQ27220::getCurrent(void)
 }
 bool BQ27220::getControlStatus(BQ27220ControlStatus *ctrl_sta)
 {
-    (*ctrl_sta).full = readRegU16(CommandControl);
+    uint16_t value = 0;
+    if(!readRegU16(CommandControl, value)) {
+        return false;
+    }
+    (*ctrl_sta).full = value;
     return true;
 }
 bool BQ27220::getBatteryStatus(BQ27220BatteryStatus *batt_sta)
 {
-    (*batt_sta).full = readRegU16(CommandBatteryStatus);
+    uint16_t value = 0;
+    if(!readRegU16(CommandBatteryStatus, value)) {
+        return false;
+    }
+    (*batt_sta).full = value;
     return true;
 }
 bool BQ27220::getOperationStatus(BQ27220OperationStatus *oper_sta)
 {
-    (*oper_sta).full = readRegU16(CommandOperationStatus);
+    uint16_t value = 0;
+    if(!readRegU16(CommandOperationStatus, value)) {
+        return false;
+    }
+    (*oper_sta).full = value;
     return true;
 }
 bool BQ27220::getGaugingStatus(BQ27220GaugingStatus *gauging_sta)
 {
     // Request gauging data to be loaded to MAC
-    controlSubCmd(Control_GAUGING_STATUS);
+    if(!controlSubCmd(Control_GAUGING_STATUS)) {
+        return false;
+    }
     // Wait for data being loaded to MAC
     delayMicroseconds(BQ27220_SELECT_DELAY_US);
     // Read id data from MAC scratch space
-    (*gauging_sta).full = readRegU16(CommandMACData);
+    uint16_t value = 0;
+    if(!readRegU16(CommandMACData, value)) {
+        return false;
+    }
+    (*gauging_sta).full = value;
     return true;
 }
 uint16_t BQ27220::getTemperature(void)

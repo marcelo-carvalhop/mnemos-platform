@@ -5,6 +5,7 @@
 #include <driver/gpio.h>
 #include <driver/rtc_io.h>
 #include <esp_sleep.h>
+#include <esp_system.h>
 #include <esp_timer.h>
 
 #define XPOWERS_CHIP_BQ25896
@@ -29,6 +30,35 @@ void configureVendorPowerProfile() {
     // Sequencia do firmware factory H752-01.
     PPM.enableOTG();
     PPM.disableOTG();
+}
+
+const char* resetReasonName(
+    esp_reset_reason_t reason) {
+
+    switch (reason) {
+        case ESP_RST_POWERON:
+            return "POWERON";
+        case ESP_RST_EXT:
+            return "EXT";
+        case ESP_RST_SW:
+            return "SW";
+        case ESP_RST_PANIC:
+            return "PANIC";
+        case ESP_RST_INT_WDT:
+            return "INT_WDT";
+        case ESP_RST_TASK_WDT:
+            return "TASK_WDT";
+        case ESP_RST_WDT:
+            return "WDT";
+        case ESP_RST_DEEPSLEEP:
+            return "DEEPSLEEP";
+        case ESP_RST_BROWNOUT:
+            return "BROWNOUT";
+        case ESP_RST_SDIO:
+            return "SDIO";
+        default:
+            return "UNKNOWN";
+    }
 }
 
 }  // namespace
@@ -114,8 +144,10 @@ void PowerService::begin() {
         esp_sleep_get_ext1_wakeup_status();
 
     Serial.printf(
-        "[power] boot wake=%u raw=%d ext1=0x%llx "
+        "[power] boot reset=%s wake=%u raw=%d ext1=0x%llx "
         "light=%lu ms deep=%lu ms\n",
+        resetReasonName(
+            esp_reset_reason()),
         static_cast<unsigned>(
             bootWakeReason_),
         static_cast<int>(

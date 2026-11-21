@@ -3,9 +3,9 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 MODE="${1:-bench}"
 case "$MODE" in
-  bench) ENV_NAME="lilygo-t5-47-s3-touch-bench" ;;
-  demo|bench-demo) ENV_NAME="lilygo-t5-47-s3-touch-bench-demo" ;;
-  product) ENV_NAME="lilygo-t5-47-s3-touch" ;;
+  bench) ENV_NAME="t5s3-pro-bench" ;;
+  demo|bench-demo) ENV_NAME="t5s3-pro-bench-demo" ;;
+  product) ENV_NAME="t5s3-pro" ;;
   *) echo "Uso: $0 [bench|demo|product]" >&2; exit 2 ;;
 esac
 echo "[build] ambiente: $ENV_NAME"

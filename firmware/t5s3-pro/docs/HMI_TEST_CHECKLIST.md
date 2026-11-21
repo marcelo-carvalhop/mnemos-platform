@@ -7,6 +7,10 @@ variante `firmware/t5-touch`. Ele complementa os testes funcionais do firmware e
 deve ser repetido em retrato e paisagem sempre que `T5Display`, `TouchZone`,
 tipografia, orientação ou fluxo de estudo forem alterados.
 
+No `firmware/t5s3-pro` (H752-01) a geometria (`include/hmi_layout.h`) é a mesma
+do T5 Touch, mas a HMI opera só em retrato: os itens de paisagem não se
+aplicam.
+
 ## Geometria e hierarquia
 
 - [ ] A barra de sistema não compartilha baseline com o título da tela.

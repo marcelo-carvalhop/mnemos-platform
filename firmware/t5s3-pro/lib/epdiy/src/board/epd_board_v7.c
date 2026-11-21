@@ -244,7 +244,14 @@ static void epd_board_poweron(epd_ctrl_state_t *state) {
   // give the IC time to powerup and set lines
   vTaskDelay(1);
 
+  int pwrgood_tries = 0;
   while (!(pca9555_read_input(config_reg.port, 1) & CFG_PIN_PWRGOOD)) {
+    if (pwrgood_tries >= 500) {
+      ESP_LOGE("epdiy", "TPS65185 PWR_GOOD timeout");
+      break;
+    }
+    pwrgood_tries++;
+    vTaskDelay(1);
   }
 
   ESP_ERROR_CHECK(tps_write_register(config_reg.port, TPS_REG_ENABLE, 0x3F));

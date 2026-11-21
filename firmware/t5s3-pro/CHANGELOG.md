@@ -1,6 +1,45 @@
-# Changelog — firmware/t5-touch
+# Changelog — firmware/t5s3-pro
 
-## 0.7.0-preview.4.2-touch
+Firmware do Mnemos para o LILYGO T5 E-Paper S3 Pro H752-01. O projeto é um
+fork do `firmware/t5-touch`; o histórico anterior ao fork está ao final.
+
+## Não lançado
+
+- bateria: o BQ27220 passa a ser usado somente para leitura, sem chaves de
+  segurança, `RESET`, `CFGUPDATE` ou escrita de Data Memory; confiança em três
+  níveis (ausente, perfil não validado, perfil validado);
+- bateria: com perfil não validado, a carga exibida é estimada pela tensão
+  compensada (queda I·R), filtrada e com histerese; bateria crítica só sem
+  alimentação externa e nunca a partir do SOC não validado;
+- BQ27220: transporte I²C verificado, Device Number via MAC, `CFGUPDATE` como
+  subcomando de `Control()` e getters de status que reportam falha de I²C;
+- boot registra a causa do último reset (`[power] boot reset=...`);
+- epdiy: a espera por `PWR_GOOD` do TPS65185 deixa de ser infinita;
+- build: `-Wall -Wextra` nos fontes do projeto, sem `-Wno-return-type`, e
+  dependências com versão exata;
+- testes unitários no host (`pio test -e native`) para FSRS, bateria e o
+  contrato do lote de revisões com o validador do backend;
+- CI: build dos cinco ambientes com `-Werror`, testes e pacote OTA;
+- ferramentas: scripts de bancada e OTA apontam para os ambientes `t5s3-pro`
+  e leem versão, geração e modelo de `include/config.h`;
+- documentação: hardware, builds de bancada, arquitetura e limitações
+  reescritas para o H752-01.
+
+## 0.8.1-preview.1-t5s3-pro
+
+- bring-up do H752-01: EPD ED047TC1 via epdiy v7 (TPS65185 + PCA9535), touch
+  GT911 em retrato 540×960, microSD, RTC PCF8563, GNSS para hora, BQ25896 e
+  BQ27220;
+- integração do terminal herdada do T5 Touch (estudo, FSRS, biblioteca
+  SD-first, sincronização, LocalLink e OTA A/B local);
+- estabilização de energia, bateria e sincronização;
+- hard-off pelo BQ25896 (`REG09.BATFET_DIS`) a partir do menu e do auto-off
+  em bateria, com religamento por `PWR/QON` ou conexão de USB; o caminho de
+  corte não depende mais do USB CDC.
+
+## Histórico herdado do firmware/t5-touch
+
+### 0.7.0-preview.4.2-touch
 
 - prepara o primeiro ensaio OTA A/B real;
 - adiciona ambiente `bench-ota-source` em generation 70402;
@@ -10,7 +49,7 @@
 - gera o alvo via `tools/build-ota-target.sh`;
 - nao altera HMI, FSRS ou biblioteca SD-first.
 
-## 0.7.0-preview.4.1.2-touch
+### 0.7.0-preview.4.1.2-touch
 
 - separa build de produto e builds de bancada;
 - define `bench` como ambiente padrão;
@@ -21,21 +60,21 @@
 - adiciona diagnóstico do perfil de build;
 - avança `OTA_GENERATION` para `70402`.
 
-## 0.7.0-preview.4.1.1-touch
+### 0.7.0-preview.4.1.1-touch
 
 - garante explicitamente `OtaService::begin()` no boot;
 - garante verificacao do manifesto local depois da montagem do SD;
 - adiciona `[ota-summary]` ao final de `setup()`;
 - mantem `OTA_GENERATION=70401` para este hotfix via USB.
 
-## 0.7.0-preview.4.1-touch
+### 0.7.0-preview.4.1-touch
 
 - corrige conflito entre a tabela hexadecimal da OTA e a macro `HEX` do Arduino;
 - renomeia a tabela interna para `HEX_DIGITS`;
 - define geração OTA `70401`;
 - não altera o fluxo de verificação ou instalação OTA.
 
-## 0.7.0-preview.4-touch
+### 0.7.0-preview.4-touch
 
 - adiciona `OtaService`;
 - instala firmware no slot OTA inativo a partir do microSD;
@@ -51,7 +90,7 @@
 - não altera HMI.
 
 
-## 0.7.0-preview.3-touch
+### 0.7.0-preview.3-touch
 
 - microSD passa a ser armazenamento canônico das definições de cartões;
 - cria `/mnemos/library/cards.ndjson`;
@@ -64,7 +103,7 @@
 - anuncia `sdFirstLibrary=true` e `lazyCardContent=true`;
 - não altera HMI, FSRS ou rede.
 
-## 0.7.0-preview.2-touch
+### 0.7.0-preview.2-touch
 
 - adiciona `PowerService`;
 - light sleep com wake por touch GPIO47 e botão GPIO21;
@@ -77,7 +116,7 @@
 - anuncia `deepSleepTouchWake=false`;
 - mantém a HMI congelada.
 
-## 0.7.0-preview.1-touch
+### 0.7.0-preview.1-touch
 
 - congela a arquitetura atual da HMI touch-first;
 - desativa `DEMO_INTERVALS` no padrão normal;
@@ -90,7 +129,7 @@
 - tenta recuperar cursores HTTP 410 a partir de zero;
 - atualiza documentação e TODO de integração externa.
 
-## 0.6.0-preview.6-touch
+### 0.6.0-preview.6-touch
 
 - consolida a HMI touch-first;
 - retrato passa a ser a orientação inicial;
@@ -103,7 +142,7 @@
 - mantém pinyin tonal e Hanzi no mesmo renderer Unicode.
 
 
-## 0.6.0-preview.4-touch
+### 0.6.0-preview.4-touch
 
 - Home redesenhada como agenda semanal;
 - log serial associa coordenada touch a UiAction;
@@ -113,7 +152,7 @@
 - adiciona subconjunto grafico CJK especifico para os 100 ideogramas.
 
 
-## 0.6.0-preview.3-touch
+### 0.6.0-preview.3-touch
 
 - variante dedicada ao T5-4.7-S3 capacitive touch;
 - GT911 substitui CardKB como entrada;
@@ -123,7 +162,7 @@
 - StudyEngine, FSRS, sincronização e bateria permanecem desacoplados do input.
 
 
-## 0.6.0-preview.2
+### 0.6.0-preview.2
 
 - substituição do scheduler próprio pelo FSRS determinístico compartilhado;
 - geração do contrato compartilhado também para C++;
@@ -138,7 +177,7 @@
 - remoção de indicadores positivos de relógio da interface normal;
 - atualização da documentação e do checklist físico.
 
-## 0.6.0-preview.1
+### 0.6.0-preview.1
 
 Primeiro port funcional do firmware Mnemos para LILYGO T5-4.7-S3 sem touch.
 

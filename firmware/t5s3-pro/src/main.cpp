@@ -14,12 +14,15 @@
 #include "metrics_service.h"
 #include "network_service.h"
 #include "ota_service.h"
+#include "platform_sync_config.h"
 #include "power_service.h"
 #include "schedule_service.h"
 #include "sd_card_service.h"
+#include "serial_console.h"
 #include "storage.h"
 #include "study_engine.h"
 #include "t5_display.h"
+#include "terminal_identity.h"
 #include "time_service.h"
 #include "touch_input.h"
 #include "ui_actions.h"
@@ -111,6 +114,7 @@ LocalLinkService localLink(
 BackendSyncService backendSync(
     networkService,
     storage,
+    clockService,
     cards,
     states,
     Config::MAX_DEVICE_CARDS,
@@ -133,6 +137,19 @@ bool networkRadioSuspended = false;
 uint32_t lastNetworkDemandMs = 0;
 
 bool localLinkProvisioning = false;
+
+SerialConsole serialConsole;
+
+// Para onde o botão da tela de mensagem volta. As mensagens de Wi-Fi voltam
+// para Conexão; as de sincronização, para Sincronização.
+AppScreen messageReturnScreen = AppScreen::Connection;
+
+bool lastWifiConnected = false;
+
+void canonicalizeActiveLibraryIfPossible();
+void finishLocalLinkScreen();
+void handleSerialCommand(JsonDocument& command);
+void prepareForSleep();
 
 DeckSummary deckView[MAX_VISIBLE_DECKS];
 size_t deckViewCount = 0;
@@ -850,6 +867,7 @@ void scanWifiNetworks() {
     if (!networkService.startScan()) {
         wifiMessageTitle =
             "Wi-Fi ocupado";
+        messageReturnScreen = AppScreen::Connection;
 
         wifiMessageText =
             friendlyWifiError();
@@ -886,6 +904,126 @@ void renderWifiMessage() {
         wifiMessageTitle,
         wifiMessageText,
         wifiMessagePrimary);
+}
+
+void showInfoMessage(
+    const String& title,
+    const String& text,
+    const String& primary,
+    AppScreen returnTo) {
+
+    wifiMessageTitle = title;
+    wifiMessageText = text;
+    wifiMessagePrimary = primary;
+    messageReturnScreen = returnTo;
+    renderWifiMessage();
+}
+
+// Biblioteca/estado FSRS mudou numa sincronização com o backend.
+bool applyBackendLibraryUpdate() {
+    if (!backendSync.consumeLibraryUpdated()) {
+        return false;
+    }
+
+    canonicalizeActiveLibraryIfPossible();
+    rebuildEngine();
+
+    // O texto de um cartão pode mudar mantendo o id: descarta o cache de
+    // conteúdo hidratado do microSD.
+    displayCardBuffer = CardDefinition{};
+
+    Serial.printf(
+        "[app] biblioteca sincronizada com a conta: %u cartoes\n",
+        static_cast<unsigned>(cardCount));
+
+    return true;
+}
+
+bool waitForWifi(uint32_t timeoutMs) {
+    if (networkService.connected()) {
+        return true;
+    }
+
+    // Reinicia o backoff de reconexão: quem pediu a sincronização está
+    // esperando agora, não daqui a alguns minutos.
+    networkService.resumeAfterSleep();
+
+    const uint32_t started = millis();
+
+    while (
+        !networkService.connected() &&
+        millis() - started < timeoutMs
+    ) {
+        networkService.loop();
+        delay(40);
+    }
+
+    return networkService.connected();
+}
+
+void runManualBackendSync() {
+    if (!backendSync.paired()) {
+        BackendSyncReport report;
+        report.outcome = SyncOutcome::NotPaired;
+        showInfoMessage(
+            BackendSyncService::outcomeTitle(report),
+            BackendSyncService::outcomeMessage(report),
+            "Voltar à sincronização",
+            AppScreen::Sync);
+        return;
+    }
+
+    noteNetworkDemand();
+
+    if (!networkService.connected()) {
+        if (!networkService.hasCredentials()) {
+            showInfoMessage(
+                "Sem rede Wi-Fi",
+                "O terminal ainda não conhece nenhuma rede. Use Menu > Conexão > Procurar redes "
+                "ou Configurar pelo celular.",
+                "Voltar à sincronização",
+                AppScreen::Sync);
+            return;
+        }
+
+        if (!networkService.enabled()) {
+            networkService.enable();
+        }
+
+        display.showWifiMessage(
+            "Conectando",
+            "Conectando ao Wi-Fi para sincronizar com a conta...",
+            "");
+
+        if (!waitForWifi(PlatformSync::SYNC_WAIT_FOR_WIFI_MS)) {
+            BackendSyncReport report;
+            report.outcome = SyncOutcome::Offline;
+            showInfoMessage(
+                BackendSyncService::outcomeTitle(report),
+                BackendSyncService::outcomeMessage(report),
+                "Voltar à sincronização",
+                AppScreen::Sync);
+            return;
+        }
+    }
+
+    display.showWifiMessage(
+        "Sincronizando",
+        "Enviando revisões e baixando os cartões da conta...",
+        "");
+
+    backendSync.clearAuthRejected();
+    backendSync.syncNow(SyncTrigger::Manual);
+    applyBackendLibraryUpdate();
+
+    const BackendSyncReport& report =
+        backendSync.lastReport();
+
+    showInfoMessage(
+        BackendSyncService::outcomeTitle(report),
+        BackendSyncService::outcomeMessage(report),
+        "Voltar à sincronização",
+        AppScreen::Sync);
 }
 
 String friendlyWifiError() {
@@ -936,6 +1074,7 @@ void selectWifiNetwork(
     if (selected.enterprise) {
         wifiMessageTitle =
             "Rede corporativa";
+        messageReturnScreen = AppScreen::Connection;
 
         wifiMessageText =
             "Esta rede exige identidade/usuário. "
@@ -973,6 +1112,7 @@ void selectWifiNetwork(
             } else {
                 wifiMessageTitle =
                     "Falha ao conectar";
+                messageReturnScreen = AppScreen::Connection;
                 wifiMessageText =
                     friendlyWifiError();
                 wifiMessagePrimary =
@@ -1002,6 +1142,7 @@ void selectWifiNetwork(
         if (!wifiUserConnectionPending) {
             wifiMessageTitle =
                 "Falha ao conectar";
+            messageReturnScreen = AppScreen::Connection;
             wifiMessageText =
                 friendlyWifiError();
             wifiMessagePrimary =
@@ -1105,6 +1246,7 @@ void handleNetworkEvents() {
 
         wifiMessageTitle =
             "Falha ao conectar";
+        messageReturnScreen = AppScreen::Connection;
 
         wifiMessageText =
             friendlyWifiError();
@@ -1446,6 +1588,17 @@ void advanceAfterCommit(
 
     if (finished) {
         renderSummary();
+
+        // As revisões sobem assim que a pessoa sai do resumo e o Wi-Fi
+        // estiver de pé: app e web veem a sessão em segundos.
+        if (
+            backendSync.paired() &&
+            storage.pendingReviewCount() > 0
+        ) {
+            backendSync.requestSync(
+                SyncTrigger::SessionEnd,
+                PlatformSync::AUTO_SYNC_AFTER_SESSION_DELAY_MS);
+        }
     } else {
         renderQuestion();
     }
@@ -2422,7 +2575,17 @@ void processAction(
             ) {
                 clearDeckSelection();
 
-                if (
+                if (cardCount == 0) {
+                    showInfoMessage(
+                        "Nenhum cartão",
+                        backendSync.paired()
+                            ? "Escolha os baralhos deste terminal em Dispositivo, no app ou na web, "
+                              "e toque em Sincronizar com a conta."
+                            : "Pareie o terminal com o app (Menu > Conexão > Configurar pelo celular) "
+                              "ou importe um baralho do microSD em Configurações.",
+                        "Ir para sincronização",
+                        AppScreen::Sync);
+                } else if (
                     startStudyFromCurrentState(
                         false)
                 ) {
@@ -2523,23 +2686,17 @@ void processAction(
                 UiAction::
                     SyncBackend
             ) {
-                if (
-                    backendSync.
-                        syncNow() &&
-                    backendSync.
-                        consumeLibraryUpdated()
-                ) {
-                    rebuildEngine();
-                }
-
-                renderSync();
+                runManualBackendSync();
             } else if (
                 action ==
                 UiAction::SyncPhone
             ) {
+                // O app atual sincroniza com o terminal pela conta (Wi-Fi):
+                // "com o celular" significa parear/reparear com o app. O QR
+                // de pareamento é o que o app sabe ler.
                 startLocalLink(
                     LocalLinkMode::
-                        DirectSync);
+                        Provisioning);
             } else if (
                 action ==
                 UiAction::Back
@@ -2699,7 +2856,18 @@ void processAction(
 
         case AppScreen::WifiMessage:
             if (action == UiAction::WifiCancel) {
-                renderConnection();
+                const AppScreen target = messageReturnScreen;
+                messageReturnScreen = AppScreen::Connection;
+
+                if (target == AppScreen::Sync) {
+                    renderSync();
+                } else if (target == AppScreen::Home) {
+                    renderHome();
+                } else if (target == AppScreen::Menu) {
+                    renderMenu();
+                } else {
+                    renderConnection();
+                }
             }
             break;
 
@@ -2731,6 +2899,12 @@ void processAction(
                         ) {
                             cardCount =
                                 loaded;
+
+                            // Biblioteca agora mistura conteúdo local: deixa
+                            // de ser espelho da conta (não reporta baralhos
+                            // locais ao backend). Um snapshot com baralhos
+                            // escolhidos na conta volta a substituí-la.
+                            storage.setLibraryFromBackend(false);
 
                             rebuildEngine();
 
@@ -2773,8 +2947,7 @@ void processAction(
                     CancelLocalLink
             ) {
                 localLink.stop();
-                rebuildEngine();
-                renderMenu();
+                finishLocalLinkScreen();
             }
             break;
 
@@ -3085,9 +3258,371 @@ void canonicalizeActiveLibraryIfPossible() {
     }
 }
 
+void finishLocalLinkScreen() {
+    rebuildEngine();
+
+    if (!localLink.consumeProvisioned()) {
+        renderMenu();
+        return;
+    }
+
+    // O app gravou rede (e credencial, se o registro no backend deu certo).
+    // A primeira sincronização roda assim que o Wi-Fi subir.
+    backendSync.clearAuthRejected();
+    noteNetworkDemand();
+
+    if (backendSync.paired()) {
+        backendSync.requestSync(
+            SyncTrigger::Provisioned,
+            PlatformSync::AUTO_SYNC_AFTER_CONNECT_DELAY_MS);
+
+        showInfoMessage(
+            "Terminal conectado",
+            "Rede e conta gravadas. O terminal sincroniza sozinho assim que o Wi-Fi conectar.\n"
+            "Escolha os baralhos deste terminal em Dispositivo, no app ou na web.",
+            "Ver sincronização",
+            AppScreen::Sync);
+    } else {
+        showInfoMessage(
+            "Rede gravada",
+            "O app gravou a rede, mas não registrou o terminal na conta (servidor "
+            "inacessível ou endereço local como localhost). Pareie de novo com o "
+            "app apontando para o IP do servidor.",
+            "Voltar ao menu",
+            AppScreen::Menu);
+    }
+}
+
+
+String maskedToken(const String& token) {
+    if (token.length() == 0) return String();
+    if (token.length() <= 4) return "****";
+    return "..." + token.substring(token.length() - 4);
+}
+
+void describeTerminal(JsonDocument& response) {
+    response["deviceId"] = TerminalIdentity::deviceId();
+    response["identityGeneration"] = TerminalIdentity::generation();
+    response["firmware"] = Config::APP_VERSION;
+    response["model"] = Config::DEVICE_MODEL;
+    response["protocol"] = Config::DEVICE_PROTOCOL_VERSION;
+    response["build"] = Config::BUILD_FLAVOR;
+    response["cards"] = cardCount;
+    response["maxCards"] = Config::MAX_DEVICE_CARDS;
+    response["librarySource"] = storage.libraryFromBackend() ? "backend" : "local";
+    response["pendingReviews"] = storage.pendingReviewCount();
+    response["rejectedReviews"] = storage.rejectedReviewCount();
+
+    JsonObject wifi = response["wifi"].to<JsonObject>();
+    wifi["enabled"] = networkService.enabled();
+    wifi["connected"] = networkService.connected();
+    wifi["ssid"] = networkService.ssid();
+    wifi["ip"] = networkService.ip();
+    wifi["profiles"] = networkService.profileCount();
+    wifi["radioSuspended"] = networkRadioSuspended;
+    wifi["lastError"] = networkService.lastError();
+
+    JsonObject backend = response["backend"].to<JsonObject>();
+    backend["url"] = networkService.backendUrl();
+    backend["paired"] = backendSync.paired();
+    backend["token"] = maskedToken(networkService.deviceToken());
+    backend["authRejected"] = backendSync.authRejected();
+    backend["syncIntervalSeconds"] = networkService.syncIntervalSeconds();
+
+    JsonObject clock = response["clock"].to<JsonObject>();
+    clock["epoch"] = clockService.now();
+    clock["trusted"] = clockService.trusted();
+    clock["ntp"] = clockService.ntpSynchronized();
+
+    const BackendSyncReport& report = backendSync.lastReport();
+    JsonObject sync = response["lastSync"].to<JsonObject>();
+    sync["outcome"] = BackendSyncService::outcomeName(report.outcome);
+    sync["trigger"] = BackendSyncService::triggerName(report.trigger);
+    if (report.outcome != SyncOutcome::NeverRan) {
+        sync["ageSeconds"] = (millis() - report.finishedAtMs) / 1000U;
+        sync["durationMs"] = report.durationMs;
+        sync["failedStep"] = report.failedStep;
+        sync["httpStatus"] = report.httpStatus;
+        sync["detail"] = report.detail;
+        sync["pushed"] = report.reviewsPushed;
+        sync["quarantined"] = report.reviewsQuarantined;
+        sync["remoteReviews"] = report.remoteReviews;
+        sync["libraryChanged"] = report.libraryChanged;
+        sync["keptLocalLibrary"] = report.keptLocalLibrary;
+    }
+    sync["pendingRequest"] = backendSync.hasPendingRequest();
+}
+
+bool profileFromCommand(
+    JsonDocument& command,
+    NetworkProfile& profile,
+    String& error) {
+
+    profile = NetworkProfile{};
+    profile.ssid = command["ssid"] | "";
+    profile.ssid.trim();
+    const String password = command["password"] | "";
+    String security = command["security"] | "";
+
+    if (security.length() == 0) {
+        security = password.length() == 0 ? "open" : "personal";
+    }
+
+    profile.security = security;
+    profile.priority = command["priority"] | 100;
+    profile.enabled = true;
+    profile.autoConnect = true;
+
+    if (security == "enterprise-password" || security == "enterprise") {
+        profile.security = "enterprise-password";
+        profile.identity = command["identity"] | "";
+        profile.username = command["username"] | "";
+        profile.password = password;
+    } else if (security == "personal") {
+        profile.password = password;
+    } else if (security != "open") {
+        error = "invalid_security";
+        return false;
+    }
+
+    // Reaproveita o perfil já gravado para o mesmo SSID (pelo app ou pelo
+    // teclado do terminal) em vez de criar um duplicado.
+    for (size_t i = 0; i < networkService.profileCount(); ++i) {
+        const NetworkProfile* existing = networkService.profileAt(i);
+        if (existing != nullptr && existing->ssid == profile.ssid) {
+            profile.id = existing->id;
+            break;
+        }
+    }
+
+    if (profile.id.length() == 0) {
+        uint32_t hash = 2166136261UL;
+        for (size_t i = 0; i < profile.ssid.length(); ++i) {
+            hash ^= static_cast<uint8_t>(profile.ssid[i]);
+            hash *= 16777619UL;
+        }
+        profile.id = "serial-" + String(hash, HEX);
+    }
+
+    if (profile.ssid.length() == 0) {
+        error = "missing_ssid";
+        return false;
+    }
+    return true;
+}
+
+void replySyncReport(const char* cmd, bool ok) {
+    JsonDocument response;
+    response["cmd"] = cmd;
+    response["ok"] = ok;
+    const BackendSyncReport& report = backendSync.lastReport();
+    response["outcome"] = BackendSyncService::outcomeName(report.outcome);
+    response["title"] = BackendSyncService::outcomeTitle(report);
+    response["message"] = BackendSyncService::outcomeMessage(report);
+    response["cards"] = cardCount;
+    response["pushed"] = report.reviewsPushed;
+    response["pending"] = report.reviewsPending;
+    response["quarantined"] = report.reviewsQuarantined;
+    response["remoteReviews"] = report.remoteReviews;
+    response["libraryChanged"] = report.libraryChanged;
+    response["httpStatus"] = report.httpStatus;
+    response["failedStep"] = report.failedStep;
+    response["detail"] = report.detail;
+    response["durationMs"] = report.durationMs;
+    SerialConsole::reply(response);
+}
+
+void refreshAfterPlatformChange() {
+    if (screen == AppScreen::Home) {
+        renderHome();
+    } else if (screen == AppScreen::Sync) {
+        renderSync();
+    } else if (screen == AppScreen::Connection) {
+        renderConnection();
+    }
+}
+
+void handleSerialCommand(JsonDocument& command) {
+    const String cmd = command["cmd"] | "";
+    powerService.noteActivity();
+
+    // Trocar a biblioteca no meio de uma sessão invalidaria a fila em uso.
+    const bool studying =
+        activeStudyForPowerPolicy() ||
+        screen == AppScreen::Summary;
+
+    if (
+        (cmd == "sync" || cmd == "provision" || cmd == "wifi" || cmd == "backend") &&
+        (studying || localLink.active())
+    ) {
+        SerialConsole::replyError(
+            cmd,
+            studying
+                ? "busy_studying: volte para a tela inicial do terminal"
+                : "busy_pairing: cancele a tela de QR do terminal");
+        return;
+    }
+
+    if (cmd == "help") {
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = true;
+        JsonArray commands = response["commands"].to<JsonArray>();
+        commands.add("info");
+        commands.add("provision {ssid,password,security?,backendUrl,deviceToken}");
+        commands.add("wifi {ssid,password,security?}");
+        commands.add("backend {url,token}");
+        commands.add("sync");
+        commands.add("time {epoch}");
+        commands.add("unpair {newIdentity?}");
+        commands.add("reboot");
+        SerialConsole::reply(response);
+        return;
+    }
+
+    if (cmd == "info" || cmd == "status") {
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = true;
+        describeTerminal(response);
+        SerialConsole::reply(response);
+        return;
+    }
+
+    if (cmd == "time") {
+        const uint32_t epoch = command["epoch"] | 0U;
+        if (epoch < 1700000000U) {
+            SerialConsole::replyError(cmd, "invalid_epoch");
+            return;
+        }
+        clockService.setFromEpoch(epoch);
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = true;
+        response["epoch"] = clockService.now();
+        SerialConsole::reply(response);
+        refreshAfterPlatformChange();
+        return;
+    }
+
+    if (cmd == "wifi" || cmd == "provision") {
+        NetworkProfile profile;
+        String error;
+        if (!profileFromCommand(command, profile, error)) {
+            SerialConsole::replyError(cmd, error);
+            return;
+        }
+
+        String backendUrl = command["backendUrl"] | "";
+        String deviceToken = command["deviceToken"] | "";
+        const uint32_t interval =
+            command["syncIntervalSeconds"] | networkService.syncIntervalSeconds();
+
+        if (cmd == "wifi") {
+            backendUrl = "";
+            deviceToken = "";
+        }
+
+        const uint32_t epoch = command["epoch"] | 0U;
+        if (epoch >= 1700000000U) clockService.setFromEpoch(epoch);
+
+        if (!networkService.storeProfile(profile, backendUrl, deviceToken, interval)) {
+            SerialConsole::replyError(cmd, networkService.lastError());
+            return;
+        }
+
+        networkService.enable();
+        backendSync.clearAuthRejected();
+        noteNetworkDemand();
+
+        if (backendSync.paired()) {
+            backendSync.requestSync(
+                SyncTrigger::Provisioned,
+                PlatformSync::AUTO_SYNC_AFTER_CONNECT_DELAY_MS);
+        }
+
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = true;
+        describeTerminal(response);
+        SerialConsole::reply(response);
+        refreshAfterPlatformChange();
+        return;
+    }
+
+    if (cmd == "backend") {
+        const String url = command["url"] | "";
+        const String token = command["token"] | "";
+        if (!networkService.setBackend(url, token)) {
+            SerialConsole::replyError(cmd, networkService.lastError());
+            return;
+        }
+        backendSync.clearAuthRejected();
+        if (backendSync.paired()) {
+            noteNetworkDemand();
+            backendSync.requestSync(SyncTrigger::Serial, 0);
+        }
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = true;
+        describeTerminal(response);
+        SerialConsole::reply(response);
+        return;
+    }
+
+    if (cmd == "sync") {
+        if (!backendSync.paired()) {
+            SerialConsole::replyError(cmd, "not_paired");
+            return;
+        }
+        noteNetworkDemand();
+        if (!networkService.connected()) {
+            if (!networkService.enabled()) networkService.enable();
+            waitForWifi(PlatformSync::SYNC_WAIT_FOR_WIFI_MS);
+        }
+        backendSync.clearAuthRejected();
+        const bool ok = backendSync.syncNow(SyncTrigger::Serial);
+        if (applyBackendLibraryUpdate()) {
+            refreshAfterPlatformChange();
+        }
+        replySyncReport("sync", ok);
+        return;
+    }
+
+    if (cmd == "unpair") {
+        networkService.clearBackend();
+        backendSync.cancelPendingRequest();
+        const bool newIdentity = command["newIdentity"] | false;
+        if (newIdentity) TerminalIdentity::rotate();
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = true;
+        response["deviceId"] = TerminalIdentity::deviceId();
+        SerialConsole::reply(response);
+        return;
+    }
+
+    if (cmd == "reboot") {
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = true;
+        SerialConsole::reply(response);
+        Serial.flush();
+        prepareForSleep();
+        delay(200);
+        ESP.restart();
+        return;
+    }
+
+    SerialConsole::replyError(cmd, "unknown_command");
+}
+
+
 void setup() {
     Serial.begin(
         115200);
+
+    serialConsole.begin();
 
     Serial.printf(
         "[build] flavor=%s bench=%d demo=%d light-sleep=%d deep-sleep=%d ota-auto=%d\n",
@@ -3122,8 +3657,6 @@ void setup() {
         Config::TOUCH_I2C_FREQUENCY);
 
 
-    const bool startPortrait = true;
-
     if (!display.begin()) {
         Serial.println(
             "[app] display indisponivel; "
@@ -3136,8 +3669,12 @@ void setup() {
 
     display.setOrientation(DisplayOrientation::Portrait);
 
-    batteryService.begin();
+    // VBUS vem do BQ25896; o BQ27220 é só sensor de bateria.
     powerService.begin();
+    batteryService.begin(
+        []() {
+            return powerService.externalPowerPresent();
+        });
 
 
     display.setBatteryStatus(
@@ -3300,14 +3837,24 @@ void setup() {
 
     backendSync.begin();
 
-    if (
-        networkService.connected() &&
-        networkService.
-            backendUrl().
-            length() > 0
-    ) {
-        backendSync.syncNow();
+    // O Wi-Fi conecta de forma cooperativa no loop; a primeira sincronização
+    // roda assim que houver rede (e só em telas fora do estudo).
+    if (backendSync.paired()) {
+        backendSync.requestSync(
+            SyncTrigger::Boot,
+            0);
     }
+
+    Serial.printf(
+        "[platform] terminal=%s backend=%s pareado=%d biblioteca=%s\n",
+        TerminalIdentity::deviceId().c_str(),
+        networkService.backendUrl().length() > 0
+            ? networkService.backendUrl().c_str()
+            : "-",
+        backendSync.paired() ? 1 : 0,
+        storage.libraryFromBackend()
+            ? "conta"
+            : "local");
 
     rebuildEngine();
 
@@ -3415,6 +3962,21 @@ void loop() {
 
     localLink.loop();
 
+    JsonDocument serialCommand;
+    if (serialConsole.poll(serialCommand)) {
+        handleSerialCommand(serialCommand);
+    }
+
+    // Sincronização pedida (fim de sessão, provisionamento) acorda o rádio
+    // que a política de energia tinha desligado.
+    if (
+        backendSync.hasPendingRequest() &&
+        networkRadioSuspended &&
+        !localLink.active()
+    ) {
+        noteNetworkDemand();
+    }
+
     if (!networkRadioSuspended) {
         networkService.loop();
         display.setNetworkStatus(
@@ -3427,6 +3989,31 @@ void loop() {
             networkService.enabled(),
             false);
     }
+
+    const bool wifiConnectedNow =
+        networkService.connected();
+
+    if (
+        wifiConnectedNow &&
+        !lastWifiConnected &&
+        backendSync.paired()
+    ) {
+        const BackendSyncReport& last =
+            backendSync.lastReport();
+
+        const bool stale =
+            last.outcome != SyncOutcome::Ok ||
+            millis() - last.finishedAtMs > 60000UL;
+
+        if (stale || storage.pendingReviewCount() > 0) {
+            backendSync.requestSync(
+                SyncTrigger::WifiConnected,
+                PlatformSync::AUTO_SYNC_AFTER_CONNECT_DELAY_MS);
+        }
+    }
+
+    lastWifiConnected =
+        wifiConnectedNow;
 
     serviceNetworkPowerPolicy();
     if (clockService.maintain()) {
@@ -3498,13 +4085,7 @@ void loop() {
     ) {
         backendSync.loop();
 
-        if (
-            backendSync.
-                consumeLibraryUpdated()
-        ) {
-            canonicalizeActiveLibraryIfPossible();
-            rebuildEngine();
-
+        if (applyBackendLibraryUpdate()) {
             if (
                 screen ==
                 AppScreen::Home
@@ -3529,8 +4110,7 @@ void loop() {
             AppScreen::LocalLink &&
         !localLink.active()
     ) {
-        rebuildEngine();
-        renderMenu();
+        finishLocalLinkScreen();
     }
 
     MnemosTouchPoint point;

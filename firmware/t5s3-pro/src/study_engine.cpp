@@ -1,4 +1,5 @@
 #include "study_engine.h"
+#include "terminal_identity.h"
 
 #include <algorithm>
 #include <esp_system.h>
@@ -528,14 +529,12 @@ bool StudyEngine::commitCurrent(
 
     ReviewEvent event;
 
+    // UUIDv7, como app e web (§5.7): ordenável por tempo e único entre
+    // plataformas.
     event.id =
-        String(reviewedAt)
-        + "-"
-        + String(millis())
-        + "-"
-        + String(
-            esp_random(),
-            HEX);
+        TerminalIdentity::uuidV7(
+            reviewedAtMs +
+            (millis() % 1000U));
 
     event.cardId =
         card.id;

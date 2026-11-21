@@ -1,0 +1,57 @@
+name: Firmware T5S3 Pro
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'firmware/t5s3-pro/**'
+      - '.github/workflows/firmware-t5s3-pro.yml'
+  pull_request:
+    paths:
+      - 'firmware/t5s3-pro/**'
+      - '.github/workflows/firmware-t5s3-pro.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: firmware-t5s3-pro-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-t5s3-pro:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware/t5s3-pro
+    env:
+      # Acrescentado ao build_src_flags (-Wall -Wextra) do platformio.ini.
+      PLATFORMIO_BUILD_SRC_FLAGS: -Werror
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-t5s3-pro-${{ runner.os }}-${{ hashFiles('firmware/t5s3-pro/platformio.ini') }}
+      - name: Install PlatformIO
+        run: python -m pip install --upgrade platformio
+      - name: Unit tests (host)
+        run: pio test -e native
+      - name: Build all environments
+        run: >-
+          pio run
+          -e t5s3-pro
+          -e t5s3-pro-bench
+          -e t5s3-pro-bench-demo
+          -e t5s3-pro-bench-ota-source
+          -e t5s3-pro-bench-ota-target
+      - name: OTA bundle (product)
+        run: python3 tools/make_ota_bundle.py .pio/build/t5s3-pro/firmware.bin --env t5s3-pro --output .pio/ota-bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: t5s3-pro-firmware
+          path: |
+            firmware/t5s3-pro/.pio/build/t5s3-pro/firmware.bin
+            firmware/t5s3-pro/.pio/build/t5s3-pro-bench/firmware.bin
+            firmware/t5s3-pro/.pio/ota-bundle/

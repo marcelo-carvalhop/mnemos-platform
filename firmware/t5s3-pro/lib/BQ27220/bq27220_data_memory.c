@@ -1,7 +1,7 @@
 #include "bq27220_data_memory.h"
 
 /* ******************************************************************************
- *              T-Embed-CC1101 CEDV Gauging Configuration
+ *              H752-01 3.7 V / 1500 mAh CEDV Configuration
  ***************************************************************************** */
 // CEDV：Compensated End-of-Discharge Voltage
 

@@ -101,7 +101,7 @@ typedef union GaugingStatus{
 
 class BQ27220{
 public:
-    BQ27220() : addr{BQ27220_I2C_ADDRESS}, wire(&Wire), scl(DEFAULT_SCL), sda(DEFAULT_SDA)
+    BQ27220() : wire(&Wire), addr{BQ27220_I2C_ADDRESS}, scl(DEFAULT_SCL), sda(DEFAULT_SDA)
     {}
 
     bool begin()
@@ -119,13 +119,21 @@ public:
 
     bool getCharingFinish(void)
     {
-        BQ27220BatteryStatus batt;
-        getBatteryStatus(&batt);
+        BQ27220BatteryStatus batt = {};
+        if(!getBatteryStatus(&batt)) {
+            return false;
+        }
         if(!(batt.reg.DSG || getCurrent()) )
             return true;
         return false;
     }
 
+    /*
+     * Provisioning API: these calls send security keys, RESET,
+     * CFGUPDATE and Data Memory writes. The H752-01 gauge is
+     * SEALED with an unknown key, so the firmware must not call
+     * them until a confirmed provisioning procedure exists.
+     */
     bool parameterCheck(uint16_t address, uint32_t value, size_t size, bool update);
     bool dateMemoryCheck(const BQ27220DMData *data_memory, bool update);
 
@@ -155,54 +163,157 @@ public:
 
     // i2c
     uint16_t readRegU16(uint16_t reg) {
-        uint8_t data[2];
-        i2cReadBytes(reg, data, 2);
-        return ((uint16_t) data[1] << 8) | data[0];
+        uint16_t value = 0xFFFFU;
+
+        if (!readRegU16(
+                static_cast<uint8_t>(reg),
+                value)) {
+            return 0xFFFFU;
+        }
+
+        return value;
     }
 
-    // uint16_t readCtrlWord(uint16_t fun) {
-    //     uint8_t msb = (fun >> 8);
-    //     uint8_t lsb = (fun & 0x00FF);
-    //     uint8_t cmd[2] = { lsb, msb };
-    //     uint8_t data[2] = {0};
+    // Tells an I2C failure apart from a legitimate 0xFFFF
+    // (e.g. Current() = -1 mA).
+    bool readRegU16(uint8_t reg, uint16_t &value) {
+        uint8_t data[2] = {0, 0};
 
-    //     i2cWriteBytes((uint8_t)BQ27220_COMMAND_CONTROL, cmd, 2);
+        if (!i2cReadBytes(
+                reg,
+                data,
+                sizeof(data))) {
+            return false;
+        }
 
-    //     if (i2cReadBytes((uint8_t) 0, data, 2)) {
-    //         return ((uint16_t)data[1] << 8) | data[0];
-    //     }
-    //     return 0;
-    // }
+        value =
+            (static_cast<uint16_t>(data[1]) << 8) |
+            static_cast<uint16_t>(data[0]);
+
+        return true;
+    }
 
     bool controlSubCmd(uint16_t sub_cmd)
     {
-        uint8_t msb = (sub_cmd >> 8);
-        uint8_t lsb = (sub_cmd & 0x00FF);
-        uint8_t buf[2] = { lsb, msb };
-        i2cWriteBytes(CommandControl, buf, 2);
+        uint8_t buf[2] = {
+            static_cast<uint8_t>(sub_cmd & 0x00FFU),
+            static_cast<uint8_t>((sub_cmd >> 8) & 0x00FFU)
+        };
+
+        return
+            i2cWriteBytes(
+                CommandControl,
+                buf,
+                sizeof(buf));
+    }
+
+    bool i2cReadBytes(
+        uint8_t reg,
+        uint8_t *dest,
+        uint8_t count)
+    {
+        if (
+            dest == nullptr ||
+            count == 0
+        ) {
+            return false;
+        }
+
+        wire->beginTransmission(addr);
+
+        if (wire->write(reg) != 1) {
+            wire->endTransmission(true);
+            delayMicroseconds(80);
+            return false;
+        }
+
+        const uint8_t txResult =
+            wire->endTransmission(false);
+
+        if (txResult != 0) {
+            delayMicroseconds(80);
+            return false;
+        }
+
+        const size_t received =
+            wire->requestFrom(
+                static_cast<uint8_t>(addr),
+                static_cast<size_t>(count),
+                true);
+
+        if (received != count) {
+            while (wire->available()) {
+                wire->read();
+            }
+
+            delayMicroseconds(80);
+            return false;
+        }
+
+        for (
+            uint8_t i = 0;
+            i < count;
+            ++i
+        ) {
+            if (!wire->available()) {
+                delayMicroseconds(80);
+                return false;
+            }
+
+            const int value =
+                wire->read();
+
+            if (value < 0) {
+                delayMicroseconds(80);
+                return false;
+            }
+
+            dest[i] =
+                static_cast<uint8_t>(value);
+        }
+
+        delayMicroseconds(80);
         return true;
     }
 
-    bool i2cReadBytes(uint8_t reg, uint8_t * dest, uint8_t count) {
-        wire->beginTransmission(addr);
-        wire->write(reg);
-        wire->endTransmission(true);
-
-        wire->requestFrom(addr, count);
-        for(int i = 0; i < count; i++) {
-            dest[i] = wire->read();
+    bool i2cWriteBytes(
+        uint8_t reg,
+        uint8_t *src,
+        uint8_t count)
+    {
+        if (
+            src == nullptr ||
+            count == 0
+        ) {
+            return false;
         }
-        return true;
-    }
 
-    bool i2cWriteBytes(uint8_t reg, uint8_t * src, uint8_t count) {
         wire->beginTransmission(addr);
-        wire->write(reg);
-        for(int i = 0; i < count; i++) {
-            wire->write(src[i]);
+
+        if (wire->write(reg) != 1) {
+            wire->endTransmission(true);
+            delayMicroseconds(80);
+            return false;
         }
-        wire->endTransmission(true);
-        return true;
+
+        for (
+            uint8_t i = 0;
+            i < count;
+            ++i
+        ) {
+            if (wire->write(src[i]) != 1) {
+                wire->endTransmission(true);
+                delayMicroseconds(80);
+                return false;
+            }
+        }
+
+        const uint8_t result =
+            wire->endTransmission(true);
+
+        delayMicroseconds(80);
+
+        return result == 0;
     }
 
 private:

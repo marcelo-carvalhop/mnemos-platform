@@ -284,10 +284,12 @@ bool NetworkService::storeProfile(const NetworkProfile& profile,
         lastError_ = "invalid_network_profile";
         return false;
     }
-    const bool hasBackend = backendUrl.length() > 0;
+    String url = backendUrl;
+    url.trim();
+    const bool hasBackend = url.length() > 0;
     const bool hasToken = deviceToken.length() > 0;
     if (hasBackend != hasToken ||
-        (hasBackend && !backendUrl.startsWith("http://") && !backendUrl.startsWith("https://"))) {
+        (hasBackend && !url.startsWith("http://") && !url.startsWith("https://"))) {
         lastError_ = "invalid_backend";
         return false;
     }
@@ -302,13 +304,44 @@ bool NetworkService::storeProfile(const NetworkProfile& profile,
         return false;
     }
 
-    backendUrl_ = backendUrl;
-    deviceToken_ = deviceToken;
+    // O app só envia credencial quando conseguiu registrar o terminal no
+    // backend. Reprovisionar o Wi-Fi sem backend (app offline, emulador,
+    // registro recusado) não pode apagar um pareamento que já funciona.
+    if (hasBackend) {
+        backendUrl_ = url;
+        deviceToken_ = deviceToken;
+    }
     syncIntervalSeconds_ = constrain(syncIntervalSeconds, 300U, 86400U);
     enabled_ = true;
     lastError_ = "";
     save();
     return true;
+}
+
+bool NetworkService::setBackend(const String& backendUrl, const String& deviceToken) {
+    String url = backendUrl;
+    url.trim();
+    while (url.endsWith("/")) url.remove(url.length() - 1);
+    if (url.length() == 0 && deviceToken.length() == 0) {
+        clearBackend();
+        return true;
+    }
+    if (url.length() == 0 || deviceToken.length() == 0 ||
+        (!url.startsWith("http://") && !url.startsWith("https://"))) {
+        lastError_ = "invalid_backend";
+        return false;
+    }
+    backendUrl_ = url;
+    deviceToken_ = deviceToken;
+    lastError_ = "";
+    save();
+    return true;
+}
+
+void NetworkService::clearBackend() {
+    backendUrl_ = "";
+    deviceToken_ = "";
+    save();
 }
 
 bool NetworkService::configure(const String& ssid,
