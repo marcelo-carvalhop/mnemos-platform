@@ -9,7 +9,19 @@ Uma instância Lightsail roda Postgres, API, worker e Caddy (HTTPS e build da we
 | Bucket | `mnemos-uploads-71895761` | `us-east-2` |
 | Chave SSH | `mnemos-key` | `us-east-2` |
 
-Endereço: `https://mnemos.<ip-com-hífens>.sslip.io`. O `sslip.io` resolve o nome para o IP embutido nele, o que permite certificado Let's Encrypt sem domínio próprio. Trocar por um domínio próprio exige só mudar `DOMAIN` no `.env` e apontar o DNS para o IP estático.
+Endereço: `https://mnemos.<ip-com-hífens>.sslip.io`. O `sslip.io` resolve o nome para o IP embutido nele, o que permite certificado Let's Encrypt sem domínio próprio. Trocar por um domínio próprio exige mudar `DOMAIN` no `.env`, apontar o DNS para o IP estático e acrescentar o novo endereço ao CORS do bucket (abaixo).
+
+### CORS do bucket
+
+A web envia PDFs e fotos direto para o bucket, por URL pré-assinada, e o navegador só faz esse `PUT` se o bucket liberar a origem do site. Sem a regra, o preflight volta 403 e a geração por PDF falha só na web (o app não passa por CORS). Bucket do Lightsail não aceita `s3api put-bucket-cors`: a regra vai pela API do Lightsail.
+
+```bash
+aws lightsail update-bucket --profile mnemos --region us-east-2 \
+  --bucket-name mnemos-uploads-71895761 \
+  --cors '{"rules":[{"id":"web-upload","allowedMethods":["PUT"],"allowedOrigins":["https://mnemos.3-13-6-164.sslip.io"],"allowedHeaders":["content-type"],"maxAgeSeconds":3000}]}'
+```
+
+Com domínio próprio, liste os dois endereços em `allowedOrigins` durante a transição.
 
 ## Rotas
 
