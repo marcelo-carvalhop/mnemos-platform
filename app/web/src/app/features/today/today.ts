@@ -42,7 +42,7 @@ import { OpenGenerations } from '../create/open-generations';
       <!-- O bloco-âncora. Existe em todos os três estados: com fila, sem fila
            e sem cards. Um vazio centralizado no lugar dele deixaria a tela sem
            dizer nada no dia em que não há o que fazer. -->
-      <section class="anchor" aria-label="O que vence agora">
+      <section class="anchor mn-panel" aria-label="O que vence agora">
         @if (due().length > 0) {
           <p class="eyebrow mn-mono">Vencendo agora</p>
           <p class="figure">
@@ -73,7 +73,7 @@ import { OpenGenerations } from '../create/open-generations';
             Diga o que você quer aprender e a IA escreve os cards. Você aprova um por um antes de
             qualquer coisa virar baralho.
           </p>
-          <a class="onDark" routerLink="/criar">Criar com IA</a>
+          <a class="cta" routerLink="/criar">Criar com IA</a>
         }
       </section>
 

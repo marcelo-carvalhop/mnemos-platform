@@ -197,18 +197,20 @@ h2 {
 }
 
 /* O primeiro cartão da fileira é o bloco-âncora: a métrica que o produto
- * promete, separada por cor das que só descrevem esforço. */
+ * promete, separada das que só descrevem esforço pela grade e pela borda de
+ * vidro (`.mn-panel`), não por cor. As regras de `.cards article` ganham da
+ * classe global, então o painel é repetido aqui. */
 .cards .anchor {
-  background: var(--mn-hero);
-  border-color: transparent;
-  color: var(--mn-text-on-hero);
+  background: var(--mn-panel-bg);
+  border-color: var(--mn-panel-line);
+  box-shadow: var(--mn-panel-sheen);
 }
 .cards .anchor .eyebrow {
   margin: 0;
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--mn-text-on-hero-muted);
+  color: var(--mn-text-faint);
 }
 .cards .anchor .figure {
   display: flex;
@@ -230,7 +232,7 @@ h2 {
   margin: 8px 0 0;
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--mn-text-on-hero-muted);
+  color: var(--mn-text-muted);
 }
 .cards .n.good {
   color: var(--mn-good);

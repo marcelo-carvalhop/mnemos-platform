@@ -82,8 +82,14 @@ abstract final class MnemosColors {
   /// Decoração: grade, trilho, ícone que espera. Nunca texto a ser lido.
   static const deco = Color(0xFF9BAEC0);
 
-  /// Texto sobre marinho, sobre o gradiente do herói ou sobre o da IA.
+  /// Texto sobre marinho ou sobre o gradiente da IA.
   static const onDark = Color(0xFFFAFBFC);
+
+  /// O bloco-âncora do Hoje: branco a 66%, borda de vidro a 10% de marinho e
+  /// grade fina a 6%. Sem gradiente de cor — o marinho fica no numeral.
+  static const panel = Color(0xA8FFFFFF);
+  static const panelLine = Color(0x1A0F1C3D);
+  static const panelGrid = Color(0x0F0F1C3D);
 
   // -------------------------------------------------------------------------
   // Marinho — a ação
@@ -194,16 +200,8 @@ abstract final class MnemosColors {
   static const aiEnd = Color(0xFFE14FB8);
 }
 
-/// Os dois gradientes do sistema, e só eles.
+/// O único gradiente do sistema.
 abstract final class MnemosGradients {
-  /// O bloco-herói: o marinho ganhando luz em direção ao azul.
-  static const hero = LinearGradient(
-    begin: Alignment.bottomRight,
-    end: Alignment.topLeft,
-    colors: [Color(0xFF2F5BA6), Color(0xFF0F1C3D)],
-    stops: [0.0, 1.0],
-  );
-
   /// **Exclusivo da IA.** Onde ele aparece, é a IA agindo — gerar cards, a
   /// tela de geração. Usá-lo como enfeite apaga esse sinal.
   static const ai = LinearGradient(

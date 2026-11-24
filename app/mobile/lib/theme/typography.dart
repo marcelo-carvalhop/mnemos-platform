@@ -100,14 +100,14 @@ abstract final class MnemosText {
   // Numerais — Geist, grandes e apertados
   // -------------------------------------------------------------------------
 
-  /// O número do bloco-herói: quantos cards vencem agora.
+  /// O número do bloco-âncora: quantos cards vencem agora.
   static const heroNumeral = TextStyle(
     fontFamily: MnemosFonts.sans,
     fontFeatures: [FontFeature.tabularFigures()],
     fontSize: 44,
     fontWeight: FontWeight.w400,
     height: 1,
-    color: MnemosColors.onDark,
+    color: MnemosColors.ink,
     letterSpacing: -1.5,
   );
 

@@ -121,29 +121,76 @@ class SurfaceCard extends StatelessWidget {
   }
 }
 
-/// O bloco-âncora lavanda que abre a tela Hoje.
+/// O bloco-âncora que abre a tela Hoje.
 ///
 /// §design — "cada tela ganha um bloco-âncora no topo em vez de começar com
-/// uma lista solta". Este é o mais forte deles: o único elemento da interface
-/// que inverte para fundo escuro.
-class HeroCard extends StatelessWidget {
-  const HeroCard({super.key, required this.child, this.padding});
+/// uma lista solta". Claro, sobre uma grade fina que some a partir do canto
+/// superior direito, com borda de vidro. Igual ao `.mn-panel` do web.
+class AnchorCard extends StatelessWidget {
+  const AnchorCard({super.key, required this.child, this.padding});
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
 
   @override
   Widget build(BuildContext context) {
+    final shape = squircle(
+      MnemosRadii.card,
+      side: const BorderSide(color: MnemosColors.panelLine),
+    );
     return Container(
       width: double.infinity,
-      padding: padding ?? const EdgeInsets.all(MnemosSpacing.xl),
-      decoration: ShapeDecoration(
-        gradient: MnemosGradients.hero,
-        shape: squircle(MnemosRadii.card),
+      decoration: ShapeDecoration(color: MnemosColors.panel, shape: shape),
+      child: ClipPath(
+        clipper: ShapeBorderClipper(shape: shape),
+        child: CustomPaint(
+          painter: const _PanelGrid(),
+          child: Padding(
+            padding: padding ?? const EdgeInsets.all(MnemosSpacing.xl),
+            child: child,
+          ),
+        ),
       ),
-      child: child,
     );
   }
+}
+
+/// A grade de 20 pt do bloco-âncora, apagada por um degradê radial a partir do
+/// canto superior direito para não brigar com o numeral.
+class _PanelGrid extends CustomPainter {
+  const _PanelGrid();
+
+  static const _step = 20.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final line = Paint()
+      ..color = MnemosColors.panelGrid
+      ..strokeWidth = 1;
+    canvas.saveLayer(rect, Paint());
+    for (var x = _step; x < size.width; x += _step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), line);
+    }
+    for (var y = _step; y < size.height; y += _step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), line);
+    }
+    final reach = size.longestSide * 0.9;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..blendMode = BlendMode.dstIn
+        ..shader = RadialGradient(
+          center: Alignment.topRight,
+          radius: reach / size.shortestSide,
+          colors: const [Color(0xFF000000), Color(0x00000000)],
+        ).createShader(rect),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_PanelGrid oldDelegate) => false;
 }
 
 /// Uma faixa tracejada de convite — "Novo baralho".

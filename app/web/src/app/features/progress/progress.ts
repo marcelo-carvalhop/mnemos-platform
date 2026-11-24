@@ -36,7 +36,7 @@ import { Store, dayStart } from '../../core/store';
     <section class="cards">
       <!-- O bloco-âncora: a métrica que o produto promete, antes das que só
            descrevem esforço. -->
-      <article class="anchor">
+      <article class="anchor mn-panel">
         <p class="eyebrow mn-mono">Memória acumulada</p>
         <p class="figure">
           <span class="n">{{ store.accumulatedMemoryDays().toLocaleString('pt-BR') }}</span>

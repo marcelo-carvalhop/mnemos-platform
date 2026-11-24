@@ -86,7 +86,12 @@
     rgba(106, 124, 240, 0.06) 34%,
     rgba(225, 79, 184, 0.07) 100%
   );
-  --mn-hero: linear-gradient(-62deg, #2f5ba6 1%, #0f1c3d 100%);
+  /* O bloco-âncora (Hoje, Progresso): claro, sobre grade fina, com borda de
+   * vidro. Sem gradiente de cor — o marinho fica no numeral e na barra. */
+  --mn-panel-bg: rgba(255, 255, 255, 0.66);
+  --mn-panel-line: rgba(15, 28, 61, 0.1);
+  --mn-panel-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --mn-panel-grid: rgba(15, 28, 61, 0.06);
   --mn-text-on-hero: #fafbfc;
   --mn-text-on-hero-muted: #c9d3dd;
   --mn-hero-ink: #0f1c3d;
@@ -167,7 +172,10 @@
 
     --mn-destructive: #ee9f86;
 
-    --mn-hero: linear-gradient(-62deg, #2f5ba6 1%, #17233f 100%);
+    --mn-panel-bg: rgba(17, 28, 54, 0.66);
+    --mn-panel-line: rgba(250, 251, 252, 0.1);
+    --mn-panel-sheen: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    --mn-panel-grid: rgba(250, 251, 252, 0.05);
     --mn-shadow-float: 0 8px 32px rgba(0, 0, 0, 0.35);
     --mn-shadow-menu: 0 8px 24px rgba(0, 0, 0, 0.5);
   }
@@ -235,6 +243,33 @@ button {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* O bloco-âncora do topo de Hoje e Progresso. A grade vive numa camada
+ * própria, que some em direção ao canto inferior esquerdo, para não brigar
+ * com o numeral. */
+.mn-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--mn-panel-bg);
+  border: 1px solid var(--mn-panel-line);
+  box-shadow: var(--mn-panel-sheen);
+  border-radius: var(--mn-radius-xl);
+  color: var(--mn-text);
+}
+.mn-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--mn-panel-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mn-panel-grid) 1px, transparent 1px);
+  background-size: 20px 20px;
+  -webkit-mask-image: radial-gradient(circle at 100% 0%, #000 0%, transparent 75%);
+  mask-image: radial-gradient(circle at 100% 0%, #000 0%, transparent 75%);
 }
 
 @media (prefers-reduced-motion: reduce) {

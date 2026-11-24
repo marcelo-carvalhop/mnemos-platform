@@ -110,11 +110,11 @@ class _DueHero extends ConsumerWidget {
       _ => ('vencendo agora', '$cards', 'cards em ${plural(decks, 'baralho', 'baralhos')}'),
     };
 
-    return HeroCard(
+    return AnchorCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Eyebrow(eyebrow, color: MnemosColors.onPrimaryMuted),
+          Eyebrow(eyebrow, color: MnemosColors.faint),
           const SizedBox(height: MnemosSpacing.sm),
           Row(
             crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -127,14 +127,14 @@ class _DueHero extends ConsumerWidget {
                   detail,
                   style: MnemosText.body.copyWith(
                     fontSize: 16,
-                    color: MnemosColors.onPrimarySoft,
+                    color: MnemosColors.muted,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: MnemosSpacing.lg),
-          Container(height: 1, color: MnemosColors.onDark.withValues(alpha: 0.18)),
+          Container(height: 1, color: MnemosColors.panelLine),
           const SizedBox(height: MnemosSpacing.lg),
           Row(
             children: [
@@ -146,11 +146,11 @@ class _DueHero extends ConsumerWidget {
                   terminal == null
                       ? 'Nenhum Mnemos T5 conectado'
                       : 'T5 ${relativeSince(lastSync, now) == null ? 'ainda não sincronizou' : 'sincronizado ${relativeSince(lastSync, now)}'}',
-                  style: MnemosText.bodySmall.copyWith(color: MnemosColors.onPrimarySoft),
+                  style: MnemosText.bodySmall.copyWith(color: MnemosColors.muted),
                 ),
               ),
               const SizedBox(width: MnemosSpacing.md),
-              _HeroButton(
+              _PanelButton(
                 label: terminal == null ? 'Conectar' : 'Enviar ao T5',
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const DeviceScreen()),
@@ -164,10 +164,9 @@ class _DueHero extends ConsumerWidget {
   }
 }
 
-/// O botão claro sobre o bloco-herói. Inverte as cores do primário porque
-/// sobre o marinho o primário desapareceria.
-class _HeroButton extends StatelessWidget {
-  const _HeroButton({required this.label, required this.onTap});
+/// O botão do bloco-âncora: a pílula marinho do primário, compacta.
+class _PanelButton extends StatelessWidget {
+  const _PanelButton({required this.label, required this.onTap});
 
   final String label;
   final VoidCallback onTap;
@@ -182,16 +181,16 @@ class _HeroButton extends StatelessWidget {
           horizontal: MnemosSpacing.lg,
           vertical: MnemosSpacing.md,
         ),
-        decoration: ShapeDecoration(
-        color: MnemosColors.onDark,
-        shape: const StadiumBorder(),
-      ),
+        decoration: const ShapeDecoration(
+          color: MnemosColors.primary,
+          shape: StadiumBorder(),
+        ),
         child: Text(
           label,
           style: MnemosText.labelSmall.copyWith(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: MnemosColors.ink,
+            color: MnemosColors.onDark,
           ),
         ),
       ),

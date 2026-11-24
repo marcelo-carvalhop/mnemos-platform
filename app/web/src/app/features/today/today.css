@@ -72,13 +72,10 @@
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  background: var(--mn-hero);
-  color: var(--mn-text-on-hero);
-  border-radius: var(--mn-radius-xl);
   padding: var(--mn-gap-5);
 }
 .anchor .eyebrow {
-  color: var(--mn-text-on-hero-muted);
+  color: var(--mn-text-faint);
 }
 .figure {
   display: flex;
@@ -94,17 +91,18 @@
 }
 .figure .unit {
   font-size: 17px;
-  color: var(--mn-text-on-hero-muted);
+  color: var(--mn-text-muted);
 }
 .anchor .prose {
   margin: var(--mn-gap-4) 0 0;
   font-size: 14.5px;
   line-height: 1.55;
-  color: var(--mn-text-on-hero-muted);
+  color: var(--mn-text-muted);
   max-width: 46ch;
 }
 
-/* A proporção da fila entre baralhos, lida antes de qualquer legenda. */
+/* A proporção da fila entre baralhos, lida antes de qualquer legenda: o
+ * primeiro baralho em marinho, os outros num tom abaixo. */
 .split-bar {
   display: flex;
   gap: 8px;
@@ -113,7 +111,7 @@
 .split-bar span {
   height: 8px;
   border-radius: 4px;
-  background: var(--mn-text-on-hero);
+  background: var(--mn-accent);
 }
 .split-bar span.second {
   background: var(--mn-accent-60);
@@ -124,14 +122,15 @@
   flex-wrap: wrap;
   margin: 12px 0 0;
   font-size: 13.5px;
-  color: var(--mn-text-on-hero-muted);
+  color: var(--mn-text-muted);
 }
 
-.onDark {
+.cta {
   display: inline-block;
+  align-self: flex-start;
   margin-top: var(--mn-gap-4);
-  background: var(--mn-text-on-hero);
-  color: var(--mn-hero-ink);
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
   border-radius: var(--mn-radius-pill);
   padding: 11px 18px;
   font-size: 14px;

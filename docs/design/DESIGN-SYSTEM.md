@@ -75,14 +75,29 @@ Sempre nesta ordem: errei, difícil, bom, fácil.
 Retenção é menta, vencimento é coral, memória acumulada é azul e contagem
 sem juízo é tinta. O mesmo número não muda de cor ao mudar de tela.
 
-### Gradientes
+### Gradiente
 
-Só estes dois:
+Só um, e só da IA:
 
 | Nome | Valor | Onde |
 |---|---|---|
-| Herói | `linear-gradient(-62deg, #2F5BA6, #0F1C3D)` | o bloco-âncora de Hoje e de Progresso |
 | IA | `linear-gradient(-55deg, #6A7CF0, #E14FB8)` | gerar cards, tela de geração, plano Com IA |
+
+### Bloco-âncora
+
+O bloco do topo de Hoje e de Progresso é claro, sem gradiente de cor. Até
+2026-11-23 era um gradiente marinho→azul, que pesava a tela. No netlex esse
+gradiente só aparece num cartão pequeno do menu, nunca como âncora de página.
+
+| Parte | Claro | Escuro (web) |
+|---|---|---|
+| fundo | branco a 66% | `rgba(17,28,54,.66)` |
+| borda de vidro | 1 px `rgba(15,28,61,.10)` + `inset 0 1px 0 rgba(255,255,255,.7)` | 1 px `rgba(250,251,252,.10)` |
+| grade | linhas `rgba(15,28,61,.06)` a cada 20 px | `rgba(250,251,252,.05)` |
+| numeral e barra | tinta marinho; barra marinho sobre trilho `#ECF0F3` | `#E8EDF3` sobre `#17233F` |
+
+A grade fica numa camada própria, apagada por um degradê radial a partir do
+canto superior direito, para não brigar com o numeral.
 
 ## Tipografia
 
@@ -133,7 +148,7 @@ A palavra "Mnemos" vem em Geist 600, com tracking de −0,02 em.
 |---|---|---|
 | Botão principal | `.primary` (marinho, pílula) | `FilledButton` pelo tema |
 | Botão da IA | `.primary` em Criar, `.create` na Biblioteca | `AiButton` |
-| Bloco-herói | `.anchor` (gradiente herói) | `HeroCard` |
+| Bloco-âncora | `.mn-panel` (claro, grade fina, borda de vidro) | `AnchorCard` |
 | Selo de vencimento | `.badge` | `DueBadge` |
 | Menu no celular | `.topbar`, `.tabbar` e a folha `.sheet` (abaixo de 900 px) | `AppShell`, `MnemosTabBar` e a folha do "Mais" |
 | Chip | `.chips button`, `.counts button` (pílula) | `MnemosChip` e `chipTheme` (pílula) |
