@@ -94,6 +94,14 @@
  * pergunta acima. Em qualquer fluxo de leitura ou revisão da Apple a ação de
  * avanço é a mais pesada da tela. Preenchida, e com largura de botão em vez de
  * largura de página. */
+/* A entrada da IA fica entre o card e a ação: perto da pergunta, mais leve
+ * que "Ver a resposta". */
+.ask {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--mn-gap-4);
+}
+
 .reveal {
   margin: var(--mn-gap-5) auto 0;
   display: flex;
@@ -284,6 +292,11 @@
 .eyebrow.centred {
   text-align: center;
   margin-bottom: 14px;
+}
+/* Depois da entrada da IA, o "Como foi?" precisa de ar: colado nela, lia como
+ * legenda do botão. */
+.ask + .eyebrow.centred {
+  margin-top: var(--mn-gap-5);
 }
 
 .card .front {

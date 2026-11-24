@@ -13,6 +13,8 @@ import { Store } from '../../core/store';
 import { Sync } from '../../core/sync';
 import { preview } from '../../core/scheduler';
 import { IntervalPipe } from '../../shared/interval-pipe';
+import type { ChatContext } from '../../core/chat';
+import { ChatPanel } from '../chat/chat-panel';
 
 /**
  * A sessão de estudo (§5.8).
@@ -30,7 +32,7 @@ import { IntervalPipe } from '../../shared/interval-pipe';
 @Component({
   selector: 'app-study',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, IntervalPipe],
+  imports: [RouterLink, IntervalPipe, ChatPanel],
   styleUrl: './study.css',
   host: { '(document:keydown)': 'onKey($event)' },
   template: `
@@ -92,6 +94,18 @@ import { IntervalPipe } from '../../shared/interval-pipe';
         }
       </article>
 
+      <!-- A dúvida nasce aqui, diante da pergunta. Antes da resposta a IA só
+           dá dicas; depois, explica. -->
+      @if (chatContext(); as context) {
+        <div class="ask">
+          <app-chat-panel
+            [context]="context"
+            [(open)]="chatOpen"
+            label="Perguntar à IA sobre este card"
+          />
+        </div>
+      }
+
       @if (!revealed()) {
         <button class="reveal" type="button" (click)="reveal()">
           Ver a resposta
@@ -142,6 +156,9 @@ export class Study implements OnDestroy {
   protected readonly labels = GRADE_LABELS;
 
   protected readonly revealed = signal(false);
+
+  /** Com o chat aberto o teclado é dele: espaço e 1–4 não tocam no card. */
+  protected readonly chatOpen = signal(false);
   protected readonly answered = signal(0);
 
   /** Quantos a pessoa acertou nesta sessão — "errei" é o único erro. */
@@ -212,6 +229,23 @@ export class Study implements OnDestroy {
     return id ? (this.store.liveCards().find((c) => c.id === id) ?? null) : null;
   });
 
+  /**
+   * O que a IA sabe do card. A resposta só entra depois de revelada — e o
+   * serviço também não a envia antes disso.
+   */
+  protected readonly chatContext = computed<ChatContext | null>(() => {
+    const current = this.card();
+    if (!current) return null;
+    return {
+      kind: 'card',
+      cardId: current.id,
+      deck: this.deckName(current.deck_id),
+      question: current.front,
+      answer: current.back,
+      revealed: this.revealed(),
+    };
+  });
+
   protected readonly intervals = computed(() => {
     const current = this.card();
     if (!current) return {} as Record<Grade, number>;
@@ -250,10 +284,11 @@ export class Study implements OnDestroy {
    *
    * `Escape` sai, espaço revela, 1–4 graduam. Teclas só valem quando o foco não
    * está num campo de texto — caso contrário digitar "3" numa busca graduaria
-   * um card sem ninguém pedir.
+   * um card sem ninguém pedir. Com o chat aberto, nenhuma vale: Esc fecha o
+   * chat em vez de sair da sessão, e espaço num botão do chat é do chat.
    */
   protected onKey(event: KeyboardEvent): void {
-    if (isTyping(event.target)) return;
+    if (this.chatOpen() || event.defaultPrevented || isTyping(event.target)) return;
 
     if (event.key === 'Escape') {
       event.preventDefault();

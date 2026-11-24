@@ -1,0 +1,349 @@
+:host {
+  display: contents;
+}
+
+/* --- a entrada ------------------------------------------------------------ */
+
+/* Pílula de contorno, com o gradiente da IA no fio e na marca: é uma ação
+ * secundária ao lado de "Estudar agora", e um segundo preenchido forte
+ * competiria com ela. */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px 9px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--mn-radius-pill);
+  background:
+    linear-gradient(var(--mn-surface-raised), var(--mn-surface-raised)) padding-box,
+    var(--mn-ai) border-box;
+  color: var(--mn-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.trigger:hover {
+  background:
+    linear-gradient(var(--mn-surface-soft), var(--mn-surface-soft)) padding-box,
+    var(--mn-ai) border-box;
+}
+
+.mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--mn-radius-pill);
+  background: var(--mn-ai);
+  color: var(--mn-text-on-hero);
+}
+.mark.big {
+  width: 32px;
+  height: 32px;
+}
+.mark.big svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* --- o painel ------------------------------------------------------------- */
+
+/* Gaveta à direita na mesa. O que está fora dela continua visível atrás do
+ * véu — no estudo, a pergunta sobre a qual se conversa. */
+.panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(440px, 100vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--mn-line);
+  background: var(--mn-surface-raised);
+  color: var(--mn-text);
+  box-shadow: var(--mn-shadow-menu);
+  overflow: hidden;
+}
+.panel::backdrop {
+  background: rgba(7, 16, 34, 0.3);
+}
+.panel[open] {
+  animation: drawer-in 0.22s var(--mn-ease);
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+
+.body:focus {
+  outline: none;
+}
+.body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 14px 14px 18px;
+  border-bottom: 1px solid var(--mn-line);
+}
+.titles {
+  flex: 1;
+  min-width: 0;
+}
+.head h2 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+.sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--mn-text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--mn-radius-pill);
+  background: none;
+  color: var(--mn-text-muted);
+  cursor: pointer;
+}
+.close:hover {
+  background: var(--mn-surface-soft);
+}
+
+/* --- a conversa ----------------------------------------------------------- */
+
+.log {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+.intro {
+  margin: 0;
+  padding: 14px;
+  border-radius: var(--mn-radius-lg);
+  background: var(--mn-ai-soft);
+  border: 1px solid var(--mn-line);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--mn-text-muted);
+}
+.msg {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.msg.mine {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 9px 13px;
+  border-radius: var(--mn-radius-lg);
+  background: var(--mn-accent-soft);
+  line-height: 1.5;
+}
+
+.typing {
+  display: flex;
+  gap: 5px;
+  padding: 6px 0;
+}
+.typing span:not(.sr) {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mn-text-quiet);
+  animation: blink 1.2s infinite ease-in-out;
+}
+.typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.problem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  background: var(--mn-again-bg);
+  color: var(--mn-again);
+  font-size: 13.5px;
+}
+.problem p {
+  margin: 0;
+}
+.problem button {
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--mn-radius-pill);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* --- sugestões e campo ---------------------------------------------------- */
+
+.chips {
+  display: flex;
+  gap: 8px;
+  padding: 0 18px 10px;
+  flex-wrap: wrap;
+}
+.chips button {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid var(--mn-line-strong);
+  border-radius: var(--mn-radius-pill);
+  background: var(--mn-surface-raised);
+  color: var(--mn-text-muted);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.chips button:hover:not(:disabled) {
+  border-color: var(--mn-outline);
+  color: var(--mn-text);
+}
+.chips button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin: 0 18px;
+  padding: 6px 6px 6px 14px;
+  border: 1px solid var(--mn-outline);
+  border-radius: 22px;
+  background: var(--mn-surface);
+}
+.composer:focus-within {
+  border-color: var(--mn-highlight);
+}
+.composer textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 32px;
+  max-height: 140px;
+  padding: 6px 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--mn-text);
+  font: inherit;
+  /* 16 px: abaixo disso o Safari do iPhone dá zoom no campo ao focar. */
+  font-size: 16px;
+  line-height: 1.35;
+  resize: none;
+  field-sizing: content;
+}
+.send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: var(--mn-radius-pill);
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  cursor: pointer;
+}
+.send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.disclaimer {
+  margin: 0;
+  padding: 8px 18px calc(12px + env(safe-area-inset-bottom, 0px));
+  font-size: 12px;
+  color: var(--mn-text-quiet);
+  text-align: center;
+}
+
+/* Celular: uma folha que sobe da base e para logo abaixo do topo, por cima
+ * da barra de abas (o `<dialog>` modal mora numa camada acima dela). */
+@media (max-width: 900px) {
+  .panel {
+    inset: auto 0 0 0;
+    width: 100%;
+    height: calc(100dvh - 40px - env(safe-area-inset-top, 0px));
+    border-left: 0;
+    border-top: 1px solid var(--mn-line);
+    border-radius: var(--mn-radius-lg) var(--mn-radius-lg) 0 0;
+  }
+  .panel[open] {
+    animation-name: sheet-in;
+  }
+  .head {
+    padding-top: 14px;
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel[open],
+  .typing span:not(.sr) {
+    animation: none;
+  }
+}

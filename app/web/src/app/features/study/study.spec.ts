@@ -144,6 +144,32 @@ describe('Study', () => {
     expect(store.reviews()).toHaveLength(0);
   });
 
+  it('com o chat aberto, espaço e os graus não tocam no card', async () => {
+    (fixture.nativeElement.querySelector('.ask .trigger') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    press(' ');
+    expect(text()).not.toContain('Jaime II.');
+    press('Escape');
+    expect(store.reviews()).toHaveLength(0);
+  });
+
+  it('o chat do card leva a pergunta, e a resposta só depois de revelada', () => {
+    const panel = fixture.debugElement.query((d) => d.name === 'app-chat-panel');
+    expect(panel.componentInstance.context()).toMatchObject({
+      kind: 'card',
+      question: 'Quem foi deposto em 1688?',
+      revealed: false,
+    });
+    press(' ');
+    const after = fixture.debugElement.query((d) => d.name === 'app-chat-panel');
+    expect(after.componentInstance.context()).toMatchObject({
+      revealed: true,
+      answer: 'Jaime II.',
+    });
+  });
+
   it('cada grau mostra o intervalo que produz, antes da escolha', () => {
     // §5.8.3 — a prévia vem de `preview`, derivada de `apply`. Ela não pode
     // mentir porque é o mesmo cálculo.
