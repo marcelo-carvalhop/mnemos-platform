@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     # ceiling per account still stops a runaway client.
     beta_unlimited_generation: bool = False
 
+    # The study chat (POST /v1/chat), per account. A brake on a runaway client
+    # or a script, not a plan: the spend ceiling lives in the Anthropic
+    # console. Counted in memory by the API process. 0 turns a limit off.
+    chat_requests_per_minute: int = 8
+    chat_requests_per_day: int = 100
+
     # Login waits for the address to answer the link we send. Off in tests and
     # local development, where the link is only logged.
     require_email_verification: bool = False

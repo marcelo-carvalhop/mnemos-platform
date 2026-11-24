@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from app import contract
 from app.account.router import router as account_router
 from app.auth.router import router as auth_router
+from app.chat.router import router as chat_router
 from app.config import get_settings
 from app.db import check_connection
 from app.generation.router import router as generation_router
@@ -53,6 +54,7 @@ app.include_router(quota_router)
 app.include_router(generation_router)
 app.include_router(account_router)
 app.include_router(terminal_router)
+app.include_router(chat_router)
 
 
 class HealthResponse(BaseModel):
