@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink } from '@angular/router';
 import { Store } from '../../core/store';
 import { Sync } from '../../core/sync';
+import type { ChatContext } from '../../core/chat';
+import { ChatPanel } from '../chat/chat-panel';
 import { OpenGenerations } from '../create/open-generations';
 
 /**
@@ -20,7 +22,7 @@ import { OpenGenerations } from '../create/open-generations';
 @Component({
   selector: 'app-today',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, OpenGenerations],
+  imports: [RouterLink, OpenGenerations, ChatPanel],
   styleUrl: './today.css',
   template: `
     <app-open-generations />
@@ -30,12 +32,15 @@ import { OpenGenerations } from '../create/open-generations';
         <p class="eyebrow mn-mono">{{ today() }}</p>
         <h1>Hoje</h1>
       </div>
-      @if (due().length > 0) {
-        <a class="primary" routerLink="/estudar">
-          Estudar agora
-          <kbd class="mn-mono">espaço</kbd>
-        </a>
-      }
+      <div class="actions">
+        <app-chat-panel [context]="chatContext()" label="Tirar dúvidas com IA" />
+        @if (due().length > 0) {
+          <a class="primary" routerLink="/estudar">
+            Estudar agora
+            <kbd class="mn-mono">espaço</kbd>
+          </a>
+        }
+      </div>
     </header>
 
     <div class="split">
@@ -175,6 +180,12 @@ export class Today {
 
   protected readonly due = computed(() => this.store.due());
   protected readonly hasCards = computed(() => this.store.liveCards().length > 0);
+
+  /** Hoje não tem card na tela: a IA sabe só quais baralhos a pessoa estuda. */
+  protected readonly chatContext = computed<ChatContext>(() => ({
+    kind: 'home',
+    decks: this.store.liveDecks().map((d) => d.name),
+  }));
 
   protected plural(n: number, one: string, many: string): string {
     return `${n} ${n === 1 ? one : many}`;

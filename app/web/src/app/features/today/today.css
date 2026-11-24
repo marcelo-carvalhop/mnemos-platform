@@ -14,6 +14,36 @@
   justify-content: space-between;
   gap: var(--mn-gap-4);
 }
+/* A IA ao lado da ação principal, nunca no lugar dela. Sem largura, as duas
+ * descem juntas para baixo do título. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--mn-gap-3);
+}
+@media (max-width: 620px) {
+  .head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  /* Duas pílulas de larguras diferentes, uma sob a outra, pareciam um
+   * acidente: no celular as duas ocupam a linha, a de estudar primeiro. */
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    gap: var(--mn-gap-2);
+  }
+  .actions .primary {
+    order: -1;
+    justify-content: center;
+  }
+  .primary kbd {
+    display: none;
+  }
+}
 .head h1 {
   font-size: 34px;
   margin-top: 6px;
