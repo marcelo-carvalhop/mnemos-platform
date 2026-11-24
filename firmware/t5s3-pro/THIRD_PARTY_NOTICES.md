@@ -11,7 +11,10 @@
 | ArduinoJson | 7.4.3 | MIT | dependência |
 | QRCode (ricmoo) | `eafbde4` | MIT | dependência |
 | Unity | 2.6.1 | MIT | somente testes no host |
-| Fontes bitmap de `src/mnemos_fonts.cpp` | não documentada | não documentada | firmware |
+| Geist e Geist Mono (Vercel) | `app/mobile/assets/fonts` | OFL-1.1 | fontes da interface, rasterizadas em `src/mnemos_font_data.h` |
+| Literata (TypeTogether) | `app/mobile/assets/fonts` | OFL-1.1 | texto dos cards, idem |
+| Noto Sans SC (Adobe/Google), recortada como "Mnemos Hanzi" | `tools/fonts/MnemosHanzi.ttf` | OFL-1.1 (`tools/fonts/OFL-NotoSansSC.txt`) | ideogramas do baralho de mandarim, idem |
+| Fontes bitmap antigas (`tools/fonts/legacy/mnemos_fonts_1bpp.cpp`) | não documentada | não documentada | só os glifos que as famílias acima não cobrem (vogais com tom do pinyin e afins) |
 
 As versões das dependências são as fixadas em `platformio.ini`; os detalhes
 das cópias locais estão em [lib/README.md](lib/README.md).
@@ -30,6 +33,9 @@ Estes itens são observações técnicas, não aconselhamento jurídico.
 - **epdiy (LGPL-3.0).** Num firmware ligado estaticamente, a LGPL exige que o
   usuário consiga trocar a biblioteca, o que normalmente significa fornecer o
   código-fonte ou os objetos para religar o firmware.
-- **Fontes.** A família e a licença das fontes convertidas em
-  `src/mnemos_fonts.cpp` não estão registradas no repositório.
+- **Fontes.** As fontes da interface são OFL-1.1 e as tabelas são geradas
+  por `tools/fonts/gen_mnemos_fonts.py`. Ainda vêm das fontes bitmap antigas,
+  de origem não registrada, os glifos que Geist, Literata e Noto Sans SC não
+  cobrem (o fallback de 1 bit). Para fechar o ponto, basta gerar esses glifos
+  de uma fonte OFL (a própria Noto Sans cobre o pinyin) e apagar o legado.
 - **Licença do projeto.** O repositório não tem arquivo `LICENSE` na raiz.

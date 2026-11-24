@@ -175,9 +175,24 @@ public:
         int32_t w,
         int32_t h);
 
+    /*
+     * Envia o canvas lógico (540×960, 4 bits por pixel, base64) para `out`,
+     * entre as linhas "@mnemos-screen <w> <h>" e "@mnemos-screen-end".
+     * Ferramenta de bancada: tools/hmi_capture.py.
+     */
+    void dumpCanvas(Print& out) const;
+
 private:
     uint8_t* framebuffer_ = nullptr;
     uint8_t* physicalFramebuffer_ = nullptr;
+
+    // Aba ativa da tela em desenho (0..4), ou -1 numa tela sem abas. Cada
+    // show*() com abas define logo depois de clearBuffer().
+    int8_t tab_ = -1;
+
+    // Subtela do "Mais" (Conexão, Configurações, Armazenamento, Agenda):
+    // o topo mostra "‹ Voltar" no lugar da marca.
+    bool back_ = false;
 
     bool powerOn_ = false;
     bool batteryAvailable_ = false;
@@ -300,6 +315,89 @@ int32_t centeredTextBaselineY(
             MnemosFontRole::Body18,
         uint8_t color = 0x00);
 
+    // --- Marinho: as primitivas do design system --------------------------
+    //
+    // Mesmo vocabulário do web e do app (docs/design/DESIGN-SYSTEM.md): cards
+    // de raio 8 com borda fina, botões e chips em pílula, sobrancelha em mono
+    // caixa alta. As bordas são suavizadas com os 16 tons do painel.
+
+    // Mistura `color` no pixel na proporção coverage/16.
+    void blendPixel(
+        int32_t x,
+        int32_t y,
+        uint8_t color,
+        uint8_t coverage16);
+
+    void fillRoundRect(
+        int32_t x,
+        int32_t y,
+        int32_t w,
+        int32_t h,
+        int32_t r,
+        uint8_t color);
+
+    void strokeRoundRect(
+        int32_t x,
+        int32_t y,
+        int32_t w,
+        int32_t h,
+        int32_t r,
+        int32_t thickness,
+        uint8_t color);
+
+    // Card de raio 8 com borda fina, fundo branco.
+    void drawSurfaceCard(
+        int32_t x,
+        int32_t y,
+        int32_t w,
+        int32_t h);
+
+    // O bloco-âncora do web (.mn-panel): claro, com grade fina no canto.
+    void drawGridPanel(
+        int32_t x,
+        int32_t y,
+        int32_t w,
+        int32_t h);
+
+    // Pílula: cheia (tinta, texto branco) ou contornada (texto tinta).
+    void drawPill(
+        int32_t x,
+        int32_t y,
+        int32_t w,
+        int32_t h,
+        const String& label,
+        bool filled,
+        MnemosFontRole role = MnemosFontRole::Strong);
+
+    // Sobrancelha: Geist Mono, caixa alta, cinza.
+    void drawEyebrow(
+        const String& text,
+        int32_t x,
+        int32_t baselineY,
+        uint8_t color = 0x48);
+
+    // O símbolo: dois cards sobrepostos, `size` px de lado.
+    void drawBrandMark(
+        int32_t x,
+        int32_t y,
+        int32_t size);
+
+    // A barra do topo do web no celular: símbolo + "Mnemos" à esquerda,
+    // rede e bateria à direita. `back` troca o símbolo por "‹ Voltar".
+    void drawTopBar(
+        bool back = false,
+        bool showAbort = false);
+
+    // A barra de abas do web no celular. `active` é o índice da aba atual
+    // (0 Hoje, 1 Baralhos, 2 Agenda, 3 Sincronizar, 4 Mais) ou -1.
+    void drawTabBar(int8_t active);
+
+    // Sobrancelha + título grande no topo do conteúdo. Devolve o y livre.
+    int32_t drawPageHeader(
+        const String& eyebrow,
+        const String& title,
+        int32_t top);
+
         void drawSystemBar(
         const String& title,
         bool showMenu,
@@ -311,6 +409,49 @@ int32_t centeredTextBaselineY(
     void drawContextStrip(
         const String& title,
         const String& meta = "");
+
+    // Linha de baralho: nome, metadado, selo "N hoje" e seleção.
+    void drawDeckRow(
+        const String& name,
+        const String& meta,
+        uint32_t due,
+        bool selected,
+        int32_t x,
+        int32_t y,
+        int32_t w,
+        int32_t h);
+
+    // Ladrilho: sobrancelha, número e unidade.
+    void drawStatTile(
+        int32_t x,
+        int32_t y,
+        int32_t w,
+        int32_t h,
+        const String& eyebrow,
+        const String& value,
+        const String& unit);
+
+    // O topo das telas de estudo: baralho, traços de progresso, contagem.
+    void drawStudyHeader(
+        const String& deck,
+        uint8_t position,
+        uint8_t total);
+
+    // Texto de card quebrado em linhas e centrado na caixa.
+    void drawCardText(
+        const String& text,
+        int32_t x,
+        int32_t top,
+        int32_t w,
+        int32_t h,
+        MnemosFontRole role,
+        int32_t lineHeight,
+        uint8_t color);
+
+    // Sobrancelha (estado) + título grande, abaixo da barra do topo.
+    void drawScreenHeader(
+        const String& title,
+        const String& meta);
 
     void drawHomeIcon(
         int32_t x,

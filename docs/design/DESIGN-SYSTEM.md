@@ -159,6 +159,23 @@ O menu do celular é o mesmo nas duas superfícies:
 - A aba ativa ganha uma pílula atrás do ícone, e Hoje mostra os cards que vencem em coral.
 - "Mais" abre uma folha com a sincronização, Dispositivo, Configurações e Sair.
 
+## Terminal (T5S3 Pro)
+
+O terminal de tinta eletrônica segue o mesmo sistema em 16 tons de cinza.
+Ele usa a mesma barra do topo, a barra de abas (Hoje, Baralhos, Estudar,
+Sincronizar, Mais), os cards de raio 8 a 12 px com borda fina, as pílulas, a
+sobrancelha em Geist Mono e a Literata no card.
+
+Duas adaptações ao painel:
+
+- os cinzas são mais escuros que os do web, porque o e-paper clareia os
+  tons claros;
+- o marinho de ação vira tinta plena.
+
+O gradiente de IA não aparece no terminal, porque ele não gera cards.
+Detalhes em
+[firmware/t5s3-pro/README.md](../../firmware/t5s3-pro/README.md#interface).
+
 ## Inspiração
 
 A estrutura visual partiu do design system público do netlex.io: marinho e

@@ -25,6 +25,23 @@ constexpr uint8_t MID_GRAY = 0x55;
 constexpr uint8_t LIGHT_GRAY = 0xAA;
 constexpr uint8_t WHITE = 0xFF;
 
+/*
+ * A escala de texto e linhas do Marinho em tons do painel. Parte do luma de
+ * cada cor do web, escurecido: o ED047TC1 mostra os cinzas claros bem mais
+ * claros que um LCD, e a borda de um card em #E0E6EC some (conferido com
+ * câmera). O marinho de ação vira tinta plena.
+ */
+constexpr uint8_t INK = 0x00;      // --mn-text, --mn-accent
+constexpr uint8_t MUTED = 0x30;    // --mn-text-muted
+constexpr uint8_t FAINT = 0x48;    // --mn-text-faint
+constexpr uint8_t QUIET = 0x70;    // --mn-text-quiet (texto grande)
+constexpr uint8_t DECO = 0x90;     // --mn-deco, segunda barra
+constexpr uint8_t OUTLINE = 0x90;  // --mn-outline, borda de botão
+constexpr uint8_t LINE = 0xA8;     // --mn-line, borda de card
+constexpr uint8_t SOFT = 0xC8;     // --mn-surface-soft, trilho, aba ativa
+constexpr uint8_t GRID = 0xC8;     // a grade do bloco-âncora
+constexpr uint8_t PAPER = 0xFF;    // --mn-surface
+
 namespace Wf = EpdWaveformBuilder;
 
 EpdiyHighlevelState gEpdState{};
@@ -1636,6 +1653,9 @@ void T5Display::clearBuffer() {
         framebuffer_,
         WHITE,
         bytes);
+
+    tab_ = -1;
+    back_ = false;
 }
 
 void T5Display::putPixel(
@@ -2918,198 +2938,22 @@ void T5Display::drawNetworkIcon(
 
 void T5Display::drawSystemBar(
     const String& title,
-    bool showMenu,
+    bool,
     bool showAbort,
     const String& rightMeta,
     bool showHome,
     bool showContext) {
 
-    const int32_t barH =
-        systemBarHeight();
+    // Com abas a navegação é toda por elas; sem abas, "‹ Voltar" leva ao
+    // início, no lugar da casinha.
+    drawTopBar((tab_ < 0 && showHome) || back_, showAbort);
 
-    drawLine(
-        0,
-        barH - 1,
-        logicalWidth() - 1,
-        barH - 1,
-        BLACK);
-
-    const int32_t iconY =
-        portrait()
-            ? 24
-            : 16;
-
-    if (showHome) {
-        drawHomeIcon(
-            18,
-            iconY + 1);
+    if (showContext && title.length() > 0) {
+        drawScreenHeader(title, rightMeta);
     }
 
-    if (showMenu) {
-        drawMenuIcon(
-            showHome
-                ? 78
-                : 32,
-            portrait()
-                ? 31
-                : 23);
-
-        /*
-         * Mantém Sync fora da área central de MNEMOS.
-         */
-        drawSyncIcon(
-            showHome
-                ? 142
-                : 102,
-            portrait()
-                ? 24
-                : 16);
-    }
-
-    /*
-     * MNEMOS possui uma caixa própria e não disputa espaço
-     * com os ícones laterais.
-     */
-    if (portrait()) {
-        drawCenteredTextInRect(
-            "MNEMOS",
-            205,
-            0,
-            140,
-            barH - 1,
-            MnemosFontRole::Title22,
-            BLACK);
-    } else {
-        drawCenteredTextInRect(
-            "MNEMOS",
-            365,
-            0,
-            230,
-            barH - 1,
-            MnemosFontRole::Title22,
-            BLACK);
-    }
-
-    if (portrait()) {
-        drawNetworkIcon(
-            390,
-            31);
-
-        drawBatteryIcon(
-            430,
-            31);
-
-        if (showAbort) {
-            drawAbortIcon(
-                492,
-                iconY);
-        }
-    } else {
-        drawNetworkIcon(
-            810,
-            23);
-
-        drawBatteryIcon(
-            850,
-            23);
-
-        if (showAbort) {
-            drawAbortIcon(
-                912,
-                iconY);
-        }
-    }
-
-    if (!showContext) {
-        return;
-    }
-
-    /*
-     * Battery percentage was intentionally removed here.
-     * Battery state now lives exclusively in the top icon.
-     */
-    const String statusMeta =
-        rightMeta;
-
-    const int32_t rowY =
-        barH +
-        (
-            portrait()
-                ? 8
-                : 6
-        );
-
-    const int32_t rowH =
-        portrait()
-            ? 48
-            : 42;
-
-    const int32_t metaW =
-        statusMeta.length() > 0
-            ? (
-                  portrait()
-                      ? 160
-                      : 220
-              )
-            : 0;
-
-    const int32_t gap =
-        metaW > 0
-            ? 24
-            : 0;
-
-    const int32_t titleW =
-        logicalWidth() -
-        2 * MARGIN -
-        metaW -
-        gap;
-
-    if (
-        title.length() > 0 &&
-        titleW > 0
-    ) {
-        const String fittedTitle =
-            fitTextToWidth(
-                title,
-                titleW,
-                MnemosFontRole::Title22);
-
-        drawText(
-            fittedTitle,
-            MARGIN,
-            centeredTextBaselineY(
-                fittedTitle,
-                rowY +
-                    rowH / 2,
-                MnemosFontRole::Title22),
-            MnemosFontRole::Title22,
-            BLACK);
-    }
-
-    if (
-        statusMeta.length() > 0 &&
-        metaW > 0
-    ) {
-        const String fittedMeta =
-            fitTextToWidth(
-                statusMeta,
-                metaW,
-                MnemosFontRole::Meta14);
-
-        drawText(
-            fittedMeta,
-            rightAlignedTextOriginX(
-                fittedMeta,
-                logicalWidth() -
-                    MARGIN,
-                MnemosFontRole::Meta14),
-            centeredTextBaselineY(
-                fittedMeta,
-                rowY +
-                    rowH / 2,
-                MnemosFontRole::Meta14),
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
+    if (tab_ >= 0) {
+        drawTabBar(tab_);
     }
 }
 
@@ -3122,50 +2966,23 @@ void T5Display::drawContextStrip(
     const String& title,
     const String& meta) {
 
-    drawText(
-        shortText(
-            title,
-            portrait()
-                ? 32
-                : 56),
-        MARGIN,
-        HmiLayout::navTitleBaseline(
-            portrait()),
-        MnemosFontRole::Title22,
-        BLACK);
+    drawScreenHeader(title, meta);
+}
 
-    /*
-     * Battery percentage removed.
-     * The top battery icon is the single battery status source.
-     */
-    const String status =
-        meta;
+void T5Display::drawScreenHeader(
+    const String& title,
+    const String& meta) {
 
-    if (status.length() > 0) {
-        drawText(
-            shortText(
-                status,
-                portrait()
-                    ? 34
-                    : 72),
-            MARGIN,
-            HmiLayout::navMetaBaseline(
-                portrait()),
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
+    // Sobrancelha com o estado, título grande: o cabeçalho das telas do web.
+    if (meta.length() > 0) {
+        drawEyebrow(
+            fitTextToWidth(mnemosUpper(meta), logicalWidth() - 2 * MARGIN,
+                           MnemosFontRole::Eyebrow),
+            MARGIN, 110);
     }
-
-    drawLine(
-        MARGIN,
-        HmiLayout::navContextBottom(
-            portrait()) -
-            1,
-        logicalWidth() -
-            MARGIN,
-        HmiLayout::navContextBottom(
-            portrait()) -
-            1,
-        LIGHT_GRAY);
+    drawText(
+        fitTextToWidth(title, logicalWidth() - 2 * MARGIN, MnemosFontRole::Title),
+        MARGIN, 162, MnemosFontRole::Title, INK);
 }
 
 
@@ -3177,63 +2994,18 @@ void T5Display::drawPrimaryButton(
     const String& label) {
 
     const HmiLayout::Rect zone =
-        HmiLayout::actionZone(
-            portrait());
+        HmiLayout::actionZone(portrait(), tab_ >= 0);
 
-    const HmiLayout::Rect button =
-        HmiLayout::actionVisualRect(
-            portrait());
-
-    drawLine(
-        0,
-        zone.y,
-        logicalWidth() - 1,
-        zone.y,
-        LIGHT_GRAY);
-
-    // Primário: nível 0, máximo contraste.
-    fillRect(
-        button.x,
-        button.y,
-        button.w,
-        button.h,
-        BLACK);
-
-    drawRect(
-        button.x,
-        button.y,
-        button.w,
-        button.h,
-        BLACK);
-
-    if (
-        button.w > 8 &&
-        button.h > 8
-    ) {
-        drawRect(
-            button.x + 4,
-            button.y + 4,
-            button.w - 8,
-            button.h - 8,
-            DARK_GRAY);
+    // A pílula do web, centrada na zona de toque. "Voltar ..." é navegação,
+    // não ação: vai contornada, como os botões secundários do web.
+    // Com abas, "Voltar ..." sobra: a navegação é pelas abas e pelo topo.
+    if (tab_ >= 0 && label.startsWith("Voltar")) {
+        return;
     }
 
-    const MnemosFontRole role =
-        portrait()
-            ? MnemosFontRole::Title22
-            : MnemosFontRole::Body18;
-
-    drawCenteredTextInRect(
-        fitTextToWidth(
-            label,
-            button.w - 28,
-            role),
-        button.x,
-        button.y,
-        button.w,
-        button.h,
-        role,
-        WHITE);
+    const int32_t h = 68;
+    const int32_t y = zone.y + (zone.h - h) / 2;
+    drawPill(zone.x, y, zone.w, h, label, !label.startsWith("Voltar"));
 }
 
 
@@ -3249,109 +3021,15 @@ void T5Display::drawPrimarySplit(
     const String& right,
     bool emphasizeLeft) {
 
-    const HmiLayout::Rect zone =
-        HmiLayout::actionZone(
-            portrait());
+    const HmiLayout::Rect zone = HmiLayout::actionZone(portrait(), tab_ >= 0);
+    const int32_t gap = 16;
+    const int32_t h = 68;
+    const int32_t y = zone.y + (zone.h - h) / 2;
+    const int32_t w = (zone.w - gap) / 2;
 
-    const HmiLayout::Rect visual =
-        HmiLayout::actionVisualRect(
-            portrait());
-
-    drawLine(
-        0,
-        zone.y,
-        logicalWidth() - 1,
-        zone.y,
-        LIGHT_GRAY);
-
-    const int32_t gap = 24;
-
-    const int32_t w =
-        (
-            visual.w -
-            gap
-        ) /
-        2;
-
-    const int32_t leftX =
-        visual.x;
-
-    const int32_t rightX =
-        visual.x +
-        w +
-        gap;
-
-    /*
-     * Primário = 0.
-     * Secundário = 2.
-     * Ambos recebem texto branco.
-     */
-    const uint8_t leftFill =
-        emphasizeLeft
-            ? BLACK
-            : DARK_GRAY;
-
-    const uint8_t rightFill =
-        emphasizeLeft
-            ? DARK_GRAY
-            : BLACK;
-
-    fillRect(
-        leftX,
-        visual.y,
-        w,
-        visual.h,
-        leftFill);
-
-    drawRect(
-        leftX,
-        visual.y,
-        w,
-        visual.h,
-        BLACK);
-
-    fillRect(
-        rightX,
-        visual.y,
-        w,
-        visual.h,
-        rightFill);
-
-    drawRect(
-        rightX,
-        visual.y,
-        w,
-        visual.h,
-        BLACK);
-
-    const MnemosFontRole role =
-        portrait()
-            ? MnemosFontRole::Body18
-            : MnemosFontRole::Meta14;
-
-    drawCenteredTextInRect(
-        fitTextToWidth(
-            left,
-            w - 24,
-            role),
-        leftX,
-        visual.y,
-        w,
-        visual.h,
-        role,
-        WHITE);
-
-    drawCenteredTextInRect(
-        fitTextToWidth(
-            right,
-            w - 24,
-            role),
-        rightX,
-        visual.y,
-        w,
-        visual.h,
-        role,
-        WHITE);
+    // A ação recomendada vai cheia; a outra, contornada.
+    drawPill(zone.x, y, w, h, left, emphasizeLeft);
+    drawPill(zone.x + w + gap, y, w, h, right, !emphasizeLeft);
 }
 
 
@@ -3456,7 +3134,7 @@ void T5Display::drawPrimaryTriple(
 
 
 void T5Display::drawChoiceCard(
-    uint8_t number,
+    uint8_t,
     const String& label,
     int32_t x,
     int32_t y,
@@ -3465,77 +3143,39 @@ void T5Display::drawChoiceCard(
     bool selected,
     char marker) {
 
-    /*
-     * Padrão único de ação/card:
-     *
-     * normal       = BLACK + WHITE
-     * selecionado  = DARK_GRAY + WHITE + borda interna
-     *
-     * Nenhum card interativo volta a usar fundo claro.
-     */
-    const uint8_t fillColor =
-        selected
-            ? DARK_GRAY
-            : BLACK;
-
-    fillRect(
-        x,
-        y,
-        w,
-        h,
-        fillColor);
-
-    drawRect(
-        x,
-        y,
-        w,
-        h,
-        BLACK);
-
-    if (
-        selected &&
-        w > 10 &&
-        h > 10
-    ) {
-        drawRect(
-            x + 5,
-            y + 5,
-            w - 10,
-            h - 10,
-            WHITE);
-    }
+    // Linha de lista do web: card claro de raio 12 com borda fina, rótulo em
+    // tinta e uma seta à direita. Selecionado ganha borda em tinta e um
+    // círculo cheio com o visto.
+    fillRoundRect(x, y, w, h, 12, PAPER);
+    strokeRoundRect(x, y, w, h, 12, selected ? 3 : 2, selected ? INK : LINE);
 
     String prefix;
-
     if (marker != '\0') {
         prefix += marker;
         prefix += " ";
     }
 
-    if (number > 0) {
-        prefix += String(number);
-        prefix += "  ";
+    const int32_t right = x + w - 24;
+    const int32_t cy = y + h / 2;
+    const String content = fitTextToWidth(
+        prefix + label, std::max<int32_t>(0, w - 96), MnemosFontRole::Strong);
+    drawText(content, x + 24,
+             centeredTextBaselineY(content, cy, MnemosFontRole::Strong),
+             MnemosFontRole::Strong, INK);
+
+    if (selected) {
+        fillRoundRect(right - 28, cy - 14, 28, 28, 14, INK);
+        drawLine(right - 21, cy, right - 16, cy + 5, PAPER);
+        drawLine(right - 16, cy + 5, right - 7, cy - 5, PAPER);
+        drawLine(right - 21, cy + 1, right - 16, cy + 6, PAPER);
+        drawLine(right - 16, cy + 6, right - 7, cy - 4, PAPER);
+    } else {
+        // Seta "›" de 2 px.
+        for (int32_t k = 0; k < 2; ++k) {
+            drawLine(right - 12 + k, cy - 9, right - 4 + k, cy, FAINT);
+            drawLine(right - 4 + k, cy, right - 12 + k, cy + 9, FAINT);
+        }
     }
-
-    const String content =
-        fitTextToWidth(
-            prefix +
-                label,
-            std::max<int32_t>(
-                0,
-                w - 44),
-            MnemosFontRole::Body18);
-
-    drawText(
-        content,
-        x + 22,
-        centeredTextBaselineY(
-            content,
-            y +
-                h / 2,
-            MnemosFontRole::Body18),
-        MnemosFontRole::Body18,
-        WHITE);
 }
 
 
@@ -3640,13 +3280,15 @@ void T5Display::drawCenteredHanzi(
     int32_t baselineY,
     uint8_t scale) {
 
+    // Um tamanho só, desenhado da Noto Sans SC em 16 tons. `scale` ficou
+    // da fonte de 1 bit, que era ampliada em blocos.
+    (void)scale;
     drawCenteredText(
         text,
         centerX,
         baselineY,
-        MnemosFontRole::Title22,
-        BLACK,
-        scale);
+        MnemosFontRole::Hanzi,
+        INK);
 }
 
 
@@ -3754,79 +3396,17 @@ void T5Display::showBoot(
     const String& message) {
 
     clearBuffer();
-
-    if (portrait()) {
-        drawCenteredTextInRect(
-            "MNEMOS",
-            MARGIN,
-            275,
-            logicalWidth() -
-                2 * MARGIN,
-            120,
-            MnemosFontRole::Title22,
-            BLACK,
-            2);
-
-        drawCenteredTextInRect(
-            "estudo sem distrações",
-            MARGIN,
-            400,
-            logicalWidth() -
-                2 * MARGIN,
-            58,
-            MnemosFontRole::Body18,
-            DARK_GRAY);
-
-        drawCenteredTextInRect(
-            fitTextToWidth(
-                message,
-                logicalWidth() -
-                    2 * MARGIN,
-                MnemosFontRole::Meta14),
-            MARGIN,
-            478,
-            logicalWidth() -
-                2 * MARGIN,
-            70,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
-    } else {
-        drawCenteredTextInRect(
-            "MNEMOS",
-            MARGIN,
-            150,
-            logicalWidth() -
-                2 * MARGIN,
-            120,
-            MnemosFontRole::Title22,
-            BLACK,
-            2);
-
-        drawCenteredTextInRect(
-            "estudo sem distrações",
-            MARGIN,
-            270,
-            logicalWidth() -
-                2 * MARGIN,
-            54,
-            MnemosFontRole::Body18,
-            DARK_GRAY);
-
-        drawCenteredTextInRect(
-            fitTextToWidth(
-                message,
-                logicalWidth() -
-                    2 * MARGIN,
-                MnemosFontRole::Meta14),
-            MARGIN,
-            336,
-            logicalWidth() -
-                2 * MARGIN,
-            54,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
+    const int32_t cx = logicalWidth() / 2;
+    drawBrandMark(cx - 48, 300, 96);
+    drawCenteredText("Mnemos", cx, 470, MnemosFontRole::Title, INK);
+    drawCenteredText("O que você aprendeu,", cx, 526, MnemosFontRole::Body, MUTED);
+    drawCenteredText("de volta na hora certa.", cx, 558, MnemosFontRole::Body, MUTED);
+    if (message.length()) {
+        drawCenteredText(
+            fitTextToWidth(mnemosUpper(message), logicalWidth() - 2 * MARGIN,
+                           MnemosFontRole::Eyebrow),
+            cx, 860, MnemosFontRole::Eyebrow, FAINT);
     }
-
     refreshFull();
 }
 
@@ -3849,6 +3429,389 @@ void T5Display::showTouchFeedback(
      * A ação é despachada imediatamente; a próxima tela
      * é publicada por refreshFull() sem redraw intermediário.
      */
+}
+
+
+void T5Display::dumpCanvas(Print& out) const {
+    const int32_t w = logicalWidth();
+    const int32_t h = logicalHeight();
+
+    out.printf("@mnemos-screen %ld %ld\n",
+               static_cast<long>(w),
+               static_cast<long>(h));
+
+    if (framebuffer_) {
+        // 48 bytes compactados (96 pixels) viram 64 caracteres por linha.
+        static const char ALPHABET[] =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const size_t pixels = static_cast<size_t>(w) * static_cast<size_t>(h);
+        uint8_t packed[48];
+        char line[66];
+
+        for (size_t start = 0; start < pixels; start += 96) {
+            size_t n = 0;
+            for (size_t i = start; i < start + 96 && i < pixels; i += 2) {
+                const uint8_t hi = framebuffer_[i] >> 4;
+                const uint8_t lo =
+                    (i + 1 < pixels) ? (framebuffer_[i + 1] >> 4) : 0;
+                packed[n++] = static_cast<uint8_t>((hi << 4) | lo);
+            }
+
+            size_t c = 0;
+            for (size_t i = 0; i < n; i += 3) {
+                const uint32_t b0 = packed[i];
+                const uint32_t b1 = i + 1 < n ? packed[i + 1] : 0;
+                const uint32_t b2 = i + 2 < n ? packed[i + 2] : 0;
+                const uint32_t v = (b0 << 16) | (b1 << 8) | b2;
+                line[c++] = ALPHABET[(v >> 18) & 0x3F];
+                line[c++] = ALPHABET[(v >> 12) & 0x3F];
+                line[c++] = i + 1 < n ? ALPHABET[(v >> 6) & 0x3F] : '=';
+                line[c++] = i + 2 < n ? ALPHABET[v & 0x3F] : '=';
+            }
+            line[c++] = '\n';
+            line[c] = '\0';
+
+            // O CDC da USB descarta o que não cabe no buffer: espera o
+            // computador ler antes de mandar a próxima linha.
+            const uint32_t waitStart = millis();
+            while (
+                out.availableForWrite() < static_cast<int>(c) &&
+                millis() - waitStart < 200
+            ) {
+                delay(1);
+            }
+            // O número da linha deixa o computador completar uma captura
+            // com outra, se o CDC perder alguma.
+            out.printf("%04u:", static_cast<unsigned>(start / 96));
+            out.print(line);
+        }
+    }
+
+    out.print("@mnemos-screen-end\n");
+}
+
+
+// --- Marinho -----------------------------------------------------------------
+
+void T5Display::blendPixel(
+    int32_t x,
+    int32_t y,
+    uint8_t color,
+    uint8_t coverage16) {
+
+    if (
+        !framebuffer_ ||
+        coverage16 == 0 ||
+        x < 0 ||
+        y < 0 ||
+        x >= logicalWidth() ||
+        y >= logicalHeight()
+    ) {
+        return;
+    }
+
+    uint8_t& dst =
+        framebuffer_[static_cast<size_t>(y) *
+                         static_cast<size_t>(logicalWidth()) +
+                     static_cast<size_t>(x)];
+
+    if (coverage16 >= 16) {
+        dst = color;
+        return;
+    }
+
+    const int32_t d = dst;
+    dst = static_cast<uint8_t>(
+        d + ((static_cast<int32_t>(color) - d) * coverage16) / 16);
+}
+
+namespace {
+
+/*
+ * Quantas das 16 amostras (4×4) do pixel (px, py) caem dentro do retângulo
+ * arredondado. Fora dos cantos a resposta é exata e barata; só os pixels de
+ * canto são amostrados.
+ */
+uint8_t roundRectSamples(
+    int32_t px,
+    int32_t py,
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t r) {
+
+    if (w <= 0 || h <= 0) return 0;
+    if (px + 1 <= x || py + 1 <= y || px >= x + w || py >= y + h) return 0;
+
+    r = std::max<int32_t>(0, std::min<int32_t>(r, std::min(w, h) / 2));
+
+    const bool insideX = px >= x && px + 1 <= x + w;
+    const bool insideY = py >= y && py + 1 <= y + h;
+    const bool crossX = px >= x + r && px + 1 <= x + w - r;
+    const bool crossY = py >= y + r && py + 1 <= y + h - r;
+    if (insideX && insideY && (crossX || crossY)) return 16;
+
+    const float fx0 = static_cast<float>(x);
+    const float fy0 = static_cast<float>(y);
+    const float fx1 = static_cast<float>(x + w);
+    const float fy1 = static_cast<float>(y + h);
+    const float fr = static_cast<float>(r);
+
+    uint8_t n = 0;
+    for (int sy = 0; sy < 4; ++sy) {
+        const float fy = static_cast<float>(py) + (sy + 0.5f) / 4.0f;
+        if (fy < fy0 || fy > fy1) continue;
+        for (int sx = 0; sx < 4; ++sx) {
+            const float fx = static_cast<float>(px) + (sx + 0.5f) / 4.0f;
+            if (fx < fx0 || fx > fx1) continue;
+            const float cx =
+                fx < fx0 + fr ? fx0 + fr : (fx > fx1 - fr ? fx1 - fr : fx);
+            const float cy =
+                fy < fy0 + fr ? fy0 + fr : (fy > fy1 - fr ? fy1 - fr : fy);
+            const float dx = fx - cx;
+            const float dy = fy - cy;
+            if (dx * dx + dy * dy <= fr * fr) ++n;
+        }
+    }
+    return n;
+}
+
+}  // namespace
+
+void T5Display::fillRoundRect(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t r,
+    uint8_t color) {
+
+    for (int32_t py = y; py < y + h; ++py) {
+        for (int32_t px = x; px < x + w; ++px) {
+            blendPixel(px, py, color,
+                       roundRectSamples(px, py, x, y, w, h, r));
+        }
+    }
+}
+
+void T5Display::strokeRoundRect(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    int32_t r,
+    int32_t thickness,
+    uint8_t color) {
+
+    const int32_t t = std::max<int32_t>(1, thickness);
+    for (int32_t py = y; py < y + h; ++py) {
+        const bool band = py < y + t + r || py >= y + h - t - r;
+        for (int32_t px = x; px < x + w; ++px) {
+            // Longe das bordas o anel é vazio: pula sem amostrar.
+            if (!band && px >= x + t && px + 1 <= x + w - t) {
+                px = x + w - t - 1;
+                continue;
+            }
+            const int32_t outer =
+                roundRectSamples(px, py, x, y, w, h, r);
+            const int32_t inner = roundRectSamples(
+                px, py, x + t, y + t, w - 2 * t, h - 2 * t,
+                std::max<int32_t>(0, r - t));
+            if (outer > inner) {
+                blendPixel(px, py, color,
+                           static_cast<uint8_t>(outer - inner));
+            }
+        }
+    }
+}
+
+void T5Display::drawSurfaceCard(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h) {
+
+    fillRoundRect(x, y, w, h, 12, PAPER);
+    strokeRoundRect(x, y, w, h, 12, 2, LINE);
+}
+
+void T5Display::drawPill(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    const String& label,
+    bool filled,
+    MnemosFontRole role) {
+
+    if (filled) {
+        fillRoundRect(x, y, w, h, h / 2, INK);
+    } else {
+        fillRoundRect(x, y, w, h, h / 2, PAPER);
+        strokeRoundRect(x, y, w, h, h / 2, 2, OUTLINE);
+    }
+
+    if (label.length() > 0) {
+        drawCenteredTextInRect(
+            fitTextToWidth(label, w - h, role),
+            x, y, w, h,
+            role,
+            filled ? PAPER : INK);
+    }
+}
+
+void T5Display::drawEyebrow(
+    const String& text,
+    int32_t x,
+    int32_t baselineY,
+    uint8_t color) {
+
+    drawText(
+        mnemosUpper(text),
+        x,
+        baselineY,
+        MnemosFontRole::Eyebrow,
+        color);
+}
+
+void T5Display::drawBrandMark(
+    int32_t x,
+    int32_t y,
+    int32_t size) {
+
+    // Grade de 24 unidades, como o favicon.svg: o card de trás contornado
+    // em tinta, o da frente cheio em azul (o luma de #2F5BA6).
+    const float u = static_cast<float>(size) / 24.0f;
+    auto at = [&](float v) { return static_cast<int32_t>(v * u + 0.5f); };
+
+    strokeRoundRect(x + at(3), y + at(6), at(14), at(14), at(3),
+                    std::max<int32_t>(2, at(2)), INK);
+    fillRoundRect(x + at(7), y + at(2), at(14), at(14), at(3), 0x50);
+}
+
+namespace {
+
+constexpr int32_t TOP_BAR_H = HmiLayout::TOP_BAR_H;
+constexpr int32_t TAB_BAR_H = HmiLayout::TAB_BAR_H;
+constexpr int32_t GUTTER = HmiLayout::GUTTER;
+
+}  // namespace
+
+void T5Display::drawTopBar(
+    bool back,
+    bool showAbort) {
+
+    const int32_t w = logicalWidth();
+
+    if (back) {
+        // "‹ Voltar" no lugar da marca: a mesma área de toque do início.
+        drawLine(GUTTER + 12, 26, GUTTER + 2, 38, INK);
+        drawLine(GUTTER + 2, 38, GUTTER + 12, 50, INK);
+        drawLine(GUTTER + 13, 26, GUTTER + 3, 38, INK);
+        drawLine(GUTTER + 3, 38, GUTTER + 13, 50, INK);
+        drawText("Voltar", GUTTER + 24, 46, MnemosFontRole::Strong, INK);
+    } else {
+        drawBrandMark(GUTTER - 2, 20, 36);
+        drawText("Mnemos", GUTTER + 46, 49, MnemosFontRole::Heading, INK);
+    }
+
+    if (showAbort) {
+        drawAbortIcon(w - 56, 20);
+    } else {
+        drawNetworkIcon(w - 128, 27);
+        drawBatteryIcon(w - 86, 27);
+    }
+
+    fillRect(0, TOP_BAR_H - 2, w, 2, LINE);
+}
+
+void T5Display::drawTabBar(int8_t active) {
+    const int32_t w = logicalWidth();
+    const int32_t top = logicalHeight() - TAB_BAR_H;
+
+    fillRect(0, top, w, TAB_BAR_H, PAPER);
+    fillRect(0, top, w, 2, LINE);
+
+    static const char* const LABELS[5] = {
+        "Hoje", "Baralhos", "Estudar", "Sincronizar", "Mais"};
+
+    // Ícones de traço de 2 px numa caixa de 28 px, como os do web.
+    auto thickLine = [&](int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t c) {
+        drawLine(x0, y0, x1, y1, c);
+        drawLine(x0 + 1, y0, x1 + 1, y1, c);
+        drawLine(x0, y0 + 1, x1, y1 + 1, c);
+    };
+
+    const int32_t slot = w / 5;
+    for (int8_t i = 0; i < 5; ++i) {
+        const int32_t cx = i * slot + slot / 2;
+        const int32_t iconY = top + 18;
+        const bool on = i == active;
+        const uint8_t c = on ? INK : FAINT;
+
+        if (i == 2) {
+            // A ação central do web ("Criar") aqui é estudar: pílula cheia.
+            fillRoundRect(cx - 36, iconY - 2, 72, 40, 20, INK);
+            // Triângulo de "tocar".
+            for (int32_t row = 0; row < 18; ++row) {
+                const int32_t half = row < 9 ? row : 17 - row;
+                fillRect(cx - 6, iconY + 9 + row, (half * 14) / 9 + 1, 1, PAPER);
+            }
+        } else {
+            if (on) {
+                fillRoundRect(cx - 34, iconY - 4, 68, 44, 22, SOFT);
+            }
+            const int32_t ix = cx - 14;
+            const int32_t iy = iconY + 4;
+            if (i == 0) {
+                // Calendário.
+                strokeRoundRect(ix + 2, iy + 4, 24, 24, 4, 2, c);
+                fillRect(ix + 2, iy + 11, 24, 2, c);
+                fillRect(ix + 8, iy, 2, 7, c);
+                fillRect(ix + 18, iy, 2, 7, c);
+            } else if (i == 1) {
+                // Pilha de cards.
+                strokeRoundRect(ix + 6, iy + 6, 20, 22, 3, 2, c);
+                fillRect(ix + 2, iy + 2, 2, 20, c);
+                fillRect(ix + 2, iy + 2, 18, 2, c);
+                fillRect(ix + 11, iy + 13, 10, 2, c);
+                fillRect(ix + 11, iy + 19, 10, 2, c);
+            } else if (i == 3) {
+                // Duas setas.
+                thickLine(ix + 2, iy + 9, ix + 26, iy + 9, c);
+                thickLine(ix + 20, iy + 3, ix + 26, iy + 9, c);
+                thickLine(ix + 2, iy + 21, ix + 26, iy + 21, c);
+                thickLine(ix + 2, iy + 21, ix + 8, iy + 27, c);
+            } else {
+                // Três pontos.
+                for (int32_t k = 0; k < 3; ++k) {
+                    fillRoundRect(ix + 2 + k * 10, iy + 13, 5, 5, 3, c);
+                }
+            }
+        }
+
+        drawCenteredText(
+            LABELS[i],
+            cx,
+            top + 84,
+            on ? MnemosFontRole::Strong : MnemosFontRole::Small,
+            i == 2 ? INK : c);
+    }
+}
+
+int32_t T5Display::drawPageHeader(
+    const String& eyebrow,
+    const String& title,
+    int32_t top) {
+
+    int32_t y = top;
+    if (eyebrow.length() > 0) {
+        drawEyebrow(eyebrow, GUTTER, y + 20);
+        y += 30;
+    }
+    drawText(title, GUTTER, y + 46, MnemosFontRole::Title, INK);
+    return y + 64;
 }
 
 
@@ -3888,6 +3851,103 @@ void T5Display::showTouchMissing() {
     refreshFull();
 }
 
+namespace {
+
+/*
+ * "TER 24/11" → "TERÇA, 24 DE NOVEMBRO": a sobrancelha de data do web.
+ * O rótulo curto vem de weeklyDayLabel() no main.
+ */
+String longDateLabel(const String& shortLabel) {
+    static const char* const SHORT[] = {
+        "DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"};
+    static const char* const LONG[] = {
+        "Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"};
+    static const char* const MONTHS[] = {
+        "janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
+        "agosto", "setembro", "outubro", "novembro", "dezembro"};
+
+    const int space = shortLabel.indexOf(' ');
+    const int slash = shortLabel.indexOf('/');
+    if (space < 0 || slash < 0) return shortLabel;
+
+    const String weekday = shortLabel.substring(0, space);
+    const int day = shortLabel.substring(space + 1, slash).toInt();
+    const int month = shortLabel.substring(slash + 1).toInt();
+
+    String out = weekday;
+    for (int i = 0; i < 7; ++i) {
+        if (weekday == SHORT[i]) out = LONG[i];
+    }
+    if (month >= 1 && month <= 12) {
+        out += ", ";
+        out += String(day);
+        out += " de ";
+        out += MONTHS[month - 1];
+    }
+    return out;
+}
+
+// "Redes, Direito +" → nomes separados, sem o "+" do fim.
+uint8_t splitDecks(const String& decks, String* out, uint8_t capacity) {
+    String rest = decks;
+    rest.trim();
+    if (rest.endsWith("+")) {
+        rest.remove(rest.length() - 1);
+        rest.trim();
+    }
+    uint8_t n = 0;
+    while (rest.length() > 0 && n < capacity) {
+        const int comma = rest.indexOf(", ");
+        if (comma < 0) {
+            out[n++] = rest;
+            break;
+        }
+        out[n++] = rest.substring(0, comma);
+        rest = rest.substring(comma + 2);
+    }
+    return n;
+}
+
+}  // namespace
+
+void T5Display::drawGridPanel(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h) {
+
+    // O bloco-âncora do web (.mn-panel): claro, borda fina e uma grade de
+    // 28 px que some a partir do canto superior direito.
+    fillRoundRect(x, y, w, h, 12, PAPER);
+
+    const int32_t cx = x + w;
+    const int32_t cy = y;
+    const int32_t reach = (w * 3) / 4;
+    const int32_t reach2 = reach * reach;
+    for (int32_t gy = y + 28; gy < y + h - 2; gy += 28) {
+        for (int32_t px = x + 2; px < x + w - 2; ++px) {
+            const int32_t dx = px - cx;
+            const int32_t dy = gy - cy;
+            const int32_t d2 = dx * dx + dy * dy;
+            if ((d2 < reach2 && ((px + gy) & 1) == 0) || d2 < reach2 / 3) {
+                blendPixel(px, gy, GRID, 16);
+            }
+        }
+    }
+    for (int32_t gx = x + w - 28; gx > x + 2; gx -= 28) {
+        for (int32_t py = y + 2; py < y + h - 2; ++py) {
+            const int32_t dx = gx - cx;
+            const int32_t dy = py - cy;
+            const int32_t d2 = dx * dx + dy * dy;
+            if ((d2 < reach2 && ((gx + py) & 1) == 0) || d2 < reach2 / 3) {
+                blendPixel(gx, py, GRID, 16);
+            }
+        }
+    }
+
+    strokeRoundRect(x, y, w, h, 12, 2, LINE);
+}
+
 void T5Display::showHome(
     const WeeklyPlanDay* days,
     uint8_t dayCount,
@@ -3895,145 +3955,119 @@ void T5Display::showHome(
     bool canResume) {
 
     clearBuffer();
+    drawTopBar();
 
-    drawSystemBar(
-        "",
-        true,
-        false,
-        "",
-        false,
-        false);
+    const uint8_t count = std::min<uint8_t>(dayCount, 7);
+    const WeeklyPlanDay* today = count > 0 ? &days[0] : nullptr;
+    const uint16_t due = today ? today->cards : 0;
 
-    drawContextStrip(
-        "Agenda semanal",
-        trustedClock
-            ? ""
-            : "hora aproximada");
+    // Cabeçalho: data por extenso, "Hoje" e o botão de estudar, como no web.
+    String eyebrow = today ? longDateLabel(today->label) : "";
+    if (!trustedClock) {
+        eyebrow += " · hora aproximada";
+    }
+    drawEyebrow(eyebrow, GUTTER, 112);
+    drawText("Hoje", GUTTER, 178, MnemosFontRole::Title, INK);
 
-    const uint8_t count =
-        std::min<uint8_t>(
-            dayCount,
-            7);
+    const HmiLayout::Rect pill = HmiLayout::HOME_STUDY_PILL;
+    drawPill(pill.x, pill.y, pill.w, pill.h,
+             canResume ? "Retomar" : "Estudar agora", true);
 
-    if (portrait()) {
-        for (
-            uint8_t i = 0;
-            i < count;
-            ++i
-        ) {
-            const int32_t y =
-                HmiLayout::
-                    homePortraitBaseline(i);
+    // O bloco-âncora: o que vence agora.
+    const HmiLayout::Rect panel = HmiLayout::HOME_PANEL;
+    drawGridPanel(panel.x, panel.y, panel.w, panel.h);
 
-            if (days[i].today) {
-                fillRect(
-                    MARGIN,
-                    y - 28,
-                    logicalWidth() -
-                        2 * MARGIN,
-                    66,
-                    LIGHT_GRAY);
-            }
+    const int32_t px = panel.x + 28;
+    String deckNames[3];
+    const uint8_t deckCount =
+        today ? splitDecks(today->decks, deckNames, 3) : 0;
 
-            drawText(
-                days[i].label,
-                MARGIN + 12,
-                y,
-                MnemosFontRole::Body18,
-                BLACK);
+    drawEyebrow(due > 0 ? "Vencendo agora" : "Nada vencendo",
+                px, panel.y + 48);
 
-            drawText(
-                String(
-                    days[i].cards),
-                190,
-                y,
-                MnemosFontRole::Title22,
-                BLACK);
+    const String figure = String(due);
+    const int32_t figureBaseline = panel.y + 150;
+    drawText(figure, px - 4, figureBaseline, MnemosFontRole::Display, INK);
+    const int32_t unitX =
+        px + textWidth(figure, MnemosFontRole::Display) + 10;
 
-            drawText(
-                days[i].cards > 0
-                    ? shortText(
-                          days[i].decks,
-                          24)
-                    : "Livre",
-                250,
-                y,
-                MnemosFontRole::Meta14,
-                days[i].cards > 0
-                    ? DARK_GRAY
-                    : MID_GRAY);
+    if (due > 0) {
+        String unit = due == 1 ? "card" : "cards";
+        if (deckCount > 1) {
+            unit += " em ";
+            unit += String(deckCount);
+            unit += " baralhos";
+        }
+        drawText(unit, unitX, figureBaseline, MnemosFontRole::Body, MUTED);
+
+        // A barra do web: um traço por baralho, o primeiro em tinta.
+        const int32_t barY = panel.y + 184;
+        const int32_t barW = panel.w - 56;
+        const int32_t parts = std::max<int32_t>(1, deckCount);
+        const int32_t gap = 10;
+        const int32_t segW = (barW - gap * (parts - 1)) / parts;
+        for (int32_t i = 0; i < parts; ++i) {
+            fillRoundRect(px + i * (segW + gap), barY, segW, 10, 5,
+                          i == 0 ? INK : DECO);
+        }
+
+        int32_t lineY = panel.y + 236;
+        for (uint8_t i = 0; i < deckCount && lineY < panel.y + panel.h - 10; ++i) {
+            drawText(fitTextToWidth(deckNames[i], panel.w - 56, MnemosFontRole::Body),
+                     px, lineY, MnemosFontRole::Body, MUTED);
+            lineY += 34;
         }
     } else {
-        for (
-            uint8_t i = 0;
-            i < count;
-            ++i
-        ) {
-            const HmiLayout::Rect card =
-                HmiLayout::
-                    homeLandscapeCard(i);
-
-            fillRect(
-                card.x,
-                card.y,
-                card.w,
-                card.h,
-                days[i].today
-                    ? LIGHT_GRAY
-                    : WHITE);
-
-            drawRect(
-                card.x,
-                card.y,
-                card.w,
-                card.h,
-                MID_GRAY);
-
-            // Same card geometry as 6.4.1, with more coherent baselines.
-            const int32_t primaryBaseline =
-                card.y + 29;
-
-            drawText(
-                days[i].label,
-                card.x + 16,
-                primaryBaseline,
-                MnemosFontRole::Body18,
-                BLACK);
-
-            drawText(
-                String(
-                    days[i].cards),
-                card.x + 150,
-                primaryBaseline + 2,
-                MnemosFontRole::Title22,
-                BLACK);
-
-            drawText(
-                days[i].cards > 0
-                    ? shortText(
-                          days[i].decks,
-                          22)
-                    : "Livre",
-                card.x + 205,
-                primaryBaseline,
-                MnemosFontRole::Meta14,
-                days[i].cards > 0
-                    ? DARK_GRAY
-                    : MID_GRAY);
-        }
+        drawText("cards para hoje", unitX, figureBaseline,
+                 MnemosFontRole::Body, MUTED);
+        drawWrapped(
+            "Sua memória segue trabalhando sozinha. O terminal te chama quando algo estiver prestes a escapar.",
+            px, panel.y + 196, panel.w - 56, 32, 3,
+            MnemosFontRole::Body, MUTED);
     }
 
-    drawPrimaryButton(
-        canResume
-            ? "Retomar sessão"
-            : "Estudar agora");
+    // Próximos dias: as barras do "Próximos 14 dias" do web, em uma semana.
+    const int32_t sectionY = panel.y + panel.h + 56;
+    drawText("Próximos 7 dias", GUTTER, sectionY, MnemosFontRole::Heading, INK);
 
+    uint16_t peak = 1;
+    for (uint8_t i = 0; i < count; ++i) {
+        peak = std::max<uint16_t>(peak, days[i].cards);
+    }
+
+    const int32_t chartBase = HmiLayout::TAB_BAR_Y - 58;
+    const int32_t chartH = std::min<int32_t>(150, chartBase - (sectionY + 44));
+    const int32_t slot = (logicalWidth() - 2 * GUTTER) / 7;
+    for (uint8_t i = 0; i < count; ++i) {
+        const int32_t cx = GUTTER + i * slot + slot / 2;
+        const int32_t barW = slot - 22;
+        const uint16_t cards = days[i].cards;
+
+        if (cards > 0) {
+            const int32_t barH = std::max<int32_t>(
+                10, (static_cast<int32_t>(cards) * chartH) / peak);
+            fillRoundRect(cx - barW / 2, chartBase - barH, barW, barH, 6,
+                          i == 0 ? INK : 0x50);
+            drawCenteredText(String(cards), cx, chartBase - barH - 10,
+                             MnemosFontRole::Small, i == 0 ? INK : MUTED);
+        } else {
+            fillRoundRect(cx - barW / 2, chartBase - 5, barW, 5, 2, SOFT);
+        }
+
+        const String weekday =
+            days[i].label.substring(0, std::max(0, days[i].label.indexOf(' ')));
+        drawCenteredText(weekday, cx, chartBase + 32, MnemosFontRole::Eyebrow,
+                         i == 0 ? INK : FAINT);
+    }
+
+    drawTabBar(0);
     refreshFull();
 }
 
 
 void T5Display::showMainMenu() {
     clearBuffer();
+    tab_ = 4;
 
     drawSystemBar(
         "",
@@ -4044,10 +4078,10 @@ void T5Display::showMainMenu() {
         false);
 
     drawContextStrip(
-        "Menu");
+        "Mais");
 
     const String labels[4] = {
-        "Decks",
+        "Baralhos",
         "Conexão",
         "Configurações",
         "Desligar dispositivo"
@@ -4089,6 +4123,8 @@ void T5Display::showSettings(
     const String& backlightLabel) {
 
     clearBuffer();
+    tab_ = 4;
+    back_ = true;
     drawSystemBar("", true, false, "", true, false);
     drawContextStrip("Configurações");
 
@@ -4121,35 +4157,17 @@ void T5Display::showSettings(
 void T5Display::showPowerOff(
     bool) {
 
+    // Fica no painel com o aparelho desligado: a marca, e como religar.
     clearBuffer();
-
-    drawCenteredTextInRect(
-        "MNEMOS",
-        0,
-        portrait() ? 240 : 115,
-        logicalWidth(),
-        portrait() ? 110 : 80,
-        MnemosFontRole::Title22,
-        BLACK);
-
-    drawCenteredTextInRect(
-        "estudo sem distrações",
-        MARGIN,
-        portrait() ? 365 : 220,
-        logicalWidth() - 2 * MARGIN,
-        portrait() ? 70 : 55,
-        MnemosFontRole::Body18,
-        DARK_GRAY);
-
-    drawCenteredTextInRect(
-        "Segure PWR para ligar",
-        MARGIN,
-        portrait() ? 625 : 365,
-        logicalWidth() - 2 * MARGIN,
-        portrait() ? 80 : 60,
-        MnemosFontRole::Body18,
-        BLACK);
-
+    const int32_t cx = logicalWidth() / 2;
+    drawBrandMark(cx - 48, 300, 96);
+    drawCenteredText("Mnemos", cx, 470, MnemosFontRole::Title, INK);
+    drawCenteredText("O que você aprendeu,", cx, 526, MnemosFontRole::Body, MUTED);
+    drawCenteredText("de volta na hora certa.", cx, 558, MnemosFontRole::Body, MUTED);
+    const int32_t pillW = 300;
+    fillRoundRect(cx - pillW / 2, 800, pillW, 56, 28, SOFT);
+    drawCenteredTextInRect("Segure PWR para ligar", cx - pillW / 2, 800, pillW, 56,
+                           MnemosFontRole::Strong, INK);
     refreshFull();
 }
 
@@ -4160,69 +4178,31 @@ void T5Display::showDecks(
     bool canResume) {
 
     clearBuffer();
+    tab_ = 1;
 
-    drawSystemBar(
-        "",
-        true,
-        false,
-        "",
-        true,
-        false);
+    drawSystemBar("", true, false, "", true, false);
+    drawScreenHeader(
+        "Baralhos",
+        anySelected ? "Filtro ativo" : "Todos os baralhos");
 
-    drawContextStrip(
-        "Decks",
-        anySelected
-            ? "filtro ativo"
-            : "todos");
+    uint32_t totalDue = 0;
+    for (size_t i = 0; i < count; ++i) totalDue += decks[i].dueCount;
 
-    const HmiLayout::Rect allCard =
-        HmiLayout::deckAllCard(
-            portrait());
+    const HmiLayout::Rect allCard = HmiLayout::deckAllCard(portrait());
+    drawDeckRow("Todos os baralhos",
+                String(count) + (count == 1 ? " baralho" : " baralhos"),
+                totalDue, !anySelected,
+                allCard.x, allCard.y, allCard.w, allCard.h);
 
-    drawChoiceCard(
-        0,
-        "Todos os decks",
-        allCard.x,
-        allCard.y,
-        allCard.w,
-        allCard.h,
-        !anySelected,
-        '\0');
-
-    const size_t visible =
-        std::min<size_t>(
-            count,
-            5);
-
-    for (
-        size_t i = 0;
-        i < visible;
-        ++i
-    ) {
+    const size_t visible = std::min<size_t>(count, 5);
+    for (size_t i = 0; i < visible; ++i) {
         const HmiLayout::Rect card =
-            HmiLayout::deckCard(
-                portrait(),
-                static_cast<uint8_t>(
-                    i));
-
-        drawChoiceCard(
-            static_cast<uint8_t>(
-                i + 1),
-            decks[i].name +
-                " · " +
-                String(
-                    decks[i].dueCount) +
-                (
-                    portrait()
-                        ? " agora"
-                        : ""
-                ),
-            card.x,
-            card.y,
-            card.w,
-            card.h,
-            decks[i].selected,
-            '\0');
+            HmiLayout::deckCard(portrait(), static_cast<uint8_t>(i));
+        drawDeckRow(decks[i].name,
+                    String(decks[i].cardCount) +
+                        (decks[i].cardCount == 1 ? " card" : " cards"),
+                    decks[i].dueCount, decks[i].selected,
+                    card.x, card.y, card.w, card.h);
     }
 
     drawPrimaryButton(
@@ -4235,6 +4215,70 @@ void T5Display::showDecks(
     refreshFull();
 }
 
+void T5Display::drawStatTile(
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h,
+    const String& eyebrow,
+    const String& value,
+    const String& unit) {
+
+    drawSurfaceCard(x, y, w, h);
+    drawEyebrow(eyebrow, x + 18, y + 30);
+    const String fitted =
+        fitTextToWidth(value, w - 36, MnemosFontRole::Heading);
+    drawText(fitted, x + 18, y + 70, MnemosFontRole::Heading, INK);
+    const int32_t unitX =
+        x + 18 + textWidth(fitted, MnemosFontRole::Heading) + 8;
+    if (unit.length() > 0 && unitX < x + w - 20) {
+        drawText(fitTextToWidth(unit, x + w - 18 - unitX, MnemosFontRole::Small),
+                 unitX, y + 70, MnemosFontRole::Small, MUTED);
+    }
+}
+
+void T5Display::drawDeckRow(
+    const String& name,
+    const String& meta,
+    uint32_t due,
+    bool selected,
+    int32_t x,
+    int32_t y,
+    int32_t w,
+    int32_t h) {
+
+    // A linha da biblioteca do web: nome, metadado e o selo "N hoje".
+    fillRoundRect(x, y, w, h, 12, PAPER);
+    strokeRoundRect(x, y, w, h, 12, selected ? 3 : 2, selected ? INK : LINE);
+
+    int32_t right = x + w - 20;
+    const int32_t cy = y + h / 2;
+
+    if (selected) {
+        fillRoundRect(right - 28, cy - 14, 28, 28, 14, INK);
+        for (int32_t k = 0; k < 2; ++k) {
+            drawLine(right - 21, cy + k, right - 16, cy + 5 + k, PAPER);
+            drawLine(right - 16, cy + 5 + k, right - 7, cy - 5 + k, PAPER);
+        }
+        right -= 40;
+    }
+
+    if (due > 0) {
+        const String pill = String(due) + " hoje";
+        const int32_t pw = textWidth(pill, MnemosFontRole::Strong) + 28;
+        fillRoundRect(right - pw, cy - 18, pw, 36, 18, SOFT);
+        drawCenteredTextInRect(pill, right - pw, cy - 18, pw, 36,
+                               MnemosFontRole::Strong, INK);
+        right -= pw + 16;
+    }
+
+    const int32_t textW = right - (x + 22);
+    drawText(fitTextToWidth(name, textW, MnemosFontRole::Strong),
+             x + 22, y + 36, MnemosFontRole::Strong, INK);
+    drawText(fitTextToWidth(meta, textW, MnemosFontRole::Small),
+             x + 22, y + 64, MnemosFontRole::Small, FAINT);
+}
+
 
 void T5Display::showAgenda(
     uint16_t dueNow,
@@ -4244,6 +4288,8 @@ void T5Display::showAgenda(
     const String& nextReview) {
 
     clearBuffer();
+    tab_ = 0;
+    back_ = true;
 
     drawSystemBar(
         "",
@@ -4369,36 +4415,17 @@ void T5Display::showSyncMenu(
     bool wifiConnected) {
 
     clearBuffer();
+    tab_ = 3;
 
-    drawSystemBar(
-        "Sincronização",
-        true,
-        false,
-        wifiConnected
-            ? "rede ativa"
-            : "sem rede",
-        true);
+    drawSystemBar("", true, false, "", true, false);
+    drawScreenHeader("Sincronizar", wifiConnected ? "Rede ativa" : "Sem rede");
 
-    drawText(
-        String(total) +
-            " cartões no terminal",
-        MARGIN,
-        portrait()
-            ? 168
-            : 124,
-        MnemosFontRole::Body18,
-        BLACK);
-
-    drawText(
-        String(
-            pendingReviews) +
-            " revisões aguardando envio",
-        MARGIN,
-        portrait()
-            ? 212
-            : 160,
-        MnemosFontRole::Meta14,
-        DARK_GRAY);
+    const int32_t tileW = (logicalWidth() - 2 * MARGIN - 16) / 2;
+    drawStatTile(MARGIN, 186, tileW, 88, "No terminal", String(total),
+                 total == 1 ? "card" : "cards");
+    drawStatTile(MARGIN + tileW + 16, 186, tileW, 88, "A enviar",
+                 String(pendingReviews),
+                 pendingReviews == 1 ? "revisão" : "revisões");
 
     if (portrait()) {
         drawChoiceCard(
@@ -4453,6 +4480,8 @@ void T5Display::showConnectionMenu(
     size_t knownNetworks) {
 
     clearBuffer();
+    tab_ = 4;
+    back_ = true;
 
     const String state =
         wifiConnected
@@ -4473,35 +4502,13 @@ void T5Display::showConnectionMenu(
         "Conexão",
         state);
 
-    drawText(
-        wifiConnected
-            ? (
-                  "Rede atual: " +
-                  (
-                      ssid.length()
-                          ? ssid
-                          : String(
-                                "conectada")
-                  )
-              )
-            : "Nenhuma rede ativa",
-        MARGIN,
-        portrait()
-            ? 206
-            : 170,
-        MnemosFontRole::Body18,
-        BLACK);
-
-    drawText(
-        String(
-            knownNetworks) +
-            " redes conhecidas",
-        MARGIN,
-        portrait()
-            ? 236
-            : 196,
-        MnemosFontRole::Meta14,
-        DARK_GRAY);
+    drawStatTile(
+        MARGIN, 186, logicalWidth() - 2 * MARGIN, 88,
+        "Rede atual",
+        wifiConnected ? (ssid.length() ? ssid : String("conectada"))
+                      : String("Nenhuma"),
+        String(knownNetworks) +
+            (knownNetworks == 1 ? " rede conhecida" : " redes conhecidas"));
 
     const String labels[3] = {
         "Procurar redes",
@@ -4553,7 +4560,7 @@ void T5Display::showWifiScanning() {
         "Procurando redes próximas...",
         MARGIN,
         portrait() ? 250 : 190,
-        MnemosFontRole::Title22,
+        MnemosFontRole::Heading,
         BLACK);
 
     drawWrapped(
@@ -4563,8 +4570,8 @@ void T5Display::showWifiScanning() {
         logicalWidth() - 2 * MARGIN,
         32,
         4,
-        MnemosFontRole::Body18,
-        DARK_GRAY);
+        MnemosFontRole::Body,
+        MUTED);
 
     refreshFull();
 }
@@ -4590,8 +4597,8 @@ void T5Display::showWifiNetworks(
             "Nenhuma rede encontrada.",
             MARGIN,
             portrait() ? 230 : 180,
-            MnemosFontRole::Title22,
-            BLACK);
+            MnemosFontRole::Heading,
+            INK);
 
         drawWrapped(
             "Verifique se o Wi-Fi está disponível e tente novamente.",
@@ -4600,42 +4607,13 @@ void T5Display::showWifiNetworks(
             logicalWidth() - 2 * MARGIN,
             31,
             3,
-            MnemosFontRole::Body18,
-            DARK_GRAY);
+            MnemosFontRole::Body,
+            MUTED);
     } else if (portrait()) {
         const size_t visible =
             std::min<size_t>(count, 6);
-
         for (size_t i = 0; i < visible; ++i) {
-            const int32_t y =
-                142 +
-                static_cast<int32_t>(i) * 100;
-
-            fillRect(
-                MARGIN,
-                y,
-                logicalWidth() - 2 * MARGIN,
-                86,
-                BLACK);
-
-            drawRect(
-                MARGIN,
-                y,
-                logicalWidth() - 2 * MARGIN,
-                86,
-                BLACK);
-
-            drawText(
-                shortText(ssids[i], 25),
-                MARGIN + 20,
-                y + 35,
-                MnemosFontRole::Body18,
-                WHITE);
-
-            String meta =
-                String(rssis[i]) +
-                " dBm · ";
-
+            String meta = String(rssis[i]) + " dBm · ";
             if (flags[i] & 0x02) {
                 meta += "corporativa";
             } else if (flags[i] & 0x01) {
@@ -4643,17 +4621,12 @@ void T5Display::showWifiNetworks(
             } else {
                 meta += "segura";
             }
-
             if (flags[i] & 0x04) {
                 meta += " · salva";
             }
-
-            drawText(
-                meta,
-                MARGIN + 20,
-                y + 67,
-                MnemosFontRole::Meta14,
-                LIGHT_GRAY);
+            drawDeckRow(ssids[i], meta, 0, false, MARGIN,
+                        HmiLayout::wifiNetworkRowY(static_cast<uint8_t>(i)),
+                        logicalWidth() - 2 * MARGIN, 86);
         }
     } else {
         const size_t visible =
@@ -4752,7 +4725,7 @@ void T5Display::showWifiPassword(
         i < visibleChars;
         ++i
     ) {
-        masked += '*';
+        masked += "•";
     }
 
     if (
@@ -4774,13 +4747,11 @@ void T5Display::showWifiPassword(
             ? 70
             : 54;
 
-    drawRect(
-        MARGIN,
-        passwordY,
-        logicalWidth() -
-            2 * MARGIN,
-        passwordH,
-        BLACK);
+    // O campo do web: raio 12, borda em tinta quando há texto.
+    fillRoundRect(MARGIN, passwordY, logicalWidth() - 2 * MARGIN,
+                  passwordH, 12, PAPER);
+    strokeRoundRect(MARGIN, passwordY, logicalWidth() - 2 * MARGIN,
+                    passwordH, 12, 2, passwordLength > 0 ? INK : OUTLINE);
 
     const String fieldText =
         masked.length() > 0
@@ -4794,9 +4765,7 @@ void T5Display::showWifiPassword(
             logicalWidth() -
                 2 * MARGIN -
                 36,
-            masked.length() > 0
-                ? MnemosFontRole::Body18
-                : MnemosFontRole::Meta14),
+            MnemosFontRole::Body),
         MARGIN + 18,
         passwordY +
             (
@@ -4804,10 +4773,8 @@ void T5Display::showWifiPassword(
                     ? 44
                     : 35
             ),
-        masked.length() > 0
-            ? MnemosFontRole::Body18
-            : MnemosFontRole::Meta14,
-        BLACK);
+        MnemosFontRole::Body,
+        masked.length() > 0 ? INK : FAINT);
 
     if (hint.length()) {
         drawText(
@@ -4820,8 +4787,8 @@ void T5Display::showWifiPassword(
             portrait()
                 ? 282
                 : 204,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
+            MnemosFontRole::Small,
+            MUTED);
     }
 
     const char* chars =
@@ -4856,8 +4823,8 @@ void T5Display::showWifiPassword(
         const int32_t y =
             startY + row * (keyH + gap);
 
-        fillRect(x, y, keyW, keyH, BLACK);
-        drawRect(x, y, keyW, keyH, BLACK);
+        // Tecla clara de raio 8, como num teclado de celular.
+        fillRoundRect(x, y, keyW, keyH, 8, SOFT);
 
         String label;
         label += chars[i];
@@ -4867,8 +4834,8 @@ void T5Display::showWifiPassword(
             y,
             keyW,
             keyH,
-            MnemosFontRole::Body18,
-            WHITE);
+            MnemosFontRole::Heading,
+            INK);
     }
 
     const int32_t controlY =
@@ -4892,19 +4859,19 @@ void T5Display::showWifiPassword(
 
     int32_t x = MARGIN;
     for (uint8_t i = 0; i < 4; ++i) {
-        fillRect(x, controlY, widths[i], controlH, BLACK);
-        drawRect(x, controlY, widths[i], controlH, BLACK);
+        fillRoundRect(x, controlY, widths[i], controlH, 8, PAPER);
+        strokeRoundRect(x, controlY, widths[i], controlH, 8, 2, OUTLINE);
         drawCenteredTextInRect(
             fitTextToWidth(
                 labels[i],
                 widths[i] - 10,
-                MnemosFontRole::Meta14),
+                MnemosFontRole::Strong),
             x,
             controlY,
             widths[i],
             controlH,
-            MnemosFontRole::Meta14,
-            WHITE);
+            MnemosFontRole::Strong,
+            INK);
         x += widths[i] + controlGap;
     }
 
@@ -4933,12 +4900,12 @@ void T5Display::showWifiMessage(
     drawWrapped(
         message,
         MARGIN,
-        portrait() ? 220 : 170,
+        portrait() ? 212 : 170,
         logicalWidth() - 2 * MARGIN,
         portrait() ? 36 : 32,
         portrait() ? 8 : 5,
-        MnemosFontRole::Body18,
-        BLACK);
+        MnemosFontRole::Body,
+        INK);
 
     if (primaryLabel.length()) {
         drawPrimaryButton(primaryLabel);
@@ -4958,175 +4925,54 @@ void T5Display::showStorage(
     const String& status) {
 
     clearBuffer();
+    tab_ = 4;
+    back_ = true;
 
-    drawSystemBar(
-        "",
-        false,
-        false,
-        "",
-        true,
-        false);
+    drawSystemBar("", false, false, "", true, false);
+    drawScreenHeader("Armazenamento", mounted ? "microSD" : "Sem cartão");
 
-    drawContextStrip(
-        "Armazenamento",
-        mounted
-            ? "microSD"
-            : "sem cartão");
+    const int32_t w = logicalWidth() - 2 * MARGIN;
 
     if (!mounted) {
-        drawText(
-            "Nenhum cartão microSD montado.",
-            MARGIN,
-            portrait() ? 230 : 190,
-            MnemosFontRole::Title22,
-            BLACK);
-
+        drawText("Nenhum cartão microSD", MARGIN, 230,
+                 MnemosFontRole::Heading, INK);
         drawWrapped(
-            "Insira um cartão FAT32. O Mnemos procura decks JSON em /mnemos/decks.",
-            MARGIN,
-            portrait() ? 300 : 250,
-            logicalWidth() - 2 * MARGIN,
-            34,
-            5,
-            MnemosFontRole::Body18,
-            DARK_GRAY);
-
+            "Insira um cartão FAT32. O Mnemos procura baralhos JSON em /mnemos/decks.",
+            MARGIN, 272, w, 32, 5, MnemosFontRole::Body, MUTED);
         if (status.length()) {
-            drawText(
-                shortText(
-                    status,
-                    52),
-                MARGIN,
-                portrait() ? 490 : 350,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
+            drawText(shortText(status, 52), MARGIN, 470,
+                     MnemosFontRole::Small, FAINT);
         }
-
-        drawPrimaryButton(
-            "Detectar cartão");
-
+        drawPrimaryButton("Detectar cartão");
         refreshFull();
         return;
     }
 
-    const uint64_t sizeMb =
-        cardSizeBytes /
-        1024ULL /
-        1024ULL;
+    const uint64_t sizeMb = cardSizeBytes / 1024ULL / 1024ULL;
+    const uint64_t usedMb = usedBytes / 1024ULL / 1024ULL;
 
-    const uint64_t usedMb =
-        usedBytes /
-        1024ULL /
-        1024ULL;
-
-    drawText(
-        String(
-            static_cast<unsigned long>(
-                sizeMb)) +
-            " MB · " +
-            String(
-                static_cast<unsigned long>(
-                    usedMb)) +
-            " MB usados",
-        MARGIN,
-        portrait() ? 198 : 158,
-        MnemosFontRole::Meta14,
-        BLACK);
-
-    if (status.length()) {
-        drawText(
-            shortText(
-                status,
-                portrait()
-                    ? 48
-                    : 78),
-            MARGIN,
-            portrait() ? 226 : 184,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
-    }
+    // Ocupação do cartão num ladrilho; a última ação vira a sobrancelha.
+    drawStatTile(
+        MARGIN, 186, w, 88,
+        status.length() ? shortText(status, 40) : String("Em uso"),
+        String(static_cast<unsigned long>(usedMb)) + " MB",
+        "de " + String(static_cast<unsigned long>(sizeMb)) + " MB");
 
     if (fileCount == 0) {
-        drawText(
-            "Nenhum deck JSON em /mnemos/decks",
-            MARGIN,
-            portrait() ? 320 : 250,
-            MnemosFontRole::Body18,
-            BLACK);
+        drawText("Nenhum baralho JSON em /mnemos/decks", MARGIN, 330,
+                 MnemosFontRole::Body, MUTED);
     } else {
-        const size_t visible =
-            std::min<size_t>(
-                fileCount,
-                portrait()
-                    ? 5
-                    : 6);
-
-        for (
-            size_t i = 0;
-            i < visible;
-            ++i
-        ) {
+        const size_t visible = std::min<size_t>(fileCount, portrait() ? 5 : 6);
+        for (size_t i = 0; i < visible; ++i) {
             const HmiLayout::Rect card =
-                HmiLayout::storageFileCard(
-                    portrait(),
-                    static_cast<uint8_t>(
-                        i));
-
-            fillRect(
-                card.x,
-                card.y,
-                card.w,
-                card.h,
-                BLACK);
-
-            drawRect(
-                card.x,
-                card.y,
-                card.w,
-                card.h,
-                MID_GRAY);
-
-            drawText(
-                shortText(
-                    fileNames[i],
-                    portrait()
-                        ? 30
-                        : 24),
-                card.x + 16,
-                card.y +
-                    (
-                        portrait()
-                            ? 32
-                            : 29
-                    ),
-                MnemosFontRole::Body18,
-                WHITE);
-
-            drawText(
-                String(
-                    fileSizes[i] /
-                    1024U) +
-                    (
-                        portrait()
-                            ? " KB · toque para importar"
-                            : " KB · importar"
-                    ),
-                card.x + 16,
-                card.y +
-                    (
-                        portrait()
-                            ? 61
-                            : 55
-                    ),
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
+                HmiLayout::storageFileCard(portrait(), static_cast<uint8_t>(i));
+            drawDeckRow(fileNames[i],
+                        String(fileSizes[i] / 1024U) + " KB · toque para importar",
+                        0, false, card.x, card.y, card.w, card.h);
         }
     }
 
-    drawPrimarySplit(
-        "Atualizar",
-        "Exportar");
-
+    drawPrimarySplit("Atualizar", "Exportar");
     refreshFull();
 }
 
@@ -5139,101 +4985,149 @@ void T5Display::showLocalLink(
     bool provisioning) {
 
     clearBuffer();
+    drawTopBar();
+    drawScreenHeader(
+        provisioning ? "Configurar terminal" : "Sincronizar celular",
+        "Leia com o app Mnemos");
 
-    const int32_t qrScale =
-        portrait()
-            ? 6
-            : 5;
+    // O código num card branco, centrado. Versão 8 do QR: 49 módulos de
+    // 6 px mais a margem de 12 px que drawQr() desenha.
+    const int32_t qrSide = 49 * 6 + 24;
+    const int32_t cardY = 190;
+    const int32_t cardH = qrSide + 40;
+    drawSurfaceCard(MARGIN, cardY, logicalWidth() - 2 * MARGIN, cardH);
+    drawQr(qrPayload, (logicalWidth() - qrSide) / 2, cardY + 20, 6);
 
-    const int32_t qrX =
-        portrait()
-            ? 80
-            : 70;
+    // A rede temporária e a senha, para quem conecta à mão.
+    const int32_t tileY = cardY + cardH + 16;
+    const int32_t tileW = logicalWidth() - 2 * MARGIN;
+    drawStatTile(MARGIN, tileY, tileW, 88, "Rede temporária", ssid, "");
+    drawStatTile(MARGIN, tileY + 100, tileW, 88, "Senha", password, "");
 
-    const int32_t qrY =
-        portrait()
-            ? 100
-            : 90;
+    const HmiLayout::Rect zone = HmiLayout::actionZone(portrait());
+    drawPill(zone.x, zone.y + (zone.h - 68) / 2, zone.w, 68, "Cancelar", false);
+    refreshFull();
+}
 
-    drawText(
-        provisioning
-            ? "Configurar terminal"
-            : "Sincronizar celular",
-        MARGIN,
-        portrait()
-            ? 60
-            : 48,
-        MnemosFontRole::Title22,
-        BLACK);
+namespace {
 
-    drawQr(
-        qrPayload,
-        qrX,
-        qrY,
-        qrScale);
+/*
+ * Quebra `text` em linhas de até maxWidth px no papel `role`. Palavra maior
+ * que a linha é cortada com reticências. Devolve quantas linhas preencheu.
+ */
+uint8_t wrapLines(
+    const String& text,
+    int32_t maxWidth,
+    MnemosFontRole role,
+    String* out,
+    uint8_t maxLines) {
 
-    if (portrait()) {
-        drawText(
-            "Rede temporária",
-            MARGIN,
-            650,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
+    uint8_t n = 0;
+    String line;
+    int start = 0;
+    const int len = text.length();
 
-        drawText(
-            ssid,
-            MARGIN,
-            688,
-            MnemosFontRole::Body18,
-            BLACK);
+    while (start <= len && n < maxLines) {
+        int end = text.indexOf(' ', start);
+        if (end < 0) end = len;
+        const String word = text.substring(start, end);
+        const String candidate = line.length() ? line + " " + word : word;
 
-        drawText(
-            "Senha",
-            MARGIN,
-            738,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
-
-        drawText(
-            password,
-            MARGIN,
-            776,
-            MnemosFontRole::Body18,
-            BLACK);
-    } else {
-        drawText(
-            "Rede temporária",
-            470,
-            170,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
-
-        drawText(
-            ssid,
-            470,
-            210,
-            MnemosFontRole::Body18,
-            BLACK);
-
-        drawText(
-            "Senha",
-            470,
-            270,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
-
-        drawText(
-            password,
-            470,
-            310,
-            MnemosFontRole::Body18,
-            BLACK);
+        if (mnemosFontTextWidth(candidate, role) <= maxWidth || line.length() == 0) {
+            line = candidate;
+        } else {
+            out[n++] = line;
+            line = word;
+            if (n >= maxLines) break;
+        }
+        start = end + 1;
+        if (end >= len) {
+            if (n < maxLines && line.length()) out[n++] = line;
+            line = "";
+            break;
+        }
     }
 
-    drawPrimaryButton(
-        "Cancelar");
+    // Sobrou texto: a última linha termina em reticências.
+    if (line.length() && n == maxLines) {
+        out[n - 1] += "…";
+    }
+    for (uint8_t i = 0; i < n; ++i) {
+        while (mnemosFontTextWidth(out[i], role) > maxWidth && out[i].length() > 2) {
+            out[i].remove(out[i].length() - 4);
+            out[i] += "…";
+        }
+    }
+    return n;
+}
 
-    refreshFull();
+}  // namespace
+
+void T5Display::drawStudyHeader(
+    const String& deck,
+    uint8_t position,
+    uint8_t total) {
+
+    // O topo do estudo no web: nome do baralho, traços de progresso e a
+    // contagem. "‹" pausa e volta ao Hoje; "×" encerra a sessão.
+    const int32_t w = logicalWidth();
+
+    for (int32_t k = 0; k < 3; ++k) {
+        drawLine(MARGIN + 12 + k, 24, MARGIN + 2 + k, 36, INK);
+        drawLine(MARGIN + 2 + k, 36, MARGIN + 12 + k, 48, INK);
+    }
+    // "×" como o do web, com traço que o painel mostra.
+    for (int32_t k = 0; k < 3; ++k) {
+        drawLine(w - MARGIN - 22 + k, 25, w - MARGIN - 2 + k, 45, INK);
+        drawLine(w - MARGIN - 2 + k, 25, w - MARGIN - 22 + k, 45, INK);
+    }
+
+    drawCenteredText(
+        fitTextToWidth(deck, w - 2 * MARGIN - 110, MnemosFontRole::Strong),
+        w / 2, 44, MnemosFontRole::Strong, INK);
+
+    // Traços: um por card até 30; depois, uma barra contínua.
+    const int32_t barX = MARGIN;
+    const int32_t barW = w - 2 * MARGIN;
+    const int32_t barY = 74;
+    if (total > 0 && total <= 30) {
+        const int32_t gap = 6;
+        const int32_t seg = (barW - gap * (total - 1)) / total;
+        for (uint8_t i = 0; i < total; ++i) {
+            fillRoundRect(barX + i * (seg + gap), barY, seg, 6, 3,
+                          i <= position ? INK : SOFT);
+        }
+    } else if (total > 0) {
+        fillRoundRect(barX, barY, barW, 6, 3, SOFT);
+        fillRoundRect(barX, barY, (barW * (position + 1)) / total, 6, 3, INK);
+    }
+
+    drawCenteredText(String(position + 1) + " de " + String(total),
+                     w / 2, 112, MnemosFontRole::Small, FAINT);
+    fillRect(0, 130, w, 2, LINE);
+}
+
+void T5Display::drawCardText(
+    const String& text,
+    int32_t x,
+    int32_t top,
+    int32_t w,
+    int32_t h,
+    MnemosFontRole role,
+    int32_t lineHeight,
+    uint8_t color) {
+
+    // Texto do card centrado na caixa, linha a linha, em Literata.
+    String lines[10];
+    const uint8_t maxLines =
+        static_cast<uint8_t>(std::min<int32_t>(10, h / lineHeight));
+    const uint8_t n = wrapLines(text, w, role, lines, maxLines);
+    const int32_t blockH = n * lineHeight;
+    int32_t baseline = top + (h - blockH) / 2 + (lineHeight * 3) / 4;
+    for (uint8_t i = 0; i < n; ++i) {
+        drawCenteredText(lines[i], x + w / 2, baseline, role, color);
+        baseline += lineHeight;
+    }
 }
 
 void T5Display::showQuestion(
@@ -5242,180 +5136,61 @@ void T5Display::showQuestion(
     uint8_t total) {
 
     clearBuffer();
+    drawStudyHeader(card.deck, position, total);
 
-    drawSystemBar(
-        "Estudo",
-        false,
-        true,
-        String(position + 1) +
-            " de " +
-            String(total),
-        true);
+    const bool mandarin = card.deckId == "training-mandarin-100";
+    const int32_t cardX = MARGIN;
+    const int32_t cardY = 156;
+    const int32_t cardW = logicalWidth() - 2 * MARGIN;
 
-    const bool mandarin =
-        card.deckId ==
-        "training-mandarin-100";
-
-    const int32_t barH =
-        systemBarHeight();
-
-    const int32_t deckY =
-        portrait()
-            ? barH + 68
-            : barH + 62;
-
-    drawText(
-        shortText(
-            card.deck,
-            portrait()
-                ? 36
-                : 30),
-        MARGIN,
-        deckY,
-        MnemosFontRole::Meta14,
-        DARK_GRAY);
-
-    if (mandarin) {
-        if (portrait()) {
-            drawText(
-                "Qual é a leitura e o significado?",
-                MARGIN,
-                245,
-                MnemosFontRole::Body18,
-                BLACK);
-
-            drawCenteredHanzi(
-                card.question,
-                logicalWidth() / 2,
-                510,
-                4);
-        } else {
-            drawLine(
-                468,
-                150,
-                468,
-                438,
-                LIGHT_GRAY);
-
-            drawWrapped(
-                "Qual é a leitura e o significado?",
-                MARGIN,
-                190,
-                360,
-                34,
-                3,
-                MnemosFontRole::Body18,
-                BLACK);
-
-            drawText(
-                "Recupere primeiro; depois revele.",
-                MARGIN,
-                292,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawCenteredHanzi(
-                card.question,
-                714,
-                338,
-                4);
+    if (card.isObjective() && !mandarin) {
+        // Objetiva: o enunciado em cima, as alternativas como linhas.
+        drawEyebrow("Pergunta", MARGIN, cardY + 34);
+        String lines[5];
+        const uint8_t n = wrapLines(card.question, cardW, MnemosFontRole::CardSmall, lines, 5);
+        int32_t baseline = cardY + 80;
+        for (uint8_t i = 0; i < n; ++i) {
+            drawText(lines[i], MARGIN, baseline, MnemosFontRole::CardSmall, INK);
+            baseline += 34;
         }
-
-        drawPrimaryButton(
-            "Ver resposta");
-
+        // As alternativas são só leitura (a resposta é mental, como nos
+        // demais cards): letra e texto, sem a seta de "tocável".
+        const uint8_t count = std::min<uint8_t>(card.optionCount, 4);
+        for (uint8_t i = 0; i < count; ++i) {
+            const int32_t y = 375 + i * 96;
+            fillRoundRect(MARGIN, y, cardW, 86, 12, PAPER);
+            strokeRoundRect(MARGIN, y, cardW, 86, 12, 2, LINE);
+            fillRoundRect(MARGIN + 20, y + 25, 36, 36, 18, SOFT);
+            drawCenteredTextInRect(String(static_cast<char>('A' + i)),
+                                   MARGIN + 20, y + 25, 36, 36,
+                                   MnemosFontRole::Strong, INK);
+            drawText(fitTextToWidth(card.options[i], cardW - 100, MnemosFontRole::Body),
+                     MARGIN + 72,
+                     centeredTextBaselineY(card.options[i], y + 43, MnemosFontRole::Body),
+                     MnemosFontRole::Body, INK);
+        }
+        drawPrimaryButton("Ver a resposta");
         refreshFull();
         return;
     }
 
-    if (card.isObjective()) {
-        if (portrait()) {
-            drawWrapped(
-                card.question,
-                MARGIN,
-                205,
-                logicalWidth() -
-                    2 * MARGIN,
-                31,
-                5,
-                MnemosFontRole::Body18,
-                BLACK);
+    // O card do web: branco, borda fina, sobrancelha e o texto centrado.
+    const int32_t cardH = 640;
+    drawSurfaceCard(cardX, cardY, cardW, cardH);
+    drawCenteredText(mnemosUpper("Pergunta"), cardX + cardW / 2, cardY + 56,
+                     MnemosFontRole::Eyebrow, FAINT);
 
-            const uint8_t count =
-                std::min<uint8_t>(
-                    card.optionCount,
-                    4);
-
-            for (
-                uint8_t i = 0;
-                i < count;
-                ++i
-            ) {
-                drawChoiceCard(
-                    i + 1,
-                    card.options[i],
-                    MARGIN,
-                    375 +
-                        i * 96,
-                    logicalWidth() -
-                        2 * MARGIN,
-                    86);
-            }
-        } else {
-            drawWrapped(
-                card.question,
-                MARGIN,
-                180,
-                390,
-                31,
-                6,
-                MnemosFontRole::Body18,
-                BLACK);
-
-            const uint8_t count =
-                std::min<uint8_t>(
-                    card.optionCount,
-                    4);
-
-            for (
-                uint8_t i = 0;
-                i < count;
-                ++i
-            ) {
-                drawChoiceCard(
-                    i + 1,
-                    card.options[i],
-                    504,
-                    126 +
-                        i * 80,
-                    408,
-                    72);
-            }
-        }
+    if (mandarin) {
+        drawCenteredText("Qual é a leitura e o significado?",
+                         cardX + cardW / 2, cardY + 104,
+                         MnemosFontRole::Body, MUTED);
+        drawCenteredHanzi(card.question, cardX + cardW / 2, cardY + 400, 5);
     } else {
-        drawWrapped(
-            card.question,
-            MARGIN,
-            portrait()
-                ? 240
-                : 190,
-            portrait()
-                ? logicalWidth() -
-                      2 * MARGIN
-                : 650,
-            portrait()
-                ? 34
-                : 32,
-            portrait()
-                ? 8
-                : 6,
-            MnemosFontRole::Body18,
-            BLACK);
+        drawCardText(card.question, cardX + 36, cardY + 90, cardW - 72,
+                     cardH - 130, MnemosFontRole::Card, 44, INK);
     }
 
-    drawPrimaryButton(
-        "Ver resposta");
-
+    drawPrimaryButton("Ver a resposta");
     refreshFull();
 }
 
@@ -5427,207 +5202,56 @@ void T5Display::showSelfAssessment(
     uint8_t total) {
 
     clearBuffer();
+    drawStudyHeader(card.deck, position, total);
 
-    drawSystemBar(
-        "Conferir",
-        false,
-        true,
-        String(position + 1) +
-            " de " +
-            String(total),
-        true);
-
-    const bool mandarin =
-        card.deckId ==
-        "training-mandarin-100";
+    const bool mandarin = card.deckId == "training-mandarin-100";
+    const int32_t cardX = MARGIN;
+    const int32_t cardY = 156;
+    const int32_t cardW = logicalWidth() - 2 * MARGIN;
+    const int32_t cardH = 640;
+    drawSurfaceCard(cardX, cardY, cardW, cardH);
+    const int32_t innerX = cardX + 32;
+    const int32_t innerW = cardW - 64;
 
     if (mandarin) {
-        const int separator =
-            card.answer.indexOf(
-                " - ");
-
+        const int separator = card.answer.indexOf(" - ");
         const String pinyin =
-            separator >= 0
-                ? card.answer.substring(
-                      0,
-                      separator)
-                : card.answer;
-
+            separator >= 0 ? card.answer.substring(0, separator) : card.answer;
         const String meaning =
-            separator >= 0
-                ? card.answer.substring(
-                      separator + 3)
-                : "";
+            separator >= 0 ? card.answer.substring(separator + 3) : "";
 
-        if (portrait()) {
-            drawCenteredHanzi(
-                card.question,
-                logicalWidth() / 2,
-                315,
-                3);
-
-            drawText(
-                "Pronúncia",
-                MARGIN,
-                420,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawText(
-                pinyin,
-                MARGIN,
-                468,
-                MnemosFontRole::Title22,
-                BLACK);
-
-            drawText(
-                "Significado",
-                MARGIN,
-                530,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawWrapped(
-                meaning,
-                MARGIN,
-                578,
-                logicalWidth() -
-                    2 * MARGIN,
-                32,
-                4,
-                MnemosFontRole::Body18,
-                BLACK);
-        } else {
-            drawLine(
-                468,
-                135,
-                468,
-                438,
-                LIGHT_GRAY);
-
-            drawCenteredHanzi(
-                card.question,
-                245,
-                320,
-                3);
-
-            drawText(
-                "Pronúncia",
-                520,
-                165,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawText(
-                pinyin,
-                520,
-                218,
-                MnemosFontRole::Title22,
-                BLACK);
-
-            drawText(
-                "Significado",
-                520,
-                282,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawWrapped(
-                meaning,
-                520,
-                330,
-                385,
-                31,
-                3,
-                MnemosFontRole::Body18,
-                BLACK);
+        drawCenteredHanzi(card.question, cardX + cardW / 2, cardY + 200, 4);
+        fillRect(innerX, cardY + 290, innerW, 2, LINE);
+        drawEyebrow("Pronúncia", innerX, cardY + 340);
+        drawText(fitTextToWidth(pinyin, innerW, MnemosFontRole::Heading),
+                 innerX, cardY + 384, MnemosFontRole::Heading, INK);
+        drawEyebrow("Significado", innerX, cardY + 446);
+        String lines[4];
+        const uint8_t n = wrapLines(meaning, innerW, MnemosFontRole::Card, lines, 4);
+        int32_t baseline = cardY + 496;
+        for (uint8_t i = 0; i < n; ++i) {
+            drawText(lines[i], innerX, baseline, MnemosFontRole::Card, INK);
+            baseline += 42;
         }
     } else {
-        if (portrait()) {
-            drawText(
-                "Pergunta",
-                MARGIN,
-                180,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawWrapped(
-                card.question,
-                MARGIN,
-                220,
-                logicalWidth() -
-                    2 * MARGIN,
-                30,
-                5,
-                MnemosFontRole::Body18,
-                DARK_GRAY);
-
-            drawLine(
-                MARGIN,
-                410,
-                logicalWidth() -
-                    MARGIN,
-                410,
-                MID_GRAY);
-
-            drawText(
-                "Resposta de referência",
-                MARGIN,
-                460,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawWrapped(
-                card.answer,
-                MARGIN,
-                505,
-                logicalWidth() -
-                    2 * MARGIN,
-                34,
-                7,
-                MnemosFontRole::Body18,
-                BLACK);
-        } else {
-            drawText(
-                "Pergunta",
-                MARGIN,
-                145,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawWrapped(
-                card.question,
-                MARGIN,
-                190,
-                390,
-                30,
-                6,
-                MnemosFontRole::Body18,
-                DARK_GRAY);
-
-            drawText(
-                "Resposta de referência",
-                504,
-                145,
-                MnemosFontRole::Meta14,
-                DARK_GRAY);
-
-            drawWrapped(
-                card.answer,
-                504,
-                190,
-                408,
-                31,
-                6,
-                MnemosFontRole::Body18,
-                BLACK);
+        // A pergunta em cima, menor e apagada; a resposta é o foco.
+        drawEyebrow("Pergunta", innerX, cardY + 50);
+        String q[3];
+        const uint8_t nq = wrapLines(card.question, innerW, MnemosFontRole::CardSmall, q, 3);
+        int32_t baseline = cardY + 94;
+        for (uint8_t i = 0; i < nq; ++i) {
+            drawText(q[i], innerX, baseline, MnemosFontRole::CardSmall, FAINT);
+            baseline += 34;
         }
+        const int32_t divider = baseline - 6;
+        fillRect(innerX, divider, innerW, 2, LINE);
+        drawEyebrow("Resposta", innerX, divider + 50);
+        drawCardText(card.answer, innerX, divider + 66, innerW,
+                     cardY + cardH - 24 - (divider + 66),
+                     MnemosFontRole::Card, 44, INK);
     }
 
-    drawPrimarySplit(
-        "Não recuperei",
-        "Recuperei");
-
+    drawPrimarySplit("Não lembrei", "Lembrei");
     refreshFull();
 }
 
@@ -5780,96 +5404,40 @@ void T5Display::showEffort(
     uint8_t total) {
 
     clearBuffer();
+    drawStudyHeader("Como foi lembrar?", position, total);
 
-    drawSystemBar(
-        "Esforço",
-        false,
-        true,
-        String(position + 1) +
-            " de " +
-            String(total),
-        true);
-
-    drawWrapped(
-        "Quanto esforço foi necessário "
-        "para recuperar a resposta?",
-        MARGIN,
-        portrait()
-            ? 250
-            : 180,
-        portrait()
-            ? logicalWidth() -
-                  2 * MARGIN
-            : 720,
-        portrait()
-            ? 36
-            : 32,
-        4,
-        MnemosFontRole::Title22,
-        BLACK);
-
-    drawText(
-        "Avalie o processo de recuperação, não a importância do tema.",
-        MARGIN,
-        portrait()
-            ? 430
-            : 285,
-        MnemosFontRole::Meta14,
-        DARK_GRAY);
-
-    /*
-     * Não usa drawPrimaryTriple().
-     *
-     * Usa exatamente o mesmo renderer dos cards de Decks,
-     * Conexão e Configurações, que já apresenta contraste
-     * correto no painel físico.
-     */
-    const HmiLayout::Rect visual =
-        HmiLayout::actionVisualRect(
-            portrait());
-
-    const int32_t gap =
-        portrait()
-            ? 12
-            : 16;
-
-    const int32_t buttonW =
-        (
-            visual.w -
-            2 * gap
-        ) /
-        3;
-
-    const String labels[3] = {
-        "Difícil",
-        "Normal",
-        "Fácil"
-    };
-
-    for (
-        uint8_t i = 0;
-        i < 3;
-        ++i
-    ) {
-        const int32_t x =
-            visual.x +
-            static_cast<int32_t>(i) *
-                (
-                    buttonW +
-                    gap
-                );
-
-        drawChoiceCard(
-            0,
-            labels[i],
-            x,
-            visual.y,
-            buttonW,
-            visual.h,
-            false,
-            '\0');
+    const int32_t cardW = logicalWidth() - 2 * MARGIN;
+    drawEyebrow("Esforço", MARGIN, 206);
+    String lines[3];
+    const uint8_t n = wrapLines(
+        "Quanto esforço foi necessário para lembrar a resposta?",
+        cardW, MnemosFontRole::Heading, lines, 3);
+    int32_t baseline = 252;
+    for (uint8_t i = 0; i < n; ++i) {
+        drawText(lines[i], MARGIN, baseline, MnemosFontRole::Heading, INK);
+        baseline += 36;
+    }
+    String hint[3];
+    const uint8_t nh = wrapLines(
+        "Avalie o processo de lembrar, não a importância do tema. "
+        "A resposta define quando o card volta.",
+        cardW, MnemosFontRole::Body, hint, 3);
+    baseline += 20;
+    for (uint8_t i = 0; i < nh; ++i) {
+        drawText(hint[i], MARGIN, baseline, MnemosFontRole::Body, MUTED);
+        baseline += 32;
     }
 
+    // As três notas do web, como pílulas na zona de ação.
+    const HmiLayout::Rect visual = HmiLayout::actionVisualRect(portrait());
+    const int32_t gap = 12;
+    const int32_t buttonW = (visual.w - 2 * gap) / 3;
+    const int32_t h = 68;
+    const int32_t y = visual.y + (visual.h - h) / 2;
+    const String labels[3] = {"Difícil", "Normal", "Fácil"};
+    for (uint8_t i = 0; i < 3; ++i) {
+        drawPill(visual.x + i * (buttonW + gap), y, buttonW, h, labels[i], i == 1);
+    }
     refreshFull();
 }
 
@@ -5881,136 +5449,57 @@ void T5Display::showSummary(
     const String& nextReview) {
 
     clearBuffer();
+    drawTopBar();
 
-    drawSystemBar(
-        stats.mode ==
-                SessionMode::Practice
-            ? "Prática concluída"
-            : "Sessão concluída",
-        false,
-        false,
-        "",
-        true);
+    const bool practice = stats.mode == SessionMode::Practice;
+    drawScreenHeader(practice ? "Prática concluída" : "Sessão concluída",
+                     practice ? "Prática livre" : "Revisão do dia");
 
-    if (portrait()) {
-        drawText(
-            String(
-                stats.reviewed) +
-                " cartões trabalhados",
-            MARGIN,
-            190,
-            MnemosFontRole::Title22,
-            BLACK);
+    // O bloco-âncora com o que a sessão rendeu.
+    const int32_t panelX = MARGIN;
+    const int32_t panelY = 196;
+    const int32_t panelW = logicalWidth() - 2 * MARGIN;
+    const int32_t panelH = 250;
+    drawGridPanel(panelX, panelY, panelW, panelH);
+    const int32_t px = panelX + 28;
+    drawEyebrow("Revisados", px, panelY + 48);
+    const String figure = String(stats.reviewed);
+    drawText(figure, px - 4, panelY + 150, MnemosFontRole::Display, INK);
+    drawText(stats.reviewed == 1 ? "card" : "cards",
+             px + textWidth(figure, MnemosFontRole::Display) + 10,
+             panelY + 150, MnemosFontRole::Body, MUTED);
 
-        drawText(
-            String(
-                stats.correct) +
-                " recuperados",
-            MARGIN,
-            260,
-            MnemosFontRole::Body18,
-            BLACK);
-
-        drawText(
-            String(
-                stats.incorrect) +
-                " para reforçar",
-            MARGIN,
-            315,
-            MnemosFontRole::Body18,
-            BLACK);
-
-        drawText(
-            "Próxima revisão",
-            MARGIN,
-            410,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
-
-        drawText(
-            nextReview.length()
-                ? nextReview
-                : "Sem revisão agendada",
-            MARGIN,
-            455,
-            MnemosFontRole::Body18,
-            BLACK);
-
-        const uint16_t maximum =
-            std::max<uint16_t>(
-                1,
-                std::max(
-                    remainingDue,
-                    remainingNew));
-
-        drawAgendaBar(
-            "Pendentes",
-            remainingDue,
-            maximum,
-            MARGIN,
-            560,
-            logicalWidth() -
-                2 * MARGIN);
-
-        drawAgendaBar(
-            "Novos",
-            remainingNew,
-            maximum,
-            MARGIN,
-            630,
-            logicalWidth() -
-                2 * MARGIN);
-    } else {
-        drawText(
-            String(
-                stats.reviewed) +
-                " cartões trabalhados",
-            MARGIN,
-            150,
-            MnemosFontRole::Title22,
-            BLACK);
-
-        drawText(
-            String(
-                stats.correct) +
-                " recuperados",
-            MARGIN,
-            210,
-            MnemosFontRole::Body18,
-            BLACK);
-
-        drawText(
-            String(
-                stats.incorrect) +
-                " para reforçar",
-            MARGIN,
-            250,
-            MnemosFontRole::Body18,
-            BLACK);
-
-        drawText(
-            "Próxima revisão",
-            504,
-            150,
-            MnemosFontRole::Meta14,
-            DARK_GRAY);
-
-        drawWrapped(
-            nextReview.length()
-                ? nextReview
-                : "Sem revisão agendada",
-            504,
-            190,
-            408,
-            32,
-            4,
-            MnemosFontRole::Body18,
-            BLACK);
+    // A proporção lembrados × para reforçar, na barra do web.
+    const int32_t barY = panelY + 182;
+    const int32_t barW = panelW - 56;
+    const uint16_t total = std::max<uint16_t>(1, stats.correct + stats.incorrect);
+    const int32_t okW = (barW * stats.correct) / total;
+    if (stats.correct > 0) {
+        fillRoundRect(px, barY, std::max<int32_t>(10, okW - 5), 10, 5, INK);
     }
+    if (stats.incorrect > 0) {
+        const int32_t x = stats.correct > 0 ? px + okW + 5 : px;
+        fillRoundRect(x, barY, px + barW - x, 10, 5, DECO);
+    }
+    drawText(String(stats.correct) + " lembrados", px, panelY + 228,
+             MnemosFontRole::Body, MUTED);
+    drawText(String(stats.incorrect) + " para reforçar",
+             rightAlignedTextOriginX(String(stats.incorrect) + " para reforçar",
+                                     panelX + panelW - 28, MnemosFontRole::Body),
+             panelY + 228, MnemosFontRole::Body, MUTED);
 
-    drawPrimaryButton(
-        "Continuar");
+    // O que vem depois, em ladrilhos.
+    const int32_t tileY = panelY + panelH + 20;
+    drawStatTile(MARGIN, tileY, panelW, 88, "Próxima revisão",
+                 nextReview.length() ? nextReview : String("Sem revisão agendada"),
+                 "");
+    const int32_t tileW = (panelW - 16) / 2;
+    drawStatTile(MARGIN, tileY + 104, tileW, 88, "Pendentes",
+                 String(remainingDue), remainingDue == 1 ? "card" : "cards");
+    drawStatTile(MARGIN + tileW + 16, tileY + 104, tileW, 88, "Novos",
+                 String(remainingNew), remainingNew == 1 ? "card" : "cards");
 
+    drawPrimaryButton("Continuar");
     refreshFull();
 }
 
@@ -6018,47 +5507,34 @@ void T5Display::showAbortConfirm(
     uint16_t remainingInQueue) {
 
     clearBuffer();
+    drawTopBar();
 
-    drawSystemBar(
-        "Interromper sessão?",
-        false,
-        false);
+    // A confirmação do web: título, o que acontece, e a opção segura cheia.
+    const int32_t w = logicalWidth() - 2 * MARGIN;
+    drawEyebrow("Sessão em andamento", MARGIN, 150);
+    String title[2];
+    const uint8_t nt = wrapLines("Encerrar a sessão agora?", w,
+                                 MnemosFontRole::Title, title, 2);
+    int32_t baseline = 206;
+    for (uint8_t i = 0; i < nt; ++i) {
+        drawText(title[i], MARGIN, baseline, MnemosFontRole::Title, INK);
+        baseline += 52;
+    }
 
-    drawWrapped(
-        "Os cartões já respondidos foram registrados. "
-        "Os " +
-            String(
-                remainingInQueue) +
-            " cartões restantes desta fila "
-            "voltam a aguardar revisão.",
-        MARGIN,
-        portrait()
-            ? 260
-            : 175,
-        logicalWidth() -
-            2 * MARGIN,
-        portrait()
-            ? 38
-            : 34,
-        portrait()
-            ? 8
-            : 5,
-        MnemosFontRole::Body18,
-        BLACK);
+    String body[6];
+    const uint8_t nb = wrapLines(
+        "Os cards que você já respondeu estão registrados. Os " +
+            String(remainingInQueue) +
+            (remainingInQueue == 1 ? " card restante volta"
+                                   : " cards restantes voltam") +
+            " para a fila de revisão.",
+        w, MnemosFontRole::Body, body, 6);
+    baseline += 16;
+    for (uint8_t i = 0; i < nb; ++i) {
+        drawText(body[i], MARGIN, baseline, MnemosFontRole::Body, MUTED);
+        baseline += 32;
+    }
 
-    drawText(
-        "A opção segura é continuar estudando.",
-        MARGIN,
-        portrait()
-            ? 610
-            : 350,
-        MnemosFontRole::Meta14,
-        DARK_GRAY);
-
-    drawPrimarySplit(
-        "Continuar estudando",
-        "Interromper sessão",
-        true);
-
+    drawPrimarySplit("Continuar", "Encerrar", true);
     refreshFull();
 }

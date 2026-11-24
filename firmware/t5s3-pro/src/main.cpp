@@ -8,6 +8,8 @@
 #include "backlight_service.h"
 #include "battery_service.h"
 #include "cards.h"
+#include <cstring>
+
 #include "config.h"
 #include "hmi_layout.h"
 #include "local_link_service.h"
@@ -503,6 +505,69 @@ bool menuAvailable() {
 
 bool orientationAvailable() {
     return false;
+}
+
+
+/*
+ * Telas com a barra de abas do web no celular (Hoje, Baralhos, Estudar,
+ * Sincronizar, Mais). Nelas os ícones antigos do topo não existem: a
+ * navegação é toda pelas abas.
+ */
+void addZone(
+    TouchZone* zones,
+    size_t& count,
+    const char* name,
+    int16_t x,
+    int16_t y,
+    int16_t w,
+    int16_t h,
+    UiAction action,
+    int8_t argument = -1);
+
+bool tabbedScreen() {
+    switch (screen) {
+        case AppScreen::Home:
+        case AppScreen::Menu:
+        case AppScreen::Decks:
+        case AppScreen::Agenda:
+        case AppScreen::Sync:
+        case AppScreen::Connection:
+        case AppScreen::Settings:
+        case AppScreen::Storage:
+            return true;
+        default:
+            return false;
+    }
+}
+
+void addTabZones(TouchZone* zones, size_t& count) {
+    static const char* const NAMES[HmiLayout::TAB_COUNT] = {
+        "tab_today", "tab_decks", "tab_study", "tab_sync", "tab_more"};
+    static const UiAction ACTIONS[HmiLayout::TAB_COUNT] = {
+        UiAction::Home,
+        UiAction::OpenDecks,
+        UiAction::PrimaryStudy,
+        UiAction::OpenSync,
+        UiAction::OpenMenu};
+
+    for (uint8_t i = 0; i < HmiLayout::TAB_COUNT; ++i) {
+        const HmiLayout::Rect r = HmiLayout::tab(i);
+        if (ACTIONS[i] == UiAction::Home && screen == AppScreen::Home) {
+            continue;
+        }
+        addZone(zones, count, NAMES[i], r.x, r.y, r.w, r.h, ACTIONS[i]);
+    }
+
+    // Subtelas do "Mais": "‹ Voltar" no topo.
+    if (
+        screen == AppScreen::Settings ||
+        screen == AppScreen::Connection ||
+        screen == AppScreen::Storage ||
+        screen == AppScreen::Agenda
+    ) {
+        addZone(zones, count, "top_back", 0, 0, 200, HmiLayout::TOP_BAR_H,
+                UiAction::Back);
+    }
 }
 
 
@@ -1643,7 +1708,17 @@ void addZone(
     int16_t w,
     int16_t h,
     UiAction action,
-    int8_t argument = -1) {
+    int8_t argument) {
+
+    // Nas telas com abas os botões "Voltar" não são desenhados; a volta é
+    // pelo topo ("top_back") ou pelas abas.
+    if (
+        tabbedScreen() &&
+        action == UiAction::Back &&
+        std::strcmp(name, "top_back") != 0
+    ) {
+        return;
+    }
 
     TouchZone& zone =
         zones[count++];
@@ -1696,12 +1771,17 @@ size_t buildTouchZones(
 
     const HmiLayout::Rect actionZone =
         HmiLayout::actionZone(
-            portrait);
+            portrait,
+            tabbedScreen());
 
     const int16_t actionTop =
         actionZone.y;
 
-        if (homeAvailable()) {
+    if (tabbedScreen()) {
+        addTabZones(zones, count);
+    }
+
+        if (!tabbedScreen() && homeAvailable()) {
 
 addZone(
             zones,
@@ -1714,7 +1794,7 @@ addZone(
             UiAction::Home);
     }
 
-    if (menuAvailable()) {
+    if (!tabbedScreen() && menuAvailable()) {
 
 addZone(
             zones,
@@ -1730,7 +1810,7 @@ addZone(
     }
 
 
-    if (menuAvailable()) {
+    if (!tabbedScreen() && menuAvailable()) {
         addZone(
             zones,
             count,
@@ -1777,18 +1857,18 @@ addZone(
     }
 
     switch (screen) {
-        case AppScreen::Home:
-            addZone(
-                zones,
-                count,
-                "home_primary",
-                actionZone.x,
-                actionZone.y,
-                actionZone.w,
-                actionZone.h,
-                UiAction::
-                    PrimaryStudy);
+        case AppScreen::Home: {
+            // O botão ao lado de "Hoje" e o bloco "Vencendo agora".
+            const HmiLayout::Rect pill = HmiLayout::HOME_STUDY_PILL;
+            addZone(zones, count, "home_primary",
+                    pill.x - 8, pill.y - 8, pill.w + 16, pill.h + 16,
+                    UiAction::PrimaryStudy);
+            const HmiLayout::Rect panel = HmiLayout::HOME_PANEL;
+            addZone(zones, count, "home_panel",
+                    panel.x, panel.y, panel.w, panel.h,
+                    UiAction::PrimaryStudy);
             break;
+        }
 
         case AppScreen::Menu: {
             const UiAction actions[4] = {
@@ -1934,9 +2014,9 @@ addZone(
                 zones,
                 count,
                 "agenda_back",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
-                width - 96,
+                width - 2 * HmiLayout::MARGIN,
                 portrait
                     ? 136
                     : 72,
@@ -1949,9 +2029,9 @@ addZone(
                     zones,
                     count,
                     "sync_account",
-                    48,
+                    HmiLayout::MARGIN,
                     290,
-                    width - 96,
+                    width - 2 * HmiLayout::MARGIN,
                     112,
                     UiAction::
                         SyncBackend);
@@ -1960,9 +2040,9 @@ addZone(
                     zones,
                     count,
                     "sync_phone",
-                    48,
+                    HmiLayout::MARGIN,
                     430,
-                    width - 96,
+                    width - 2 * HmiLayout::MARGIN,
                     112,
                     UiAction::
                         SyncPhone);
@@ -1971,7 +2051,7 @@ addZone(
                     zones,
                     count,
                     "sync_account",
-                    48,
+                    HmiLayout::MARGIN,
                     220,
                     408,
                     130,
@@ -1994,9 +2074,9 @@ addZone(
                 zones,
                 count,
                 "sync_back",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
-                width - 96,
+                width - 2 * HmiLayout::MARGIN,
                 portrait
                     ? 136
                     : 72,
@@ -2054,14 +2134,14 @@ addZone(
             const size_t visible = std::min<size_t>(wifiScanCount, 6);
             if (portrait) {
                 for (size_t i = 0; i < visible; ++i) {
-                    addZone(zones, count, "wifi_network", 48, 142 + static_cast<int16_t>(i) * 100, width - 96, 86, UiAction::SelectWifiNetwork, static_cast<int8_t>(i));
+                    addZone(zones, count, "wifi_network", HmiLayout::MARGIN, HmiLayout::wifiNetworkRowY(static_cast<uint8_t>(i)), width - 2 * HmiLayout::MARGIN, 86, UiAction::SelectWifiNetwork, static_cast<int8_t>(i));
                 }
             } else {
                 for (size_t i = 0; i < visible; ++i) {
-                    addZone(zones, count, "wifi_network", 48 + (i % 2) * 456, 112 + (i / 2) * 110, 408, 96, UiAction::SelectWifiNetwork, static_cast<int8_t>(i));
+                    addZone(zones, count, "wifi_network", HmiLayout::MARGIN + (i % 2) * 456, 112 + (i / 2) * 110, 408, 96, UiAction::SelectWifiNetwork, static_cast<int8_t>(i));
                 }
             }
-            addZone(zones, count, "wifi_rescan", 48, actionTop, width - 96, portrait ? 136 : 72, UiAction::ScanWifi);
+            addZone(zones, count, "wifi_rescan", HmiLayout::MARGIN, actionTop, width - 2 * HmiLayout::MARGIN, portrait ? 136 : 72, UiAction::ScanWifi);
             break;
         }
 
@@ -2069,7 +2149,7 @@ addZone(
             const size_t keyCount = wifiKeyboardCharCount(wifiKeyboardPage);
             const int16_t cols = portrait ? 6 : 9;
             const int16_t gap = portrait ? 6 : 8;
-            const int16_t totalW = width - 96;
+            const int16_t totalW = width - 2 * HmiLayout::MARGIN;
             const int16_t keyW = (totalW - (cols - 1) * gap) / cols;
             const int16_t keyH = portrait ? 58 : 46;
             const int16_t startY = portrait ? 300 : 212;
@@ -2079,7 +2159,7 @@ addZone(
                 const char key = wifiKeyboardCharAt(wifiKeyboardPage, i);
                 addZone(
                     zones, count, "wifi_key",
-                    48 + static_cast<int16_t>(i % cols) * (keyW + gap),
+                    HmiLayout::MARGIN + static_cast<int16_t>(i % cols) * (keyW + gap),
                     startY + static_cast<int16_t>(i / cols) * (keyH + gap),
                     keyW, keyH,
                     UiAction::WifiKey,
@@ -2094,19 +2174,19 @@ addZone(
             const int16_t w2 = usable * 18 / 100;
             const int16_t w3 = usable * 34 / 100;
             const int16_t w4 = usable - w1 - w2 - w3;
-            addZone(zones, count, "wifi_shift", 48, controlY, w1, controlH, UiAction::WifiShift);
-            addZone(zones, count, "wifi_symbols", 48 + w1 + controlGap, controlY, w2, controlH, UiAction::WifiSymbols);
-            addZone(zones, count, "wifi_space", 48 + w1 + w2 + 2 * controlGap, controlY, w3, controlH, UiAction::WifiSpace);
-            addZone(zones, count, "wifi_backspace", 48 + w1 + w2 + w3 + 3 * controlGap, controlY, w4, controlH, UiAction::WifiBackspace);
+            addZone(zones, count, "wifi_shift", HmiLayout::MARGIN, controlY, w1, controlH, UiAction::WifiShift);
+            addZone(zones, count, "wifi_symbols", HmiLayout::MARGIN + w1 + controlGap, controlY, w2, controlH, UiAction::WifiSymbols);
+            addZone(zones, count, "wifi_space", HmiLayout::MARGIN + w1 + w2 + 2 * controlGap, controlY, w3, controlH, UiAction::WifiSpace);
+            addZone(zones, count, "wifi_backspace", HmiLayout::MARGIN + w1 + w2 + w3 + 3 * controlGap, controlY, w4, controlH, UiAction::WifiBackspace);
 
-            const int16_t buttonW = (width - 96 - 24) / 2;
-            addZone(zones, count, "wifi_cancel", 48, actionTop, buttonW, portrait ? 136 : 72, UiAction::WifiCancel);
-            addZone(zones, count, "wifi_connect", 48 + buttonW + 24, actionTop, buttonW, portrait ? 136 : 72, UiAction::WifiConnect);
+            const int16_t buttonW = (width - 2 * HmiLayout::MARGIN - 24) / 2;
+            addZone(zones, count, "wifi_cancel", HmiLayout::MARGIN, actionTop, buttonW, portrait ? 136 : 72, UiAction::WifiCancel);
+            addZone(zones, count, "wifi_connect", HmiLayout::MARGIN + buttonW + 24, actionTop, buttonW, portrait ? 136 : 72, UiAction::WifiConnect);
             break;
         }
 
         case AppScreen::WifiMessage:
-            addZone(zones, count, "wifi_message_back", 48, actionTop, width - 96, portrait ? 136 : 72, UiAction::WifiCancel);
+            addZone(zones, count, "wifi_message_back", HmiLayout::MARGIN, actionTop, width - 2 * HmiLayout::MARGIN, portrait ? 136 : 72, UiAction::WifiCancel);
             break;
 
         case AppScreen::Storage: {
@@ -2192,9 +2272,9 @@ addZone(
                 zones,
                 count,
                 "local_cancel",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
-                width - 96,
+                width - 2 * HmiLayout::MARGIN,
                 portrait
                     ? 136
                     : 72,
@@ -2211,9 +2291,9 @@ addZone(
                 zones,
                 count,
                 "question_reveal",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
-                width - 96,
+                width - 2 * HmiLayout::MARGIN,
                 portrait
                     ? 136
                     : 72,
@@ -2226,7 +2306,7 @@ addZone(
                 24;
 
             const int16_t totalW =
-                width - 96;
+                width - 2 * HmiLayout::MARGIN;
 
             const int16_t buttonW =
                 (
@@ -2239,7 +2319,7 @@ addZone(
                 zones,
                 count,
                 "self_incorrect",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
                 buttonW,
                 portrait
@@ -2252,7 +2332,7 @@ addZone(
                 zones,
                 count,
                 "self_correct",
-                48 +
+                HmiLayout::MARGIN +
                     buttonW +
                     gap,
                 actionTop,
@@ -2271,9 +2351,9 @@ addZone(
                 zones,
                 count,
                 "feedback_continue",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
-                width - 96,
+                width - 2 * HmiLayout::MARGIN,
                 portrait
                     ? 136
                     : 72,
@@ -2288,7 +2368,7 @@ addZone(
                     : 16;
 
             const int16_t totalW =
-                width - 96;
+                width - 2 * HmiLayout::MARGIN;
 
             const int16_t buttonW =
                 (
@@ -2321,7 +2401,7 @@ addZone(
                     zones,
                     count,
                     names[i],
-                    48 +
+                    HmiLayout::MARGIN +
                         i *
                             (
                                 buttonW +
@@ -2342,9 +2422,9 @@ addZone(
                 zones,
                 count,
                 "summary_continue",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
-                width - 96,
+                width - 2 * HmiLayout::MARGIN,
                 portrait
                     ? 136
                     : 72,
@@ -2356,7 +2436,7 @@ addZone(
                 24;
 
             const int16_t totalW =
-                width - 96;
+                width - 2 * HmiLayout::MARGIN;
 
             const int16_t buttonW =
                 (
@@ -2369,7 +2449,7 @@ addZone(
                 zones,
                 count,
                 "abort_cancel",
-                48,
+                HmiLayout::MARGIN,
                 actionTop,
                 buttonW,
                 portrait
@@ -2382,7 +2462,7 @@ addZone(
                 zones,
                 count,
                 "abort_confirm",
-                48 +
+                HmiLayout::MARGIN +
                     buttonW +
                     gap,
                 actionTop,
@@ -2548,6 +2628,26 @@ void processAction(
     ) {
         renderSync();
         return;
+    }
+
+    // A aba "Baralhos" abre a lista de qualquer tela com abas, não só do Menu.
+    if (
+        action == UiAction::OpenDecks &&
+        tabbedScreen() &&
+        screen != AppScreen::Decks
+    ) {
+        renderDecks();
+        return;
+    }
+
+    // A aba central "Estudar" faz o mesmo que o botão do Hoje.
+    if (
+        action == UiAction::PrimaryStudy &&
+        tabbedScreen() &&
+        screen != AppScreen::Home &&
+        screen != AppScreen::Decks
+    ) {
+        screen = AppScreen::Home;
     }
 
     switch (action) {
@@ -2742,8 +2842,9 @@ void processAction(
                                 argument));
 
                     wifiHint = "";
-
                 }
+
+                renderWifiPassword();
             } else if (
                 action ==
                 UiAction::WifiSpace
@@ -2754,8 +2855,9 @@ void processAction(
                 ) {
                     wifiPassword += ' ';
                     wifiHint = "";
-
                 }
+
+                renderWifiPassword();
             } else if (
                 action ==
                 UiAction::WifiBackspace
@@ -2770,7 +2872,7 @@ void processAction(
                 }
 
                 wifiHint = "";
-
+                renderWifiPassword();
             } else if (
                 action ==
                 UiAction::WifiShift
@@ -2937,6 +3039,9 @@ void processAction(
                     sdStatus = "Falha ao exportar: " + sdCardService.lastError();
                 }
                 renderStorage();
+            } else if (action == UiAction::Back) {
+                // "‹ Voltar" do topo: o Armazenamento abre a partir de Configurações.
+                renderSettings();
             }
             break;
 
@@ -3611,6 +3716,41 @@ void handleSerialCommand(JsonDocument& command) {
         prepareForSleep();
         delay(200);
         ESP.restart();
+        return;
+    }
+
+    /*
+     * Só na bancada: a imagem exata do canvas e um toque sintético, para
+     * revisar o desenho das telas pelo computador
+     * (tools/hmi_capture.py). Nunca no firmware de produto.
+     */
+    if (Config::BENCH_BUILD && cmd == "screen") {
+        display.dumpCanvas(Serial);
+        return;
+    }
+
+    if (Config::BENCH_BUILD && cmd == "tap") {
+        MnemosTouchPoint point;
+        point.x = static_cast<int16_t>(command["x"] | -1);
+        point.y = static_cast<int16_t>(command["y"] | -1);
+        point.rawX = point.x;
+        point.rawY = point.y;
+
+        const RoutedTouch routed = routeTouch(point);
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = routed.action != UiAction::None;
+        response["screen"] = appScreenName(screen);
+        response["zone"] = routed.zone;
+        response["action"] = uiActionName(routed.action);
+        SerialConsole::reply(response);
+
+        if (routed.action != UiAction::None) {
+            lastAcceptedTouchMs = millis();
+            display.showTouchFeedback(
+                routed.x, routed.y, routed.w, routed.h);
+            processAction(routed.action, routed.argument);
+        }
         return;
     }
 

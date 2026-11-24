@@ -101,7 +101,7 @@ firmware não cria tarefas FreeRTOS próprias.
 
 | Módulo | Responsabilidade |
 |---|---|
-| `t5_display`, `mnemos_fonts` | composição das telas em retrato 540×960, fontes bitmap e refresh do ED047TC1 via epdiy |
+| `t5_display`, `mnemos_fonts` | composição das telas em retrato 540×960, fontes em 16 tons e refresh do ED047TC1 via epdiy |
 | `touch_input` | GT911 e conversão para coordenadas lógicas |
 | `power_service` | BQ25896, light sleep, auto-off e hard-off |
 | `battery_service` | BQ27220 somente leitura e estimativa de carga |
@@ -133,6 +133,34 @@ Onde ficam os dados:
   `/mnemos/decks`, `/mnemos/export` e `/mnemos/update` (OTA);
 - NVS (Preferences): perfis de Wi-Fi, URL do backend, token do terminal,
   preferências de HMI e nível do front light.
+
+## Interface
+
+As telas seguem o design system "Marinho" do web e do app
+([docs/design/DESIGN-SYSTEM.md](../../docs/design/DESIGN-SYSTEM.md)), na
+escala desta tela: ~1,4 px por px CSS do celular.
+
+- **Navegação.** Barra do topo com a marca, e barra de abas embaixo (Hoje,
+  Baralhos, Estudar, Sincronizar, Mais), como o web no celular. As subtelas
+  do "Mais" voltam pelo "‹ Voltar" do topo. O estudo tem topo próprio: "‹"
+  pausa e volta ao Hoje, "×" pede para encerrar.
+- **Medidas.** `include/hmi_layout.h` é a fonte única: o desenho e as zonas
+  de toque de `main.cpp` leem as mesmas constantes (`MARGIN`, `GUTTER`,
+  `TAB_BAR_Y`, `actionZone(portrait, tabbed)`...).
+- **Fontes.** Geist, Geist Mono, Literata e um recorte da Noto Sans SC,
+  rasterizados em 16 tons. Para mudar um tamanho, edite a tabela `ROLES` de
+  `tools/fonts/gen_mnemos_fonts.py` e gere de novo `src/mnemos_font_data.h`.
+- **Cinzas.** Mais escuros que os do web: o ED047TC1 mostra os tons claros
+  bem mais claros que um LCD (conferido com câmera). A escala fica no topo de
+  `src/t5_display.cpp` (`INK` … `PAPER`).
+
+Para revisar o desenho pelo computador, o firmware de bancada aceita
+`mnemos screen` (envia o canvas) e `{"cmd":"tap","x":..,"y":..}` (toque
+sintético). `tools/hmi_capture.py` usa os dois:
+
+```bash
+uv run --no-project --python 3.12 --with pyserial==3.5 --with pillow==11.1.0     python tools/hmi_capture.py COM3 tap 162 908 baralhos.png
+```
 
 ## Testes e CI
 
