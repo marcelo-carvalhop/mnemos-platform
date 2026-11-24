@@ -3,6 +3,7 @@
 The whole §7 flow, in the order the app walks it:
 
     POST /v1/generation/uploads   → a pre-signed PUT, for a PDF or a photo
+    POST /v1/generation/briefing  → what the material is, and what matters in it
     POST /v1/generation/jobs      → enqueue; the quota is reserved here
     GET  /v1/generation/jobs/{id} → poll: the named stage §5.5 shows
     GET  .../jobs/{id}/queue      → the cards, for approval (§7.8)
@@ -10,7 +11,8 @@ The whole §7 flow, in the order the app walks it:
     POST .../jobs/{id}/approve-all
     POST .../jobs/{id}/close      → approved rows become real cards
 
-Nothing here talks to the model. The API enqueues and reports; the worker
+Only the briefing talks to the model, and it only reads the first pages of
+a file to ask a few questions. The API enqueues and reports; the worker
 generates (§4.2, §11.7). That is what keeps a request cheap and lets a
 generation outlive the HTTP call that asked for it.
 """
@@ -23,9 +25,11 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.config import get_settings
 from app.contract import TOPIC_MAX_CHARS
 from app.deps import CurrentUser, DbSession, Identity
-from app.generation import service, storage
+from app.generation import briefing, service, storage
+from app.generation import pdf as pdf_tools
 from app.models import GenerationJob
 from app.quota.service import QuotaExhausted
 
@@ -53,9 +57,7 @@ class UploadResponse(BaseModel):
     response_model=UploadResponse,
     summary="A pre-signed URL to upload a PDF or photo",
 )
-def create_upload(
-    body: UploadRequest, user_id: CurrentUser, _session: DbSession
-) -> UploadResponse:
+def create_upload(body: UploadRequest, user_id: CurrentUser, _session: DbSession) -> UploadResponse:
     """The file never passes through this process (§7.2).
 
     The client PUTs straight to the bucket and sends back only the key, so the
@@ -75,6 +77,123 @@ def create_upload(
 
 
 # ---------------------------------------------------------------------------
+# Briefing: the short conversation before a PDF or photo becomes cards
+# ---------------------------------------------------------------------------
+
+
+class BriefingAnswer(BaseModel):
+    question: str = Field(min_length=1, max_length=200)
+    answer: str = Field(min_length=1, max_length=briefing.ANSWER_MAX_CHARS)
+
+
+class BriefingRequest(BaseModel):
+    source_type: Literal["pdf", "photo"]
+    upload_key: str = Field(min_length=1, max_length=255)
+    # 1 when the file was just uploaded; 2 after the person answered.
+    round: int = Field(default=1, ge=1, le=briefing.MAX_ROUNDS)
+    answers: list[BriefingAnswer] = Field(default_factory=list, max_length=briefing.MAX_ANSWERS)
+    note: str = Field(default="", max_length=briefing.NOTE_MAX_CHARS)
+
+
+class BriefingSection(BaseModel):
+    title: str
+    from_page: int
+    to_page: int
+
+
+class BriefingQuestion(BaseModel):
+    id: str
+    text: str
+    options: list[str]
+    multiple: bool = False
+
+
+class BriefingResponse(BaseModel):
+    summary: str
+    focus: str
+    suggested_count: int
+    sections: list[BriefingSection] = []
+    questions: list[BriefingQuestion] = []
+    page_count: int | None = None
+    refused: bool = False
+
+
+# A briefing reads the file into this process (generation does it in the
+# worker). The ceiling keeps that bounded; the web refuses bigger files first.
+BRIEFING_MAX_BYTES = 32 * 1024 * 1024
+
+
+@router.post(
+    "/briefing",
+    operation_id="briefGeneration",
+    response_model=BriefingResponse,
+    summary="What the uploaded material is, and what to ask before generating",
+)
+def brief(body: BriefingRequest, user_id: CurrentUser) -> BriefingResponse:
+    """Reads the start of the file and asks a few questions (`briefing.py`).
+
+    Synchronous on purpose: the screen waits for it, it reads at most
+    `pdf.PREVIEW_PAGES` pages, and it touches neither the quota nor the
+    database, so there is nothing for a worker to own.
+    """
+    if not body.upload_key.startswith(f"uploads/{user_id}/"):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "upload_key does not belong to you")
+
+    settings = get_settings()
+    if not settings.anthropic_api_key:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "briefing_not_configured")
+
+    try:
+        briefing.limiter.hit(user_id, per_minute=briefing.PER_MINUTE, per_day=briefing.PER_DAY)
+    except briefing.limits_error() as exc:
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "briefing_rate_limited",
+            headers={"Retry-After": str(exc.retry_after)},
+        ) from exc
+
+    try:
+        content_type, data = storage.fetch(body.upload_key)
+    except storage.UploadUnavailable as exc:
+        # Most often the PUT never reached the bucket (CORS, a dropped
+        # connection): there is no object under the key.
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "upload_not_found") from exc
+
+    if len(data) > BRIEFING_MAX_BYTES:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, "file_too_large")
+
+    if body.source_type == "pdf":
+        content_type = "application/pdf"
+    try:
+        material = briefing.prepare(content_type, data)
+    except pdf_tools.PdfUnreadable as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "pdf_unreadable") from exc
+
+    turn = briefing.Turn(
+        round=body.round,
+        answers=tuple(briefing.Answer(a.question, a.answer) for a in body.answers),
+        note=body.note.strip(),
+    )
+    try:
+        result = briefing.ask(briefing.client_for(settings.anthropic_api_key), material, turn)
+    except briefing.BriefingUnavailable as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, "briefing_unavailable") from exc
+
+    return BriefingResponse(
+        summary=result.summary,
+        focus=result.focus,
+        suggested_count=result.suggested_count,
+        sections=[BriefingSection(**vars(s)) for s in result.sections],
+        questions=[
+            BriefingQuestion(id=q.id, text=q.text, options=list(q.options), multiple=q.multiple)
+            for q in result.questions
+        ],
+        page_count=result.page_count,
+        refused=result.refused,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Jobs (§7.3)
 # ---------------------------------------------------------------------------
 
@@ -89,6 +208,11 @@ class JobRequest(BaseModel):
     upload_key: str | None = None
     requested_count: int = Field(default=10, ge=1, le=50)
     level: Literal["basico", "intermediario", "avancado"] = "intermediario"
+
+    # PDF and photo: the briefing's instruction, possibly edited by the person,
+    # and for a PDF the pages to read (1-based, inclusive). Empty = everything.
+    focus: str | None = Field(default=None, max_length=briefing.FOCUS_MAX_CHARS)
+    page_ranges: list[tuple[int, int]] | None = Field(default=None, max_length=20)
 
 
 class JobResponse(BaseModel):
@@ -143,6 +267,15 @@ def create_job(body: JobRequest, user_id: CurrentUser, session: DbSession) -> Jo
     if body.upload_key and not body.upload_key.startswith(f"uploads/{user_id}/"):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "upload_key does not belong to you")
 
+    ranges = None
+    if body.page_ranges:
+        if body.source_type != "pdf":
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "page_ranges is for pdf")
+        if any(start < 1 or end < start for start, end in body.page_ranges):
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid page range")
+        ranges = [[start, end] for start, end in body.page_ranges]
+    focus = (body.focus or "").strip() or None
+
     try:
         job = service.enqueue(
             session,
@@ -153,6 +286,8 @@ def create_job(body: JobRequest, user_id: CurrentUser, session: DbSession) -> Jo
             upload_key=body.upload_key,
             requested_count=body.requested_count,
             level=body.level,
+            focus=focus if body.source_type in ("pdf", "photo") else None,
+            page_ranges=ranges,
         )
     except service.UnknownDeck as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc

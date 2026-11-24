@@ -23,6 +23,8 @@ dependencies = [
     "cryptography>=44.0",
     "google-auth[requests]>=2.36",
     "regex>=2024.11",
+    # Briefing e geração: ler o sumário e recortar as páginas escolhidas.
+    "pypdf>=5.1",
 ]
 
 [project.optional-dependencies]

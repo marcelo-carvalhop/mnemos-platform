@@ -165,6 +165,7 @@ textarea:focus {
   margin: 0 0 var(--mn-gap-4);
 }
 .sources button {
+  min-width: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -322,7 +323,7 @@ textarea:focus {
 
 @media (max-width: 1000px) {
   .split {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -334,4 +335,107 @@ textarea:focus {
   .counts button {
     white-space: nowrap;
   }
+}
+
+/* --- PDF e foto: o arquivo escolhido e a leitura da IA -------------------- */
+
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: var(--mn-gap-4);
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  background: var(--mn-surface-raised);
+}
+.file-row svg {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: var(--mn-text-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.file-row .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.file-row .size {
+  font-size: 12.5px;
+  color: var(--mn-text-faint);
+}
+.file-row .change,
+.fallback .link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--mn-highlight);
+  font-size: 14px;
+}
+
+/* Lendo: a marca da IA pulsando e duas linhas que ainda não são texto. */
+.reading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: var(--mn-gap-4);
+}
+.reading .avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--mn-ai);
+  animation: mn-breathe 1.6s var(--mn-ease) infinite;
+}
+.reading > div {
+  flex: 1;
+}
+.reading p {
+  margin: 4px 0 10px;
+  font-weight: 500;
+}
+.reading .bar {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--mn-ai-soft);
+  border: 1px solid var(--mn-line);
+  margin-bottom: 8px;
+}
+.reading .bar.short {
+  width: 60%;
+}
+@keyframes mn-breathe {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+}
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: var(--mn-gap-4);
+}
+.fallback p {
+  margin: 0;
+  color: var(--mn-text-muted);
+}
+.fallback label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 500;
+}
+.fallback .link {
+  align-self: flex-start;
 }

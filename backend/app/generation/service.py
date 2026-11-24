@@ -54,6 +54,8 @@ def enqueue(
     level: str = "intermediario",
     topic: str | None = None,
     upload_key: str | None = None,
+    focus: str | None = None,
+    page_ranges: list[list[int]] | None = None,
     now: datetime | None = None,
 ) -> GenerationJob:
     """Reserves quota and enqueues in **one transaction** (§4.2).
@@ -97,6 +99,8 @@ def enqueue(
         level=level,
         topic=topic,
         upload_key=upload_key,
+        focus=focus,
+        page_ranges=page_ranges,
         created_at=now,
         quota_reservation_id=reservation_id,
     )

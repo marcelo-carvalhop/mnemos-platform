@@ -1,0 +1,208 @@
+/* A conversa antes de gerar. A IA tem a marca de IA (o gradiente, só nela);
+   o resto é o vocabulário do Marinho: pílulas, bordas finas, sobrancelha. */
+
+:host {
+  display: block;
+}
+
+.talk {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mn-gap-4);
+  transition: opacity 0.2s var(--mn-ease);
+}
+.talk.thinking {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.msg {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--mn-ai);
+  position: relative;
+}
+/* A faísca: um losango branco no centro do círculo da IA. */
+.avatar::after {
+  content: '';
+  position: absolute;
+  inset: 11px;
+  background: var(--mn-text-on-hero);
+  transform: rotate(45deg);
+  border-radius: 2px;
+}
+.bubble {
+  flex: 1;
+  background: var(--mn-ai-soft);
+  border: 1px solid var(--mn-line);
+  border-radius: 4px var(--mn-radius-lg) var(--mn-radius-lg) var(--mn-radius-lg);
+  padding: 12px 16px;
+}
+.bubble p {
+  margin: 0;
+  line-height: 1.5;
+}
+.who {
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+  margin-bottom: 4px !important;
+}
+
+/* Cada pergunta fala em nome da IA, alinhada ao balão. */
+.ask {
+  padding-left: 44px;
+}
+.ask > p {
+  margin: 0 0 10px;
+  font-weight: 500;
+}
+.aside {
+  font-weight: 400;
+  color: var(--mn-text-faint);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  border: 1px solid var(--mn-line-strong);
+  background: var(--mn-surface-raised);
+  color: var(--mn-text-muted);
+  border-radius: var(--mn-radius-pill);
+  padding: 8px 14px;
+  font-size: 14px;
+  text-align: left;
+}
+.chip:hover {
+  border-color: var(--mn-accent);
+  color: var(--mn-text);
+}
+.chip.on {
+  background: var(--mn-accent);
+  border-color: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+}
+.chip.other {
+  border-style: dashed;
+}
+.chip .pages {
+  margin-left: 6px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.other-input,
+.note textarea,
+.plan-edit {
+  width: 100%;
+  font: inherit;
+  color: var(--mn-text);
+  background: var(--mn-surface-raised);
+  border: 1px solid var(--mn-line-strong);
+  border-radius: var(--mn-radius-lg);
+  padding: 10px 12px;
+}
+.other-input {
+  margin-top: 10px;
+}
+.other-input:focus,
+.note textarea:focus,
+.plan-edit:focus {
+  outline: none;
+  border-color: var(--mn-highlight);
+}
+
+.note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 44px;
+  font-weight: 500;
+}
+.note textarea {
+  resize: vertical;
+  font-weight: 400;
+}
+
+/* O que vai ser gerado: a instrução que a pessoa confere antes de gastar. */
+.plan {
+  border: 1px solid var(--mn-line);
+  border-left: 3px solid var(--mn-highlight);
+  border-radius: var(--mn-radius-lg);
+  padding: 14px 16px;
+  background: var(--mn-surface-raised);
+}
+.plan-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mn-text-faint);
+}
+.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--mn-highlight);
+  font-size: 14px;
+}
+.plan-text {
+  margin: 8px 0 0;
+  white-space: pre-line;
+  line-height: 1.55;
+  color: var(--mn-text);
+}
+.plan-edit {
+  margin-top: 8px;
+  resize: vertical;
+}
+.scope {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  color: var(--mn-text-faint);
+}
+.scope.warn {
+  color: var(--mn-again);
+}
+
+.refine {
+  align-self: flex-start;
+  border: 1px solid var(--mn-line-strong);
+  background: none;
+  color: var(--mn-text);
+  border-radius: var(--mn-radius-pill);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.refine:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@media (max-width: 600px) {
+  .ask,
+  .note {
+    padding-left: 0;
+  }
+  .refine {
+    align-self: stretch;
+  }
+}

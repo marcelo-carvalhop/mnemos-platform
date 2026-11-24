@@ -408,6 +408,12 @@ class GenerationJob(Base):
     topic: Mapped[str | None] = mapped_column(Text, nullable=True)
     upload_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # PDF and photo: what the person wants from the material (the briefing's
+    # instruction, possibly edited) and, for a PDF, the pages to read —
+    # [[from, to], ...], 1-based and inclusive. Null means the whole file.
+    focus: Mapped[str | None] = mapped_column(Text, nullable=True)
+    page_ranges: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

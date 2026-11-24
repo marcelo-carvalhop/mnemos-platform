@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.contract import ErrorCode
 
 from . import model as model_api
+from . import pdf as pdf_tools
 from . import service, storage
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ def run_one(session: Session, client: object) -> str | None:
     topic = job.topic
     level = job.level
     requested = job.requested_count
+    focus = job.focus
+    page_ranges = [tuple(r) for r in (job.page_ranges or [])]
     # The claim is committed on its own so that no other worker picks the job
     # up while the model is thinking, and so the row lock is not held across
     # the network call.
@@ -52,7 +55,21 @@ def run_one(session: Session, client: object) -> str | None:
     logger.info("job %s claimed (%s)", job_id, source_type)
 
     try:
-        content = _build_content(source_type, upload_key, topic, level, requested)
+        content = _build_content(
+            source_type, upload_key, topic, level, requested, focus, page_ranges
+        )
+    except pdf_tools.TooManyPages as exc:
+        logger.warning("job %s: too many pages: %s", job_id, exc)
+        service.fail(session, job_id, ErrorCode.PAGE_LIMIT_EXCEEDED, str(exc), refund=True)
+        session.commit()
+        return job_id
+    except pdf_tools.PdfUnreadable as exc:
+        # The person's file, not our infrastructure — but nothing was generated,
+        # so the allowance still comes back.
+        logger.warning("job %s: pdf unreadable: %s", job_id, exc)
+        service.fail(session, job_id, ErrorCode.MATERIAL_INSUFFICIENT, str(exc), refund=True)
+        session.commit()
+        return job_id
     except storage.UploadUnavailable as exc:
         # Infrastructure, so the allowance comes back (§7.7).
         logger.warning("job %s: upload unavailable: %s", job_id, exc)
@@ -95,14 +112,14 @@ def _build_content(
     topic: str | None,
     level: str,
     requested_count: int,
+    focus: str | None = None,
+    page_ranges: list[tuple[int, int]] | None = None,
 ) -> list[dict]:
     if source_type == "topic":
         return model_api.build_content(level=level, requested_count=requested_count, topic=topic)
 
     if source_type == "text":
-        return model_api.build_content(
-            level=level, requested_count=requested_count, material=topic
-        )
+        return model_api.build_content(level=level, requested_count=requested_count, material=topic)
 
     if upload_key is None:
         raise storage.UploadUnavailable(f"{source_type} job has no upload key")
@@ -110,8 +127,24 @@ def _build_content(
     content_type, data = storage.fetch(upload_key)
 
     if source_type == "pdf" or content_type == _PDF:
-        return model_api.build_content(level=level, requested_count=requested_count, pdf=data)
+        pages = None
+        info = pdf_tools.inspect(data)
+        ranges = pdf_tools.normalise_ranges(list(page_ranges or []), info.page_count)
+        reading = sum(end - start + 1 for start, end in ranges) if ranges else info.page_count
+        if reading > pdf_tools.MAX_GENERATION_PAGES:
+            raise pdf_tools.TooManyPages(f"{reading} pages")
+        if ranges and ranges != [(1, info.page_count)]:
+            # Only the chosen pages go to the model: cheaper, and the cards are
+            # about what the person asked for.
+            data = pdf_tools.cut(data, ranges)
+            pages = pdf_tools.describe_ranges(ranges)
+        return model_api.build_content(
+            level=level, requested_count=requested_count, pdf=data, focus=focus, pages=pages
+        )
 
     return model_api.build_content(
-        level=level, requested_count=requested_count, images=[(content_type, data)]
+        level=level,
+        requested_count=requested_count,
+        images=[(content_type, data)],
+        focus=focus,
     )

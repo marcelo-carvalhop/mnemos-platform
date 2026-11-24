@@ -31,6 +31,36 @@ export interface PendingCard {
   decision: string | null;
 }
 
+/** Uma parte do PDF que vale escolher: capítulo, unidade, aula. */
+export interface BriefingSection {
+  title: string;
+  from_page: number;
+  to_page: number;
+}
+
+/** Uma pergunta curta com opções de tocar. */
+export interface BriefingQuestion {
+  id: string;
+  text: string;
+  options: string[];
+  multiple: boolean;
+}
+
+/**
+ * O que a IA entendeu do material antes de gerar: o que ele é, as partes, até
+ * três perguntas e a instrução que vai guiar os cards (`focus`), que a pessoa
+ * pode editar. Ver `backend/app/generation/briefing.py`.
+ */
+export interface Briefing {
+  summary: string;
+  focus: string;
+  suggested_count: number;
+  sections: BriefingSection[];
+  questions: BriefingQuestion[];
+  page_count: number | null;
+  refused: boolean;
+}
+
 export interface Quota {
   remaining: number;
   limit: number;
@@ -83,6 +113,28 @@ export class Generation {
     );
   }
 
+  /**
+   * A conversa antes de gerar: lê o começo do material e pergunta o que importa.
+   * `round` 2 manda as respostas da primeira; não há terceira.
+   */
+  async briefing(input: {
+    sourceType: 'pdf' | 'photo';
+    uploadKey: string;
+    round?: number;
+    answers?: { question: string; answer: string }[];
+    note?: string;
+  }): Promise<Briefing> {
+    return this.call<Briefing>(
+      this.http.post<Briefing>(`${this.baseUrl}/v1/generation/briefing`, {
+        source_type: input.sourceType,
+        upload_key: input.uploadKey,
+        round: input.round ?? 1,
+        answers: input.answers ?? [],
+        note: input.note ?? '',
+      }),
+    );
+  }
+
   async create(input: {
     sourceType: 'topic' | 'text' | 'pdf' | 'photo';
     targetDeckId: string;
@@ -90,6 +142,10 @@ export class Generation {
     uploadKey?: string;
     requestedCount?: number;
     level?: string;
+    /** PDF e foto: o que a pessoa quer do material, saído do briefing. */
+    focus?: string;
+    /** PDF: as páginas a ler, 1 a N, inclusivas. Vazio é o arquivo inteiro. */
+    pageRanges?: [number, number][];
   }): Promise<GenerationJob> {
     return this.call<GenerationJob>(
       this.http.post<GenerationJob>(`${this.baseUrl}/v1/generation/jobs`, {
@@ -99,6 +155,8 @@ export class Generation {
         upload_key: input.uploadKey,
         requested_count: input.requestedCount ?? 10,
         level: input.level ?? 'intermediario',
+        focus: input.focus || undefined,
+        page_ranges: input.pageRanges?.length ? input.pageRanges : undefined,
       }),
     );
   }

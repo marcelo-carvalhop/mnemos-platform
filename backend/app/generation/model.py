@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+from html import escape
 
 import anthropic
 
@@ -105,6 +106,8 @@ def build_content(
     material: str | None = None,
     pdf: bytes | None = None,
     images: list[tuple[str, bytes]] | None = None,
+    focus: str | None = None,
+    pages: str | None = None,
 ) -> list[dict]:
     """Assembles the user turn.
 
@@ -112,6 +115,16 @@ def build_content(
     the material before being told what to do with it.
     """
     instruction = f"Nível: {level}.\nGere {requested_count} flashcards."
+    if pages:
+        instruction += f"\nO documento acima traz só estas páginas do original: {pages}."
+    if focus and focus.strip():
+        # O que a pessoa quer deste material, vindo do briefing. Escapado: é
+        # texto dela, e não pode fechar a tag e virar instrução.
+        instruction += (
+            "\n\nO QUE A PESSOA QUER DESTE MATERIAL — siga com prioridade e não "
+            "gere cards do que ficar fora disto:\n"
+            f"<foco>{escape(focus.strip(), quote=False)}</foco>"
+        )
     content: list[dict] = []
 
     if pdf is not None:

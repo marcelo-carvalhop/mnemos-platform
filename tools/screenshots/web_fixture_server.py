@@ -332,6 +332,81 @@ def open_chat_after_load(question, reveal):
     )
 
 
+BRIEFING = {
+    "summary": "É uma apostila de Redes de Computadores, com 84 páginas, sobre a "
+    "camada de transporte: UDP, TCP e controle de congestionamento.",
+    "focus": "Cards sobre o funcionamento do TCP: conexão, confiabilidade e controle "
+    "de congestionamento, com as perguntas que costumam cair em prova.",
+    "suggested_count": 12,
+    "sections": [
+        {"title": "Camada de transporte", "from_page": 1, "to_page": 14},
+        {"title": "UDP", "from_page": 15, "to_page": 26},
+        {"title": "TCP: conexão e confiabilidade", "from_page": 27, "to_page": 58},
+        {"title": "Controle de congestionamento", "from_page": 59, "to_page": 84},
+    ],
+    "questions": [
+        {
+            "id": "objetivo",
+            "text": "Para que você está estudando?",
+            "options": ["Prova da faculdade", "Concurso", "Certificação", "Trabalho"],
+            "multiple": False,
+        },
+        {
+            "id": "prioridade",
+            "text": "O que os cards devem priorizar?",
+            "options": ["Conceitos", "Comparações", "Números e campos", "Casos práticos"],
+            "multiple": True,
+        },
+    ],
+    "page_count": 84,
+    "refused": False,
+}
+
+BRIEFING_PHOTO = {
+    "summary": "Parece uma página de caderno sobre a equação de Bhaskara e o "
+    "discriminante, com dois exemplos resolvidos.",
+    "focus": "Cards sobre a fórmula de Bhaskara e o que o discriminante diz sobre as raízes.",
+    "suggested_count": 8,
+    "sections": [],
+    "questions": [
+        {
+            "id": "nivel",
+            "text": "Quer cards só da teoria ou também dos exemplos?",
+            "options": ["Só a teoria", "Teoria e exemplos"],
+            "multiple": False,
+        }
+    ],
+    "page_count": None,
+    "refused": False,
+}
+
+
+def pick_file_after_load(kind, picks):
+    """Escolhe um arquivo de mentira na tela Criar e, depois do briefing,
+    toca nos chips pedidos — para fotografar a conversa antes de gerar."""
+    label = "PDF" if kind == "pdf" else "Foto"
+    name = "Redes - camada de transporte.pdf" if kind == "pdf" else "caderno.jpg"
+    mime = "application/pdf" if kind == "pdf" else "image/jpeg"
+    chips = json.dumps(picks)
+    return (
+        "<script>(function(){var t=setInterval(function(){"
+        "var b=[].slice.call(document.querySelectorAll('.sources button'))"
+        f".filter(function(x){{return x.textContent.trim()==={json.dumps(label)};}})[0];"
+        "if(!b)return;clearInterval(t);b.click();"
+        "setTimeout(function(){var i=document.querySelector('.drop input[type=file]');"
+        f"var f=new File(['%PDF-1.4'],{json.dumps(name)},{{type:{json.dumps(mime)}}});"
+        "var d=new DataTransfer();d.items.add(f);i.files=d.files;"
+        "i.dispatchEvent(new Event('change',{bubbles:true}));"
+        f"var picks={chips};var u=setInterval(function(){{"
+        "var cs=[].slice.call(document.querySelectorAll('app-briefing button.chip'));"
+        "if(!cs.length)return;clearInterval(u);"
+        "picks.forEach(function(p){var c=cs.filter(function(x){"
+        "return x.textContent.indexOf(p)>=0;})[0];if(c)c.click();});"
+        "},100);},200);},80);"
+        "setTimeout(function(){clearInterval(t);},10000);})()</script>"
+    )
+
+
 def frame_page(src):
     """Headless Chrome não diagrama abaixo de ~500 px: a largura de celular
     vem de um iframe de 390×844 dentro de uma janela maior."""
@@ -463,6 +538,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/v1/generation/"):
             return self._generation(method, path)
 
+        if path == "/v1/fixture-put":
+            return self._json({})
+
         if path == "/v1/chat" and method == "POST":
             context = (getattr(self, "_body", None) or {}).get("context") or {}
             if context.get("kind") == "card":
@@ -487,6 +565,18 @@ class Handler(SimpleHTTPRequestHandler):
         exigir um id que só existe depois de gastar uma geração.
         """
         self._log(f"generation {path}")
+        if path == "/v1/generation/uploads":
+            # The PUT comes back to this server (do_PUT → /v1/fixture-put).
+            return self._json(
+                {"upload_key": "uploads/fixture/1", "url": "/api/v1/fixture-put", "expires_in": 600}
+            )
+        if path == "/v1/generation/briefing":
+            body = getattr(self, "_body", None) or {}
+            brief = dict(BRIEFING if body.get("source_type") == "pdf" else BRIEFING_PHOTO)
+            if (body.get("round") or 1) >= 2:
+                brief["questions"] = []
+                brief["focus"] = brief["focus"] + " Para prova da faculdade, com comparações."
+            return self._json(brief)
         if path.rstrip("/") == "/v1/generation/jobs":
             # MNEMOS_FIXTURE_OPEN_JOB=1 shows the shortcut to a waiting queue;
             # off by default so the documented captures stay as they are.
@@ -558,6 +648,13 @@ class Handler(SimpleHTTPRequestHandler):
                 html = html.replace("<body>", "<body>" + BOOT, 1)
             if parsed.path == "/moldura":
                 html = frame_page((query.get("src") or ["/hoje"])[0])
+            elif "arquivo" in query:
+                picks = [p for p in (query.get("escolher") or [""])[0].split(",") if p]
+                html = html.replace(
+                    "</body>",
+                    pick_file_after_load(query["arquivo"][0], picks) + "</body>",
+                    1,
+                )
             elif "chat" in query:
                 html = html.replace(
                     "</body>",

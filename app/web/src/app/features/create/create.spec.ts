@@ -23,6 +23,37 @@ describe('Create', () => {
     create: vi.fn(),
     createUpload: vi.fn(),
     upload: vi.fn(),
+    briefing: vi.fn(),
+  };
+
+  const BRIEF = {
+    summary: 'É uma apostila de redes, capítulo 3.',
+    focus: 'Cards sobre controle de congestionamento do TCP.',
+    suggested_count: 9,
+    sections: [
+      { title: 'Camada de transporte', from_page: 1, to_page: 12 },
+      { title: 'TCP', from_page: 13, to_page: 30 },
+    ],
+    questions: [
+      {
+        id: 'objetivo',
+        text: 'Para que você está estudando?',
+        options: ['Prova', 'Faculdade'],
+        multiple: false,
+      },
+    ],
+    page_count: 30,
+    refused: false,
+  };
+
+  const pickPdf = () => {
+    fixture.componentInstance['source'].set('pdf');
+    fixture.componentInstance['file'].set({
+      name: 'Redes de computadores - cap 3.pdf',
+      blob: new File(['%PDF'], 'x.pdf', { type: 'application/pdf' }),
+      contentType: 'application/pdf',
+      size: 2048,
+    });
   };
 
   const text = () => fixture.nativeElement.textContent as string;
@@ -38,6 +69,7 @@ describe('Create', () => {
     api.create.mockReset();
     api.createUpload.mockReset();
     api.upload.mockReset();
+    api.briefing.mockReset();
     api.quota.mockResolvedValue({ remaining: 1, limit: 1, plan: 'free' });
 
     TestBed.configureTestingModule({
@@ -180,7 +212,7 @@ describe('Create', () => {
     );
   });
 
-  it('o arquivo sobe antes de o baralho nascer', async () => {
+  it('o arquivo sobe e a IA lê antes de o baralho nascer', async () => {
     // Na ordem inversa, um 415 no upload deixa para trás um baralho vazio que
     // ninguém pediu.
     const order: string[] = [];
@@ -189,28 +221,88 @@ describe('Create', () => {
       return { upload_key: 'uploads/u/abc', url: 'https://storage.test/put' };
     });
     api.upload.mockResolvedValue(undefined);
+    api.briefing.mockImplementation(async () => {
+      order.push('briefing');
+      return BRIEF;
+    });
     api.create.mockImplementation(async () => {
       order.push('create');
       return { id: 'job', status: 'queued', stage: 'na fila' };
     });
     await build();
 
-    fixture.componentInstance['source'].set('pdf');
-    fixture.componentInstance['file'].set({
-      name: 'Redes de computadores - cap 3.pdf',
-      blob: new File(['%PDF'], 'x.pdf', { type: 'application/pdf' }),
-      contentType: 'application/pdf',
-      size: 2048,
-    });
+    pickPdf();
+    await fixture.componentInstance['startBriefing']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(text()).toContain('É uma apostila de redes');
+    expect(text()).toContain('Para que você está estudando?');
+    // A quantidade sugerida (9) vira a opção mais próxima.
+    expect(fixture.componentInstance['count']()).toBe(8);
+    expect(store.decks()).toEqual([]);
+
     await fixture.componentInstance['generate']();
 
-    expect(order).toEqual(['upload', 'create']);
+    expect(order).toEqual(['upload', 'briefing', 'create']);
     expect(api.create).toHaveBeenCalledWith(
-      expect.objectContaining({ sourceType: 'pdf', uploadKey: 'uploads/u/abc' }),
+      expect.objectContaining({
+        sourceType: 'pdf',
+        uploadKey: 'uploads/u/abc',
+        focus: 'Cards sobre controle de congestionamento do TCP.',
+      }),
     );
     // O nome do arquivo já disse do que trata; perguntar de novo seria pedir
     // duas vezes a mesma coisa. A extensão não faz parte do nome do baralho.
     expect(store.decks().map((d) => d.name)).toEqual(['Redes de computadores - cap 3']);
+  });
+
+  it('as partes e as respostas escolhidas vão para a geração', async () => {
+    api.createUpload.mockResolvedValue({ upload_key: 'uploads/u/abc', url: 'https://s/put' });
+    api.upload.mockResolvedValue(undefined);
+    api.briefing.mockResolvedValue(BRIEF);
+    api.create.mockResolvedValue({ id: 'job', status: 'queued', stage: 'na fila' });
+    await build();
+    pickPdf();
+    await fixture.componentInstance['startBriefing']();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    const chip = (label: string) =>
+      [...(fixture.nativeElement as HTMLElement).querySelectorAll('button.chip')].find((b) =>
+        b.textContent!.includes(label),
+      ) as HTMLButtonElement;
+    chip('TCP').click();
+    chip('Prova').click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+
+    expect(text()).toContain('Lendo 18 de 30 páginas.');
+    await fixture.componentInstance['generate']();
+
+    const sent = api.create.mock.calls[0][0];
+    expect(sent.pageRanges).toEqual([[13, 30]]);
+    expect(sent.focus).toContain('Partes escolhidas: TCP.');
+    expect(sent.focus).toContain('Para que você está estudando? Prova.');
+  });
+
+  it('se a leitura falhar, ainda dá para dizer o foco e gerar', async () => {
+    api.createUpload.mockResolvedValue({ upload_key: 'uploads/u/abc', url: 'https://s/put' });
+    api.upload.mockResolvedValue(undefined);
+    api.briefing.mockRejectedValue(new ApiError(502));
+    api.create.mockResolvedValue({ id: 'job', status: 'queued', stage: 'na fila' });
+    await build();
+    pickPdf();
+    await fixture.componentInstance['startBriefing']();
+    fixture.detectChanges();
+
+    expect(text()).toContain('Não consegui ler o material agora');
+    fixture.componentInstance['fallbackFocus'].set('Só os prazos');
+    await fixture.componentInstance['generate']();
+
+    expect(api.create).toHaveBeenCalledWith(
+      expect.objectContaining({ focus: 'Só os prazos', uploadKey: 'uploads/u/abc' }),
+    );
   });
 
   it('upload que falha não deixa baralho vazio para trás', async () => {
@@ -224,7 +316,9 @@ describe('Create', () => {
       contentType: 'image/jpeg',
       size: 1024,
     });
+    await fixture.componentInstance['startBriefing']();
     await fixture.componentInstance['generate']();
+    expect(api.briefing).not.toHaveBeenCalled();
 
     expect(store.decks()).toEqual([]);
     expect(api.create).not.toHaveBeenCalled();

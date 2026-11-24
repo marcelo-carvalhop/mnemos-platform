@@ -3,12 +3,20 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { TOPIC_MAX_CHARS } from '../../core/contract.g';
 import { failureForCode, failureForError } from '../../core/error-copy';
-import { Generation } from '../../core/generation';
+import { type Briefing, Generation } from '../../core/generation';
 import { Store } from '../../core/store';
 import { Sync } from '../../core/sync';
+import { BriefingTalk, type BriefingChoice } from './briefing';
 
 /** De onde os cards podem vir. Os mesmos quatro do aplicativo. */
 export type CreateSource = 'topic' | 'text' | 'pdf' | 'photo';
+
+/**
+ * PDF e foto passam por uma conversa antes de gerar (`briefing.ts`):
+ * escolher → subir → a IA ler → conversar. Se a leitura falhar, a tela cai
+ * num pedido simples e ainda dá para gerar.
+ */
+export type UploadStage = 'pick' | 'uploading' | 'reading' | 'brief' | 'fallback';
 
 /** §7.2 — o teto do servidor. Descobrir depois de subir 40 MB é a pior hora. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -39,7 +47,7 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 @Component({
   selector: 'app-create',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, RouterLink, BriefingTalk],
   styleUrl: './create.css',
   template: `
     <div class="split">
@@ -106,38 +114,90 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
           }
 
           @default {
-            <!-- Soltar o arquivo na página é o gesto nativo do navegador, e o
+            @if (file() && stage() !== 'pick') {
+              <div class="file-row">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="fileIcon()" /></svg>
+                <span class="name">{{ file()!.name }}</span>
+                <span class="size mn-mono">{{ sizeLabel(file()!.size) }}</span>
+                <button type="button" class="change" [disabled]="busy()" (click)="resetUpload()">
+                  Trocar
+                </button>
+              </div>
+
+              @switch (stage()) {
+                @case ('brief') {
+                  <app-briefing
+                    [brief]="briefing()!"
+                    [round]="round()"
+                    [thinking]="refining()"
+                    [source]="uploadSource()"
+                    (changed)="choice.set($event)"
+                    (refine)="refineBrief($event)"
+                  />
+                }
+                @case ('fallback') {
+                  <div class="fallback">
+                    <p>{{ fallbackReason() }}</p>
+                    <label>
+                      <span>O que é importante para você neste material?</span>
+                      <textarea
+                        rows="3"
+                        maxlength="2000"
+                        placeholder="Ex.: só o capítulo 4; é para a prova da OAB; foque nos prazos."
+                        [ngModel]="fallbackFocus()"
+                        (ngModelChange)="fallbackFocus.set($event)"
+                      ></textarea>
+                    </label>
+                    <button type="button" class="link" (click)="startBriefing()">
+                      Tentar ler de novo
+                    </button>
+                  </div>
+                }
+                @default {
+                  <div class="reading" role="status">
+                    <span class="avatar" aria-hidden="true"></span>
+                    <div>
+                      <p>{{ stage() === 'uploading' ? 'Enviando o arquivo…' : readingLine() }}</p>
+                      <span class="bar"></span>
+                      <span class="bar short"></span>
+                    </div>
+                  </div>
+                }
+              }
+            } @else {
+              <!-- Soltar o arquivo na página é o gesto nativo do navegador, e o
                  botão continua ali para quem prefere o seletor. Um só dos dois
                  deixaria metade das pessoas sem o caminho que conhece. -->
-            <label
-              class="drop"
-              [class.over]="dragging()"
-              (dragover)="onDragOver($event)"
-              (dragleave)="dragging.set(false)"
-              (drop)="onDrop($event)"
-            >
-              <input
-                type="file"
-                [accept]="accept()"
-                (change)="onPick($event)"
-                [attr.aria-label]="source() === 'pdf' ? 'Escolher PDF' : 'Escolher foto'"
-              />
-              @if (file(); as chosen) {
-                <span class="name">{{ chosen.name }}</span>
-                <span class="size mn-mono">{{ sizeLabel(chosen.size) }}</span>
-              } @else {
-                <span class="name">{{
-                  source() === 'pdf' ? 'Escolha um PDF' : 'Escolha uma foto do seu material'
-                }}</span>
-                <span class="size">
-                  {{
-                    source() === 'pdf'
-                      ? 'Arraste o arquivo aqui, ou clique para procurar. Até 25 MB.'
-                      : 'JPEG, PNG ou WebP. Arraste aqui, ou clique para procurar.'
-                  }}
-                </span>
-              }
-            </label>
+              <label
+                class="drop"
+                [class.over]="dragging()"
+                (dragover)="onDragOver($event)"
+                (dragleave)="dragging.set(false)"
+                (drop)="onDrop($event)"
+              >
+                <input
+                  type="file"
+                  [accept]="accept()"
+                  (change)="onPick($event)"
+                  [attr.aria-label]="source() === 'pdf' ? 'Escolher PDF' : 'Escolher foto'"
+                />
+                @if (file(); as chosen) {
+                  <span class="name">{{ chosen.name }}</span>
+                  <span class="size mn-mono">{{ sizeLabel(chosen.size) }}</span>
+                } @else {
+                  <span class="name">{{
+                    source() === 'pdf' ? 'Escolha um PDF' : 'Escolha uma foto do seu material'
+                  }}</span>
+                  <span class="size">
+                    {{
+                      source() === 'pdf'
+                        ? 'Arraste o arquivo aqui, ou clique para procurar. Até 25 MB.'
+                        : 'JPEG, PNG ou WebP. Arraste aqui, ou clique para procurar.'
+                    }}
+                  </span>
+                }
+              </label>
+            }
           }
         }
 
@@ -282,6 +342,18 @@ export class Create {
     size: number;
   } | null>(null);
   protected readonly dragging = signal(false);
+
+  // A conversa de PDF e foto.
+  protected readonly stage = signal<UploadStage>('pick');
+  protected readonly uploadKey = signal<string | null>(null);
+  protected readonly briefing = signal<Briefing | null>(null);
+  protected readonly round = signal(1);
+  protected readonly refining = signal(false);
+  protected readonly choice = signal<BriefingChoice | null>(null);
+  protected readonly fallbackFocus = signal('');
+  protected readonly fallbackReason = signal('');
+  /** Cada arquivo novo invalida o que ainda estava em voo para o anterior. */
+  private attempt = 0;
   protected readonly level = signal('intermediario');
   protected readonly count = signal(12);
   protected readonly busy = signal(false);
@@ -340,24 +412,47 @@ export class Create {
       case 'text':
         return this.material().trim().length > 0 && this.material().length <= this.topicMax;
       default:
-        return this.file() !== null;
+        return (
+          this.file() !== null &&
+          this.uploadKey() !== null &&
+          (this.stage() === 'fallback' ||
+            (this.stage() === 'brief' && !this.refining() && !this.choice()?.tooManyPages))
+        );
     }
   });
 
-  /** O que ainda falta para o botão acender — dito no lugar da frase genérica. */
-  protected readonly missing = computed(
-    () =>
-      ({
-        topic: 'Escreva o assunto para continuar.',
-        text: 'Cole o texto para continuar.',
-        pdf: 'Escolha um PDF para continuar.',
-        photo: 'Escolha uma foto para continuar.',
-      })[this.source()],
+  protected readonly uploadSource = computed<'pdf' | 'photo'>(() =>
+    this.source() === 'photo' ? 'photo' : 'pdf',
   );
+
+  protected readonly readingLine = computed(() =>
+    this.source() === 'pdf' ? 'Lendo o seu PDF…' : 'Olhando a sua foto…',
+  );
+
+  protected readonly fileIcon = computed(
+    () => this.sources.find((option) => option.value === this.source())?.icon ?? '',
+  );
+
+  /** O que ainda falta para o botão acender — dito no lugar da frase genérica. */
+  protected readonly missing = computed(() => {
+    const source = this.source();
+    if ((source === 'pdf' || source === 'photo') && this.file()) {
+      if (this.stage() === 'brief' && this.choice()?.tooManyPages) {
+        return 'Escolha as partes do PDF para continuar.';
+      }
+      return this.stage() === 'uploading' ? 'Enviando o arquivo…' : 'Lendo o material…';
+    }
+    return {
+      topic: 'Escreva o assunto para continuar.',
+      text: 'Cole o texto para continuar.',
+      pdf: 'Escolha um PDF para continuar.',
+      photo: 'Escolha uma foto para continuar.',
+    }[source];
+  });
 
   protected readonly busyLabel = computed(() => {
     if (!this.busy()) return `Gerar ${this.count()} cards`;
-    return this.source() === 'pdf' || this.source() === 'photo' ? 'Enviando…' : 'Criando…';
+    return 'Criando…';
   });
 
   /**
@@ -416,7 +511,20 @@ export class Create {
     // O arquivo escolhido não sobrevive à troca de origem: um PDF pendurado
     // enquanto a tela mostra "Foto" é a mesma contradição de sempre — a tela
     // dizendo uma coisa e o botão fazendo outra.
+    this.resetUpload();
+  }
+
+  /** Volta ao seletor de arquivo, esquecendo a conversa do anterior. */
+  protected resetUpload(): void {
+    this.attempt++;
     this.file.set(null);
+    this.stage.set('pick');
+    this.uploadKey.set(null);
+    this.briefing.set(null);
+    this.round.set(1);
+    this.refining.set(false);
+    this.choice.set(null);
+    this.fallbackFocus.set('');
   }
 
   protected onDragOver(event: DragEvent): void {
@@ -467,6 +575,100 @@ export class Create {
 
     this.problem.set(null);
     this.file.set({ name: file.name, blob: file, contentType: type, size: file.size });
+    this.uploadKey.set(null);
+    void this.startBriefing();
+  }
+
+  /**
+   * Sobe o arquivo e pede a primeira leitura, sem esperar um clique: escolher
+   * o arquivo já é dizer "é este".
+   */
+  protected async startBriefing(): Promise<void> {
+    const chosen = this.file();
+    if (!chosen) return;
+    const attempt = ++this.attempt;
+    this.problem.set(null);
+
+    let key = this.uploadKey();
+    if (!key) {
+      this.stage.set('uploading');
+      try {
+        const target = await this.generation.createUpload(chosen.contentType);
+        await this.generation.upload(target.url, chosen.blob, chosen.contentType);
+        key = target.upload_key;
+      } catch (e) {
+        if (attempt !== this.attempt) return;
+        const failure = failureForError(e);
+        this.stage.set('pick');
+        this.file.set(null);
+        this.problem.set(`${failure.title}. ${failure.detail}`);
+        return;
+      }
+      if (attempt !== this.attempt) return;
+      this.uploadKey.set(key);
+    }
+
+    this.stage.set('reading');
+    try {
+      const brief = await this.generation.briefing({
+        sourceType: this.uploadSource(),
+        uploadKey: key,
+      });
+      if (attempt !== this.attempt) return;
+      this.applyBriefing(brief, 1);
+    } catch {
+      if (attempt !== this.attempt) return;
+      this.toFallback('Não consegui ler o material agora, mas dá para gerar assim mesmo.');
+    }
+  }
+
+  /** A segunda rodada: a IA relê com as respostas e fecha o foco. */
+  protected async refineBrief(choice: BriefingChoice): Promise<void> {
+    const key = this.uploadKey();
+    if (!key || this.refining()) return;
+    const attempt = this.attempt;
+    this.refining.set(true);
+    try {
+      const brief = await this.generation.briefing({
+        sourceType: this.uploadSource(),
+        uploadKey: key,
+        round: 2,
+        answers: choice.answers,
+        note: choice.note,
+      });
+      if (attempt !== this.attempt) return;
+      this.applyBriefing(brief, 2);
+    } catch {
+      // A primeira leitura continua na tela, e as respostas entram no foco
+      // mesmo sem a segunda rodada: nada se perde.
+      if (attempt === this.attempt) {
+        this.problem.set('Não consegui ajustar agora. Suas respostas entram assim mesmo.');
+      }
+    } finally {
+      if (attempt === this.attempt) this.refining.set(false);
+    }
+  }
+
+  private applyBriefing(brief: Briefing, round: number): void {
+    if (brief.refused) {
+      this.toFallback(brief.summary);
+      return;
+    }
+    this.briefing.set(brief);
+    this.round.set(round);
+    this.stage.set('brief');
+    // A quantidade sugerida vira a escolha mais próxima entre as quatro.
+    const nearest = this.countOptions.reduce((best, option) =>
+      Math.abs(option - brief.suggested_count) < Math.abs(best - brief.suggested_count)
+        ? option
+        : best,
+    );
+    this.count.set(nearest);
+  }
+
+  private toFallback(reason: string): void {
+    this.fallbackReason.set(reason);
+    this.stage.set('fallback');
   }
 
   protected sizeLabel(bytes: number): string {
@@ -480,24 +682,15 @@ export class Create {
     this.busy.set(true);
     this.problem.set(null);
 
-    const chosen = this.file();
-    let uploadKey: string | undefined;
-
-    // O arquivo sobe **antes** de o baralho nascer. Na ordem inversa, um 415 ou
-    // uma queda no meio do upload deixaria para trás um baralho vazio que a
-    // pessoa não pediu.
-    if (chosen) {
-      try {
-        const target = await this.generation.createUpload(chosen.contentType);
-        await this.generation.upload(target.url, chosen.blob, chosen.contentType);
-        uploadKey = target.upload_key;
-      } catch (e) {
-        this.busy.set(false);
-        const failure = failureForError(e);
-        this.problem.set(`${failure.title}. ${failure.detail}`);
-        return;
-      }
-    }
+    // O arquivo já subiu na conversa — antes de o baralho nascer. Na ordem
+    // inversa, um 415 ou uma queda no meio do upload deixaria para trás um
+    // baralho vazio que a pessoa não pediu.
+    const uploadKey = this.uploadKey() ?? undefined;
+    const fromFile = this.source() === 'pdf' || this.source() === 'photo';
+    const focus = fromFile
+      ? (this.stage() === 'fallback' ? this.fallbackFocus() : (this.choice()?.focus ?? '')).trim()
+      : undefined;
+    const pageRanges = this.source() === 'pdf' ? this.choice()?.ranges : undefined;
 
     const name = this.deckName();
     const deckId = this.store.createDeck(name);
@@ -518,6 +711,8 @@ export class Create {
         uploadKey,
         requestedCount: this.count(),
         level: this.level(),
+        focus: focus || undefined,
+        pageRanges,
       });
       await this.router.navigate(['/gerar', job.id], { queryParams: { deck: deckId } });
     } catch (e) {
