@@ -407,6 +407,36 @@ def pick_file_after_load(kind, picks):
     )
 
 
+def long_card_after_load(reveal):
+    """Pergunta e resposta longas no estudo, para conferir que a ação da base
+    (\"Ver a resposta\" / \"Como foi?\") continua à vista."""
+    front = (
+        "Explique, com as palavras do protocolo, por que o TCP reduz a janela de "
+        "congestionamento pela metade ao receber três ACKs duplicados, mas volta à "
+        "partida lenta quando o temporizador de retransmissão expira, e o que cada "
+        "um desses sinais diz sobre o estado da rede naquele momento."
+    )
+    back = " ".join(
+        [
+            "Três ACKs duplicados indicam que segmentos posteriores ao perdido chegaram:",
+            "a rede ainda entrega dados, então a perda é pontual e o emissor reduz a",
+            "cwnd à metade (recuperação rápida) sem voltar ao início.",
+        ]
+        * 6
+    )
+    press = (
+        "var r=document.querySelector('.reveal');if(r)r.click();" if reveal else ""
+    )
+    return (
+        "<script>(function(){var t=setInterval(function(){"
+        "var f=document.querySelector('.card .front');if(!f)return;clearInterval(t);"
+        f"f.textContent={json.dumps(front)};{press}"
+        "setTimeout(function(){var b=document.querySelector('.card .back');"
+        f"if(b)b.textContent={json.dumps(back)};}},150);"
+        "},80);setTimeout(function(){clearInterval(t);},8000);})()</script>"
+    )
+
+
 def frame_page(src):
     """Headless Chrome não diagrama abaixo de ~500 px: a largura de celular
     vem de um iframe de 390×844 dentro de uma janela maior."""
@@ -648,6 +678,10 @@ class Handler(SimpleHTTPRequestHandler):
                 html = html.replace("<body>", "<body>" + BOOT, 1)
             if parsed.path == "/moldura":
                 html = frame_page((query.get("src") or ["/hoje"])[0])
+            elif "longo" in query:
+                html = html.replace(
+                    "</body>", long_card_after_load("revelar" in query) + "</body>", 1
+                )
             elif "arquivo" in query:
                 picks = [p for p in (query.get("escolher") or [""])[0].split(",") if p]
                 html = html.replace(

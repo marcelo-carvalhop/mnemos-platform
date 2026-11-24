@@ -293,10 +293,20 @@
   text-align: center;
   margin-bottom: 14px;
 }
-/* Depois da entrada da IA, o "Como foi?" precisa de ar: colado nela, lia como
- * legenda do botão. */
-.ask + .eyebrow.centred {
-  margin-top: var(--mn-gap-5);
+/* A ação do card presa à base da tela: "Ver a resposta" e, depois, "Como
+ * foi?" com as quatro notas ficam visíveis seja qual for o tamanho da pergunta
+ * ou da resposta. O texto longo rola por trás e some num esmaecido em vez de
+ * passar por baixo dos botões com corte seco. */
+.dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: var(--mn-gap-4);
+  padding: 28px 0 calc(var(--mn-gap-4) + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, transparent, var(--mn-surface) 28px);
+}
+.dock .reveal {
+  margin-top: 0;
 }
 
 .card .front {

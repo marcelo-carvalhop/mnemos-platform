@@ -106,29 +106,34 @@ import { ChatPanel } from '../chat/chat-panel';
         </div>
       }
 
-      @if (!revealed()) {
-        <button class="reveal" type="button" (click)="reveal()">
-          Ver a resposta
-          <kbd class="mn-mono">espaço</kbd>
-        </button>
-      } @else {
-        <p class="eyebrow mn-mono centred">Como foi?</p>
-        <div class="grades" role="group" aria-label="Como foi">
-          @for (grade of grades; track grade) {
-            <button
-              type="button"
-              [class]="'grade g' + grade"
-              (click)="answer(grade)"
-              [attr.aria-label]="labels[grade] + ', volta em ' + (intervals()[grade] | interval)"
-            >
-              <kbd class="mn-mono">{{ grade }}</kbd>
-              <span class="name">{{ labels[grade] }}</span>
-              <!-- §5.8.3: o intervalo aparece antes da escolha, não depois. -->
-              <span class="when mn-mono">{{ intervals()[grade] | interval }}</span>
-            </button>
-          }
-        </div>
-      }
+      <!-- O que se faz com o card fica sempre à vista, preso à base da tela:
+           com uma pergunta ou uma resposta longas, "Como foi?" sumia abaixo
+           da dobra e a pessoa tinha de rolar para responder. -->
+      <div class="dock">
+        @if (!revealed()) {
+          <button class="reveal" type="button" (click)="reveal()">
+            Ver a resposta
+            <kbd class="mn-mono">espaço</kbd>
+          </button>
+        } @else {
+          <p class="eyebrow mn-mono centred">Como foi?</p>
+          <div class="grades" role="group" aria-label="Como foi">
+            @for (grade of grades; track grade) {
+              <button
+                type="button"
+                [class]="'grade g' + grade"
+                (click)="answer(grade)"
+                [attr.aria-label]="labels[grade] + ', volta em ' + (intervals()[grade] | interval)"
+              >
+                <kbd class="mn-mono">{{ grade }}</kbd>
+                <span class="name">{{ labels[grade] }}</span>
+                <!-- §5.8.3: o intervalo aparece antes da escolha, não depois. -->
+                <span class="when mn-mono">{{ intervals()[grade] | interval }}</span>
+              </button>
+            }
+          </div>
+        }
+      </div>
     } @else if (loading()) {
       <p class="loading">Carregando sua fila…</p>
     } @else {
