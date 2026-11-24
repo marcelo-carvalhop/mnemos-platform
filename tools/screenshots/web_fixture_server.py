@@ -8,6 +8,7 @@ Every request is logged to requests.log so missing endpoints are visible.
 """
 
 import base64
+from html import escape as html_escape
 import json
 import os
 import random
@@ -307,6 +308,62 @@ def click_after_load(label):
     )
 
 
+def open_chat_after_load(question, reveal):
+    """Abre o chat da tela e, se houver pergunta, envia — para fotografar a
+    conversa. `reveal` aperta espaço antes, para o card do estudo aparecer com
+    a resposta."""
+    escaped = json.dumps(question)
+    press = (
+        "document.dispatchEvent(new KeyboardEvent('keydown',{key:' ',bubbles:true}));"
+        if reveal
+        else ""
+    )
+    return (
+        "<script>(function(){var t=setInterval(function(){"
+        "var b=document.querySelector('app-chat-panel .trigger');"
+        f"if(!b)return;clearInterval(t);{press}"
+        "setTimeout(function(){b.click();"
+        f"var q={escaped};if(!q)return;"
+        "setTimeout(function(){var f=document.querySelector('dialog textarea');"
+        "f.value=q;f.dispatchEvent(new Event('input'));"
+        "f.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));"
+        "},150);},150);},80);"
+        "setTimeout(function(){clearInterval(t);},8000);})()</script>"
+    )
+
+
+def frame_page(src):
+    """Headless Chrome não diagrama abaixo de ~500 px: a largura de celular
+    vem de um iframe de 390×844 dentro de uma janela maior."""
+    escaped = html_escape(src, quote=True)
+    return (
+        "<!doctype html><meta charset=utf-8>"
+        "<style>html,body{margin:0;background:#888}"
+        "iframe{display:block;width:390px;height:844px;border:0}</style>"
+        f'<iframe src="{escaped}"></iframe>'
+    )
+
+
+CHAT_REPLIES = {
+    "home": (
+        "Uma boa regra é estudar um pouco todo dia em vez de muito de uma vez.\n\n"
+        "Quando errar um card, tente lembrar a resposta antes de virá-lo de novo: "
+        "o esforço de recuperar é o que fixa a memória."
+    ),
+    "hidden": (
+        "Pense no que fica entre dois computadores ligados ao mesmo cabo ou ao mesmo "
+        "ponto de acesso. Que camada cuida de entregar dados só até o vizinho, sem "
+        "olhar o caminho inteiro?"
+    ),
+    "revealed": (
+        "Porque a camada de enlace só enxerga o trecho entre dois nós vizinhos. "
+        "Ela empacota os dados em quadros e decide quem pode transmitir no meio físico.\n\n"
+        "Exemplo: no Wi-Fi de casa, o notebook entrega o quadro ao roteador; daí em "
+        "diante, outra camada decide o caminho até o destino."
+    ),
+}
+
+
 class Handler(SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -406,6 +463,15 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith("/v1/generation/"):
             return self._generation(method, path)
 
+        if path == "/v1/chat" and method == "POST":
+            context = (getattr(self, "_body", None) or {}).get("context") or {}
+            if context.get("kind") == "card":
+                key = "revealed" if context.get("revealed") else "hidden"
+            else:
+                key = "home"
+            self._log(f"chat {key}")
+            return self._json({"reply": CHAT_REPLIES[key], "truncated": False, "refused": False})
+
         if path.startswith("/v1/account/export"):
             self._log("export")
             return self._json({"decks": TABLES["decks"], "cards": TABLES["cards"]})
@@ -487,9 +553,17 @@ class Handler(SimpleHTTPRequestHandler):
         if parsed.path == "/" or not os.path.isfile(local):
             html = open(os.path.join(ROOT, "index.html"), encoding="utf-8").read()
             # ?anon=1 renders the signed-out screens (landing, sign-in).
-            query = parse_qs(parsed.query)
+            query = parse_qs(parsed.query, keep_blank_values=True)
             if "anon" not in query:
                 html = html.replace("<body>", "<body>" + BOOT, 1)
+            if parsed.path == "/moldura":
+                html = frame_page((query.get("src") or ["/hoje"])[0])
+            elif "chat" in query:
+                html = html.replace(
+                    "</body>",
+                    open_chat_after_load(query["chat"][0], "revelar" in query) + "</body>",
+                    1,
+                )
             if "clique" in query:
                 html = html.replace(
                     "</body>", click_after_load(query["clique"][0]) + "</body>", 1
@@ -508,7 +582,7 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         api = self._api_path(parsed.path)
         if api:
-            self._read_body()
+            self._body = self._read_body()
             return self._api("POST", api, parse_qs(parsed.query))
         self.send_error(404)
 
