@@ -7,11 +7,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="O que você aprendeu, de volta na hora certa." />
     <meta name="color-scheme" content="light dark" />
-    <!-- O símbolo do Mnemos. O SVG se ajusta à aba escura; o .ico fica para
-         navegadores antigos e o PNG para a tela inicial do iPhone. -->
-    <link rel="icon" href="favicon.ico" sizes="48x48" />
-    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+    <!-- O símbolo do Mnemos. O SVG se ajusta à aba escura; os PNG servem ao
+         Safari do iPhone, que usa mal o SVG; o .ico fica para navegadores
+         antigos. O "?v=" muda o endereço quando o ícone muda: o Safari guarda
+         o ícone por site e não relê um endereço que já conhece (o do Angular
+         ficou preso assim). Trocou o desenho, suba o número. -->
+    <link rel="icon" href="favicon.ico?v=2" sizes="48x48" />
+    <link rel="icon" href="favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="icon" href="favicon-32.png?v=2" type="image/png" sizes="32x32" />
+    <link rel="icon" href="favicon-96.png?v=2" type="image/png" sizes="96x96" />
+    <link rel="icon" href="favicon-192.png?v=2" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2" sizes="180x180" />
     <meta name="theme-color" content="#fafbfc" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b1429" media="(prefers-color-scheme: dark)" />
   </head>
