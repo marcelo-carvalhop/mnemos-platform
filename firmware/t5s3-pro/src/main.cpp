@@ -1,4 +1,6 @@
 #include <Arduino.h>
+#include <LittleFS.h>
+#include <esp_heap_caps.h>
 #include <algorithm>
 #include <Preferences.h>
 #include <Wire.h>
@@ -3418,6 +3420,16 @@ void describeTerminal(JsonDocument& response) {
     response["pendingReviews"] = storage.pendingReviewCount();
     response["rejectedReviews"] = storage.rejectedReviewCount();
 
+    // Memória e disco: o HTTPS precisa de ~40 KB contíguos de RAM interna, e
+    // a biblioteca é regravada inteira no LittleFS a cada snapshot.
+    JsonObject memory = response["memory"].to<JsonObject>();
+    memory["internalFree"] = heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    memory["internalLargest"] =
+        heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    memory["psramFree"] = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
+    memory["littlefsUsed"] = LittleFS.usedBytes();
+    memory["littlefsTotal"] = LittleFS.totalBytes();
+
     JsonObject wifi = response["wifi"].to<JsonObject>();
     wifi["enabled"] = networkService.enabled();
     wifi["connected"] = networkService.connected();
@@ -3759,6 +3771,18 @@ void handleSerialCommand(JsonDocument& command) {
 
 
 void setup() {
+    // A RAM interna (~320 KB) é de quem não pode viver na PSRAM: Wi-Fi, TLS e
+    // DMA, que pedem MALLOC_CAP_INTERNAL explicitamente. O padrão do Arduino
+    // manda para a RAM interna toda alocação abaixo de 4 KB, e a biblioteca
+    // de cards, os JSON da sincronização e as filas de revisão são milhares
+    // de pedaços assim: somados, deixavam o handshake HTTPS sem memória
+    // ("SSL - Memory allocation failed") e a gravação do snapshot falhando
+    // (LittleFS com errno 12: 5 KB internos livres, maior bloco de 28 bytes),
+    // com 8 MB de PSRAM livres. A partir de 32 bytes o malloc comum vai para a
+    // PSRAM; com 256, os textos curtos dos cards (ids, nomes) ainda lotavam a
+    // RAM interna ao aplicar um snapshot de 94 cards.
+    heap_caps_malloc_extmem_enable(32);
+
     Serial.begin(
         115200);
 

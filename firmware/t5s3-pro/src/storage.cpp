@@ -1,4 +1,8 @@
 #include "storage.h"
+
+#include <cerrno>
+#include <cstring>
+#include <esp_heap_caps.h>
 #include "mnemos_contract_generated.h"
 
 #include <ArduinoJson.h>
@@ -161,17 +165,29 @@ bool Storage::saveLibrary(const CardDefinition* cards, const CardState* states, 
         (void)states;  // estados vivem em state.json; argumento preserva API transacional.
     }
 
+    if (doc.overflowed()) {
+        Serial.println("[storage] library: documento JSON sem memória");
+        return false;
+    }
     File file = LittleFS.open(TEMP_LIBRARY_PATH, "w");
-    if (!file) return false;
+    if (!file) {
+        Serial.println("[storage] library: não abriu o arquivo temporário");
+        return false;
+    }
     const size_t written = serializeJson(doc, file);
     file.flush();
     file.close();
     if (written == 0) {
+        Serial.println("[storage] library: nada gravado");
         LittleFS.remove(TEMP_LIBRARY_PATH);
         return false;
     }
     LittleFS.remove(LIBRARY_PATH);
-    return LittleFS.rename(TEMP_LIBRARY_PATH, LIBRARY_PATH);
+    if (!LittleFS.rename(TEMP_LIBRARY_PATH, LIBRARY_PATH)) {
+        Serial.println("[storage] library: rename falhou");
+        return false;
+    }
+    return true;
 }
 
 bool Storage::loadStates(CardState* states, size_t count) {
@@ -271,17 +287,34 @@ bool Storage::saveStates(const CardState* states, size_t count) {
         fsrs["initialized"] = states[i].fsrsInitialized;
     }
 
+    if (doc.overflowed()) {
+        Serial.println("[storage] state: documento JSON sem memória");
+        return false;
+    }
     File file = LittleFS.open(TEMP_STATE_PATH, "w");
-    if (!file) return false;
+    if (!file) {
+        Serial.printf(
+            "[storage] state: não abriu o arquivo temporário errno=%d (%s) interna=%u maior=%u\n",
+            errno,
+            strerror(errno),
+            static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)),
+            static_cast<unsigned>(heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL)));
+        return false;
+    }
     const size_t written = serializeJson(doc, file);
     file.flush();
     file.close();
     if (written == 0) {
+        Serial.println("[storage] state: nada gravado");
         LittleFS.remove(TEMP_STATE_PATH);
         return false;
     }
     LittleFS.remove(STATE_PATH);
-    return LittleFS.rename(TEMP_STATE_PATH, STATE_PATH);
+    if (!LittleFS.rename(TEMP_STATE_PATH, STATE_PATH)) {
+        Serial.println("[storage] state: rename falhou");
+        return false;
+    }
+    return true;
 }
 
 bool Storage::saveSession(const CardDefinition* cards,
