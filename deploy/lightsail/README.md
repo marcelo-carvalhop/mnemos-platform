@@ -9,7 +9,7 @@ Uma instância Lightsail roda Postgres, API, worker e Caddy (HTTPS e build da we
 | Bucket | `mnemos-uploads-71895761` | `us-east-2` |
 | Chave SSH | `mnemos-key` | `us-east-2` |
 
-Endereço: `https://mnemos.<ip-com-hífens>.sslip.io`. O `sslip.io` resolve o nome para o IP embutido nele, o que permite certificado Let's Encrypt sem domínio próprio. Trocar por um domínio próprio exige mudar `DOMAIN` no `.env`, apontar o DNS para o IP estático e acrescentar o novo endereço ao CORS do bucket (abaixo).
+Endereço: `https://mnemoscards.com` (registrado na Hostinger; registros A de `@` e `www` para o IP estático). O endereço anterior, `https://mnemos.<ip-com-hífens>.sslip.io`, fica em `LEGACY_DOMAIN`: a API continua respondendo nele, porque apps e terminais já pareados o chamam, e as páginas redirecionam para o domínio. `www` redireciona para o domínio sem `www`. Trocar de domínio exige mudar `DOMAIN` e `PUBLIC_WEB_URL` no `.env`, apontar o DNS para o IP estático e acrescentar o novo endereço ao CORS do bucket (abaixo).
 
 ### CORS do bucket
 
@@ -18,7 +18,7 @@ A web envia PDFs e fotos direto para o bucket, por URL pré-assinada, e o navega
 ```bash
 aws lightsail update-bucket --profile mnemos --region us-east-2 \
   --bucket-name mnemos-uploads-71895761 \
-  --cors '{"rules":[{"id":"web-upload","allowedMethods":["PUT"],"allowedOrigins":["https://mnemos.3-13-6-164.sslip.io"],"allowedHeaders":["content-type"],"maxAgeSeconds":3000}]}'
+  --cors '{"rules":[{"id":"web-upload","allowedMethods":["PUT"],"allowedOrigins":["https://mnemoscards.com","https://mnemos.3-13-6-164.sslip.io"],"allowedHeaders":["content-type"],"maxAgeSeconds":3000}]}'
 ```
 
 Com domínio próprio, liste os dois endereços em `allowedOrigins` durante a transição.

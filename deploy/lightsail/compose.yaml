@@ -80,6 +80,7 @@ services:
     restart: unless-stopped
     environment:
       DOMAIN: ${DOMAIN}
+      LEGACY_DOMAIN: ${LEGACY_DOMAIN}
     ports:
       - "80:80"
       - "443:443"

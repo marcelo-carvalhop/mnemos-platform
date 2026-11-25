@@ -3,7 +3,14 @@
 #   /api/*           -> API with the prefix stripped (the web build calls /api,
 #                       as the ng serve proxy does in development)
 #   everything else  -> Angular build, falling back to index.html for routes
-{$DOMAIN} {
+#
+# DOMAIN is the site's address. LEGACY_DOMAIN is the address it had before
+# (the sslip.io one): apps and terminals already paired keep calling its API,
+# and a redirect would break them — a client re-sending a POST with its body
+# after a 308 is not something to count on — so the API still answers there,
+# and only the pages move to the new address. www goes to the bare domain.
+
+(site) {
 	encode zstd gzip
 
 	# Registros de acesso por 6 meses: o Marco Civil (art. 15) exige, e a
@@ -37,4 +44,18 @@
 		try_files {path} /index.html
 		file_server
 	}
+}
+
+{$DOMAIN} {
+	import site
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} 308
+}
+
+{$LEGACY_DOMAIN} {
+	@pages not path /v1/* /healthz /api/*
+	redir @pages https://{$DOMAIN}{uri} 308
+	import site
 }
