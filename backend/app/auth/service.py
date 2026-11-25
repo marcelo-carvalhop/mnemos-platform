@@ -18,12 +18,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import Device, RefreshToken, User
+from app.models import Device, Invite, RefreshToken, User
 from app.quota import service as quota
 
 # §8.2 — "long-lived enough that a week in the subway changes nothing".
@@ -315,17 +315,70 @@ def invite_codes() -> list[str]:
     return [code.strip().lower() for code in raw.split(",") if code.strip()]
 
 
-def invite_matches(given: str | None) -> bool:
-    codes = invite_codes()
-    if not codes:
-        return True
-    candidate = (given or "").strip().lower().encode()
-    # Every code is compared, match or not, so the time taken says nothing
-    # about which one came close.
-    matched = False
-    for code in codes:
-        matched |= hmac.compare_digest(candidate, code.encode())
-    return matched
+def normalise_invite(code: str) -> str:
+    return code.strip().lower()
+
+
+def invite_hash(code: str) -> str:
+    return hashlib.sha256(normalise_invite(code).encode()).hexdigest()
+
+
+def invite_hint(code: str) -> str:
+    return normalise_invite(code)[:4]
+
+
+def find_invite(session: Session, given: str | None, *, now: datetime) -> Invite | None:
+    """The invite a code opens, or None when it opens nothing.
+
+    A code from INVITE_CODE that is not in the table yet becomes a row here,
+    named after its position in the list, so the people it brings in are
+    counted like everyone else's. A revoked code, or one that reached its
+    limit, opens nothing.
+    """
+    code = normalise_invite(given or "")
+    if not code:
+        return None
+
+    invite = session.execute(
+        select(Invite).where(Invite.code_hash == invite_hash(code))
+    ).scalar_one_or_none()
+
+    if invite is None:
+        listed = invite_codes()
+        # Every listed code is compared, match or not, so the time taken says
+        # nothing about which one came close.
+        position = 0
+        for index, candidate in enumerate(listed, start=1):
+            if hmac.compare_digest(code.encode(), candidate.encode()):
+                position = index
+        if not position:
+            return None
+        invite = Invite(
+            id=secrets.token_hex(18),
+            code_hash=invite_hash(code),
+            code_hint=invite_hint(code),
+            label=f"INVITE_CODE nº {position}",
+            created_at=now,
+        )
+        try:
+            with session.begin_nested():
+                session.add(invite)
+                session.flush()
+        except IntegrityError:
+            # Two signups with the same new code at once: the other made it.
+            invite = session.execute(
+                select(Invite).where(Invite.code_hash == invite_hash(code))
+            ).scalar_one()
+
+    if invite.revoked_at is not None:
+        return None
+    if invite.max_uses is not None:
+        used = session.execute(
+            select(func.count()).select_from(User).where(User.invite_id == invite.id)
+        ).scalar_one()
+        if used >= invite.max_uses:
+            return None
+    return invite
 
 
 def _new_verification(user: User, now: datetime) -> str:
@@ -357,9 +410,12 @@ def register(
     email = email.strip().lower()
 
     # The invite first: without it, the endpoint answers nothing about which
-    # addresses exist.
-    if not invite_matches(invite_code):
+    # addresses exist. On an open server a code is optional, and still
+    # recorded when it is a real one.
+    invite = find_invite(session, invite_code, now=now)
+    if invite is None and settings.invite_only:
         raise InviteInvalid("invalid invite code")
+    invite_id = invite.id if invite is not None else None
 
     user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
     if user is not None:
@@ -369,6 +425,7 @@ def register(
         # mistyped password. Take the new password and send a fresh link; the
         # old link stops working, so only the latest attempt can be confirmed.
         user.password_hash = hash_password(password)
+        user.invite_id = invite_id or user.invite_id
         token = _new_verification(user, now)
         session.flush()
         return Registration(email=email, pair=None, verification_token=token)
@@ -378,6 +435,7 @@ def register(
         email=email,
         password_hash=hash_password(password),
         email_verified_at=None if settings.require_email_verification else now,
+        invite_id=invite_id,
     )
     session.add(user)
     token = _new_verification(user, now) if settings.require_email_verification else None

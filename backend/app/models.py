@@ -38,6 +38,11 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(_ID, primary_key=True)
     email: Mapped[str | None] = mapped_column(String(320), unique=True, nullable=True)
+    # The invite the account signed up with; null for accounts from before
+    # invites were tracked, and on an open server.
+    invite_id: Mapped[str | None] = mapped_column(
+        String(36), ForeignKey("invites.id"), nullable=True, index=True
+    )
 
     # Null during the anonymous period (§8.1): the row is a real user from
     # first launch, it simply has no way to sign in yet.
@@ -500,3 +505,24 @@ class WaitlistEntry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+
+class Invite(Base):
+    """One invite code, so signups can be counted per code.
+
+    Only the code's hash is stored, like a password: the table tells how many
+    people each code brought in without being a list of working codes. The
+    hint is the code's first characters, enough to tell codes apart.
+    """
+
+    __tablename__ = "invites"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    code_hint: Mapped[str] = mapped_column(String(8), nullable=False)
+    label: Mapped[str] = mapped_column(String(120), nullable=False)
+    max_uses: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

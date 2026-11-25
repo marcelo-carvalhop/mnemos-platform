@@ -66,7 +66,13 @@ class Settings(BaseSettings):
     # address: anonymous device accounts are refused, and so is any request
     # from an account without one. Compared case-insensitively. Several codes
     # may be listed, separated by commas; any of them opens the door.
+    #
+    # Codes created with `python -m app.invites` live in the `invites` table,
+    # each with a name, and every account records which one it used. A code
+    # listed here becomes a row the first time someone signs up with it.
+    # REQUIRE_INVITE turns the mode on when every code is in the table.
     invite_code: str = ""
+    require_invite: bool = False
     # Beta: accounts with an email generate without a quota (plan "beta").
     # Spend is capped outside the app, in the Anthropic console; a monthly
     # ceiling per account still stops a runaway client.
@@ -95,7 +101,7 @@ class Settings(BaseSettings):
 
     @property
     def invite_only(self) -> bool:
-        return any(code.strip() for code in self.invite_code.split(","))
+        return self.require_invite or any(code.strip() for code in self.invite_code.split(","))
 
     def google_credentials(self) -> dict:
         import json
