@@ -53,7 +53,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
   /// §7.2 — o mesmo teto da tela antiga: acima disso o servidor recusa, e
   /// descobrir isso depois de subir vinte megabytes é a pior hora.
   static const _maxBytes = 25 * 1024 * 1024;
-  static const _counts = [5, 8, 12, 20];
+  static const _counts = [8, 12, 20, 50];
 
   /// Os três níveis que o servidor aceita. O cliente web já os oferecia; o
   /// aplicativo mandava sempre `intermediario` sem dizer a ninguém que havia

@@ -277,7 +277,7 @@ const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 })
 export class Create {
   /** As quantidades do canvas — quatro escolhas em vez de um slider. */
-  protected readonly countOptions = [5, 8, 12, 20];
+  protected readonly countOptions = [8, 12, 20, 50];
 
   /**
    * As quatro origens, com o mesmo glifo que o aplicativo usa em cada uma.

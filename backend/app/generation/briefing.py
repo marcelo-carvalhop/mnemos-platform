@@ -82,8 +82,8 @@ multiple indica se dá para marcar mais de uma opção.
 os cards vão priorizar ("Cards sobre os prazos do capítulo 4, para a prova \
 da OAB, priorizando…"). Use tudo o que a pessoa já respondeu. Ela vai ler e \
 pode editar.
-- suggested_count: quantos cards fazem sentido para o que será coberto, de 5 \
-a 30.
+- suggested_count: quantos cards fazem sentido para o que será coberto, de 8 \
+a 50.
 
 NA SEGUNDA RODADA
 Quando a mensagem trouxer respostas, incorpore-as no focus e no summary, e só \
@@ -348,7 +348,7 @@ def parse(response: object, material: Material, turn: Turn) -> Briefing:
     return Briefing(
         summary=" ".join(str(payload.get("summary", "")).split())[:600],
         focus=str(payload.get("focus", "")).strip()[:FOCUS_MAX_CHARS],
-        suggested_count=min(30, max(5, count)),
+        suggested_count=min(50, max(8, count)),
         sections=tuple(sections),
         questions=tuple(questions),
         page_count=pages,

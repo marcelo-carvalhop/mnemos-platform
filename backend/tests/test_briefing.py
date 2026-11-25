@@ -181,7 +181,7 @@ def test_the_answer_is_clamped_to_what_the_screen_accepts(client, fake, bucket, 
         {"title": "Controle de constitucionalidade", "from_page": 3, "to_page": 9}
     ]
     assert [q["id"] for q in body["questions"]] == ["objetivo"]
-    assert body["suggested_count"] == 30
+    assert body["suggested_count"] == 50
 
 
 def test_the_last_round_asks_nothing_and_carries_the_answers(client, fake, bucket, account):

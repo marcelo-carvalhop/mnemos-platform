@@ -32,7 +32,10 @@ MODEL = "claude-opus-5"
 # produced no better cards.
 EFFORT = "medium"
 
-MAX_TOKENS = 8000
+# 50 cards no limite de tamanho (frente, verso, tags e o JSON em volta) passam
+# de 8000 tokens, e um JSON cortado no meio é descartado inteiro. Abaixo de
+# ~21k o SDK ainda aceita a chamada sem streaming.
+MAX_TOKENS = 16000
 
 # The cacheable prefix (§7.4). `level` and the requested count are deliberately
 # NOT here — caching is a prefix match, so a value that varies per request
