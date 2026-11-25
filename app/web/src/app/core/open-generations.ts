@@ -1,5 +1,5 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
-import { Generation, type OpenGeneration } from './generation';
+import { Generation, type FailedGeneration, type OpenGeneration } from './generation';
 
 /**
  * As gerações que o servidor ainda deve (§7.8), num lugar só.
@@ -15,6 +15,11 @@ export class PendingGenerations {
   private readonly generation = inject(Generation);
 
   readonly jobs = signal<OpenGeneration[]>([]);
+  /**
+   * Gerações que falharam enquanto ninguém olhava. Sair da tela de progresso
+   * é permitido, então sem isto uma falha simplesmente sumia.
+   */
+  readonly failed = signal<FailedGeneration[]>([]);
 
   /** Cards esperando um sim ou não, somados entre as gerações. */
   readonly pending = computed(() => this.jobs().reduce((sum, j) => sum + j.pending, 0));
@@ -36,10 +41,13 @@ export class PendingGenerations {
 
   async refresh(): Promise<void> {
     try {
-      this.jobs.set(await this.generation.open());
+      const open = await this.generation.open();
+      this.jobs.set(open.jobs);
+      this.failed.set(open.failed);
     } catch {
       // Offline não é erro; o atalho simplesmente não aparece.
       this.jobs.set([]);
+      this.failed.set([]);
     }
     if (this.running()) this.start();
     else this.stop();

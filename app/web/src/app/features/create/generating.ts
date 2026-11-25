@@ -11,6 +11,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Offline } from '../../core/api';
 import { failureForCode, failureForError, type GenerationFailure } from '../../core/error-copy';
 import { Generation } from '../../core/generation';
+import { PendingGenerations } from '../../core/open-generations';
 
 /**
  * A espera (§5.5).
@@ -64,6 +65,7 @@ import { Generation } from '../../core/generation';
 })
 export class Generating implements OnInit, OnDestroy {
   private readonly generation = inject(Generation);
+  private readonly pending = inject(PendingGenerations);
   private readonly router = inject(Router);
 
   readonly jobId = input.required<string>();
@@ -101,6 +103,11 @@ export class Generating implements OnInit, OnDestroy {
       } else if (job.status === 'failed') {
         this.stop();
         this.failure.set(failureForCode(job.error_code));
+        // Visto: o aviso de Hoje sobre esta falha pode sumir.
+        void this.generation
+          .markFailureSeen(job.id)
+          .then(() => this.pending.refresh())
+          .catch(() => undefined);
       }
     } catch (e) {
       if (e instanceof Offline) {

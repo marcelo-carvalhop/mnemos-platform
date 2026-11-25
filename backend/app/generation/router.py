@@ -20,6 +20,7 @@ generation outlive the HTTP call that asked for it.
 from __future__ import annotations
 
 import secrets
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, status
@@ -312,11 +313,26 @@ class OpenJobResponse(BaseModel):
     pending: int = 0
 
 
+class FailedJobResponse(BaseModel):
+    id: str
+    error_code: str | None = None
+    topic: str | None = None
+    source_type: str
+    target_deck_id: str
+
+
 class OpenJobsResponse(BaseModel):
     """An envelope, not a bare array — so a count or a cursor can be added
     later without every client having to change shape on the same day."""
 
     jobs: list[OpenJobResponse]
+    # Failures nobody has seen yet. Apart from `jobs`, so a client that only
+    # knows `jobs` does not mistake a failure for one still running.
+    failed: list[FailedJobResponse] = []
+
+
+class SeenResponse(BaseModel):
+    status: str = "ok"
 
 
 @router.get(
@@ -345,8 +361,32 @@ def list_open(user_id: CurrentUser, session: DbSession) -> OpenJobsResponse:
                 pending=pending,
             )
             for job, pending in service.open_jobs(session, user_id)
-        ]
+        ],
+        failed=[
+            FailedJobResponse(
+                id=job.id,
+                error_code=job.error_code,
+                topic=job.topic,
+                source_type=job.source_type,
+                target_deck_id=job.target_deck_id,
+            )
+            for job in service.unseen_failures(session, user_id)
+        ],
     )
+
+
+@router.post(
+    "/jobs/{job_id}/seen",
+    operation_id="markGenerationFailureSeen",
+    response_model=SeenResponse,
+    summary="The person saw that this generation failed",
+)
+def mark_seen(job_id: str, user_id: CurrentUser, session: DbSession) -> SeenResponse:
+    """Idempotent, and a no-op for a job that did not fail."""
+    job = _own_job(session, user_id, job_id)
+    service.mark_failure_seen(session, job, datetime.now(UTC))
+    session.commit()
+    return SeenResponse()
 
 
 @router.get(

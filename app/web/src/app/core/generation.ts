@@ -22,6 +22,15 @@ export interface OpenGeneration {
   pending: number;
 }
 
+/** Uma geração que falhou sem ninguém olhando, até a pessoa ver o motivo. */
+export interface FailedGeneration {
+  id: string;
+  error_code: string | null;
+  topic: string | null;
+  source_type: string;
+  target_deck_id: string;
+}
+
 export interface PendingCard {
   id: string;
   front: string;
@@ -78,11 +87,15 @@ export class Generation {
   }
 
   /** §7.8 — o que o servidor ainda deve: gerações rodando ou esperando resposta. */
-  async open(): Promise<OpenGeneration[]> {
-    const body = await this.call<{ jobs: OpenGeneration[] }>(
-      this.http.get<{ jobs: OpenGeneration[] }>(`${this.baseUrl}/v1/generation/jobs`),
-    );
-    return body.jobs ?? [];
+  async open(): Promise<{ jobs: OpenGeneration[]; failed: FailedGeneration[] }> {
+    type Body = { jobs?: OpenGeneration[]; failed?: FailedGeneration[] };
+    const body = await this.call<Body>(this.http.get<Body>(`${this.baseUrl}/v1/generation/jobs`));
+    return { jobs: body.jobs ?? [], failed: body.failed ?? [] };
+  }
+
+  /** A pessoa viu que a geração falhou: o aviso de Hoje some. */
+  async markFailureSeen(jobId: string): Promise<void> {
+    await this.call(this.http.post(`${this.baseUrl}/v1/generation/jobs/${jobId}/seen`, {}));
   }
 
   /**

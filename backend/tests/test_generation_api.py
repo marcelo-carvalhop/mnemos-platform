@@ -117,9 +117,7 @@ def test_nothing_in_generation_is_reachable_without_a_token(client):
         ("post", "/v1/generation/pending/whatever"),
         ("post", "/v1/generation/jobs/whatever/close"),
     ]:
-        response = (
-            client.get(path) if method == "get" else client.post(path, json={})
-        )
+        response = client.get(path) if method == "get" else client.post(path, json={})
         assert response.status_code == 401, f"{method.upper()} {path}"
 
 
@@ -340,6 +338,48 @@ def test_a_failed_generation_is_not_something_to_come_back_to(client, account: A
     assert client.get("/v1/generation/jobs", headers=account.headers).json()["jobs"] == []
 
 
+def test_a_failure_nobody_watched_is_told_until_seen(client, account: Account):
+    """Leaving the progress screen is allowed, so a generation can fail with
+    nobody looking. It must not just vanish: it is listed apart from `jobs`
+    until the person sees it, and then never again.
+    """
+    created = client.post(
+        "/v1/generation/jobs",
+        headers=account.headers,
+        json={
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+            "topic": "Psicologia",
+        },
+    )
+    job_id = created.json()["id"]
+    with SessionLocal() as session:
+        generation.fail(session, job_id, "topic_too_vague")
+        session.commit()
+
+    body = client.get("/v1/generation/jobs", headers=account.headers).json()
+    assert body["jobs"] == []
+    assert body["failed"] == [
+        {
+            "id": job_id,
+            "error_code": "topic_too_vague",
+            "topic": "Psicologia",
+            "source_type": "topic",
+            "target_deck_id": account.deck_id,
+        }
+    ]
+
+    other = make_account()
+    assert (
+        client.post(f"/v1/generation/jobs/{job_id}/seen", headers=other.headers).status_code == 404
+    )
+
+    for _ in range(2):  # idempotente
+        seen = client.post(f"/v1/generation/jobs/{job_id}/seen", headers=account.headers)
+        assert seen.status_code == 200
+    assert client.get("/v1/generation/jobs", headers=account.headers).json()["failed"] == []
+
+
 # ---------------------------------------------------------------------------
 # Refusals the client branches on
 # ---------------------------------------------------------------------------
@@ -361,9 +401,7 @@ def test_the_second_generation_is_402_so_the_app_shows_the_paywall(client, accou
     assert second.status_code == 402
 
 
-def test_a_pdf_job_without_a_key_is_rejected_before_the_quota_is_touched(
-    client, account: Account
-):
+def test_a_pdf_job_without_a_key_is_rejected_before_the_quota_is_touched(client, account: Account):
     response = client.post(
         "/v1/generation/jobs",
         headers=account.headers,

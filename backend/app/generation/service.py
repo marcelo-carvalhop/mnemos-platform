@@ -138,9 +138,7 @@ def claim_next(session: Session, *, now: datetime | None = None) -> GenerationJo
 def advance(session: Session, job_id: str, status: str) -> None:
     if status not in STATUSES:
         raise ValueError(f"unknown status: {status}")
-    session.execute(
-        update(GenerationJob).where(GenerationJob.id == job_id).values(status=status)
-    )
+    session.execute(update(GenerationJob).where(GenerationJob.id == job_id).values(status=status))
     session.flush()
 
 
@@ -287,6 +285,31 @@ def open_jobs(session: Session, user_id: str) -> list[tuple[GenerationJob, int]]
     return [(job, count) for job, count in rows]
 
 
+def unseen_failures(session: Session, user_id: str) -> list[GenerationJob]:
+    """Failed generations the person has not been told about, newest first.
+
+    Leaving the progress screen is allowed, so a failure can happen with
+    nobody watching. Closed as `open_jobs` says, but not yet answered: until
+    it is seen, Hoje says what went wrong instead of the job simply vanishing.
+    """
+    return list(
+        session.execute(
+            select(GenerationJob)
+            .where(
+                GenerationJob.user_id == user_id,
+                GenerationJob.status == "failed",
+                GenerationJob.failure_seen_at.is_(None),
+            )
+            .order_by(GenerationJob.created_at.desc())
+        ).scalars()
+    )
+
+
+def mark_failure_seen(session: Session, job: GenerationJob, now: datetime) -> None:
+    if job.status == "failed" and job.failure_seen_at is None:
+        job.failure_seen_at = now
+
+
 def queue_for(session: Session, user_id: str, job_id: str) -> list[PendingCard]:
     return list(
         session.execute(
@@ -321,9 +344,7 @@ def decide(
 
     now = now or datetime.now(UTC)
     card = session.execute(
-        select(PendingCard).where(
-            PendingCard.id == pending_id, PendingCard.user_id == user_id
-        )
+        select(PendingCard).where(PendingCard.id == pending_id, PendingCard.user_id == user_id)
     ).scalar_one_or_none()
     if card is None:
         raise JobNotFound(pending_id)
@@ -399,13 +420,17 @@ def materialise(
     pending id, so re-running inserts nothing new.
     """
     now = now or datetime.now(UTC)
-    approved = session.execute(
-        select(PendingCard).where(
-            PendingCard.job_id == job_id,
-            PendingCard.user_id == user_id,
-            PendingCard.decision == "approved",
+    approved = (
+        session.execute(
+            select(PendingCard).where(
+                PendingCard.job_id == job_id,
+                PendingCard.user_id == user_id,
+                PendingCard.decision == "approved",
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     from app.sync import service as sync  # local import: avoids a cycle
 

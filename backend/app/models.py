@@ -424,6 +424,9 @@ class GenerationJob(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    # When the person saw that it failed. Until then a failed job is still owed
+    # an answer: whoever left the progress screen learns about it from Hoje.
+    failure_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     error_detail: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # The reservation this job holds, so a failure can release exactly it.

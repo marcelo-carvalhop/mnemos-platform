@@ -39,6 +39,10 @@ import { PendingGenerations } from '../../core/open-generations';
       background: color-mix(in srgb, var(--mn-line) 45%, transparent);
       color: var(--mn-text);
     }
+    .failed {
+      background: var(--mn-again-bg);
+      color: var(--mn-again);
+    }
     strong {
       display: block;
       font-size: 14.5px;
@@ -49,6 +53,15 @@ import { PendingGenerations } from '../../core/open-generations';
     }
   `,
   template: `
+    @for (job of failed(); track job.id) {
+      <a class="failed" [routerLink]="['/gerar', job.id]">
+        <span>
+          <strong>Não deu para gerar os cards</strong>
+          <span>{{ job.topic ?? sourceLabel(job.source_type) }} · ver o motivo</span>
+        </span>
+        <span aria-hidden="true">→</span>
+      </a>
+    }
     @for (job of jobs(); track job.id) {
       @if (job.pending > 0) {
         <a class="waiting" [routerLink]="['/aprovar', job.id]">
@@ -78,6 +91,14 @@ export class OpenGenerations {
 
   /** O mesmo estado do atalho do cabeçalho e da barra lateral. */
   protected readonly jobs = this.open.jobs;
+  protected readonly failed = this.open.failed;
+
+  protected sourceLabel(source: string): string {
+    if (source === 'pdf') return 'Do seu PDF';
+    if (source === 'photo') return 'Da sua foto';
+    if (source === 'text') return 'Do seu texto';
+    return 'Sua geração';
+  }
 
   constructor() {
     void this.open.refresh();
