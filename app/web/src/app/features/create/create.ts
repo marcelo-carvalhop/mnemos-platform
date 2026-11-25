@@ -312,16 +312,16 @@ export class Create {
   /** O formato, não o conteúdo: cards curtos, uma ideia cada. */
   protected readonly samples = [
     {
-      front: 'O que o controle de congestionamento do TCP tenta evitar?',
-      back: 'Que o emissor injete mais tráfego do que a rede consegue escoar.',
+      front: 'Por que existem as estações do ano?',
+      back: 'Pela inclinação do eixo da Terra, que muda o ângulo com que o Sol chega a cada hemisfério.',
     },
     {
-      front: 'Quando UDP é preferível a TCP?',
-      back: 'Quando latência importa mais que entrega garantida.',
+      front: 'Em que ano o Brasil declarou a independência?',
+      back: 'Em 1822, com Dom Pedro I, às margens do riacho Ipiranga.',
     },
     {
-      front: 'Para que serve o handshake de três vias?',
-      back: 'Sincronizar números de sequência antes da transferência.',
+      front: 'O que a fotossíntese libera além de glicose?',
+      back: 'Oxigênio, que vem da quebra das moléculas de água.',
     },
   ];
 

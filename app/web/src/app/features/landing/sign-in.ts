@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ApiError, Offline } from '../../core/api';
 import { Session } from '../../core/session';
 import { Sync } from '../../core/sync';
@@ -38,17 +38,19 @@ import { Sync } from '../../core/sync';
       </a>
 
       <div class="pitch-body">
-        <p class="eyebrow">Repetição espaçada</p>
+        <p class="eyebrow">
+          {{ inviteRequired() ? 'Beta fechado · com IA' : 'Repetição espaçada' }}
+        </p>
         <p class="claim">
           O que você aprendeu,<br /><span class="quiet">de volta na hora certa.</span>
         </p>
 
         <div class="sample" aria-hidden="true">
           <div class="sample-head">
-            <span>Redes de Computadores</span>
+            <span>Geografia</span>
             <span>2 / 12</span>
           </div>
-          <p class="sample-front">Em que camada do modelo OSI opera um roteador?</p>
+          <p class="sample-front">Por que existem as estações do ano?</p>
           <div class="sample-grades">
             <span class="again">Errei</span><span class="hard">Difícil</span
             ><span class="good">Bom</span><span class="easy">Fácil</span>
@@ -80,7 +82,13 @@ import { Sync } from '../../core/sync';
         </ol>
       </div>
 
-      <p class="fine">Grátis para estudar e escrever cards.</p>
+      <p class="fine">
+        {{
+          inviteRequired()
+            ? 'No beta, quem entra com convite usa o Mnemos com IA, sem pagar.'
+            : 'O primeiro mês é grátis, para testar.'
+        }}
+      </p>
     </aside>
 
     <main class="panel">
@@ -110,13 +118,38 @@ import { Sync } from '../../core/sync';
         </section>
       } @else {
         <form (submit)="submit($event)">
-          <p class="kicker">{{ creating() ? 'Nova conta' : 'Sua conta' }}</p>
+          @if (creating() && inviteRequired()) {
+            <section class="pass" aria-label="Seu convite para o beta">
+              <div class="pass-tags">
+                <span class="pass-tag">Convite</span>
+                <span class="pass-tag beta"
+                  ><span class="pulse" aria-hidden="true"></span>Beta fechado</span
+                >
+              </div>
+              <p class="pass-title">
+                Você vai testar o Mnemos <span class="ai-word">com IA</span>, antes de todo mundo.
+              </p>
+              <ul class="pass-perks">
+                <li>Cards criados pela IA a partir de um assunto, texto, foto ou PDF</li>
+                <li>Uma IA para tirar dúvidas enquanto você estuda</li>
+                <li>Tudo liberado, sem pagar, enquanto durar o beta</li>
+              </ul>
+              <p class="pass-foot">
+                <span>Acesso por convite</span>
+                <span>Beta · 2026</span>
+              </p>
+            </section>
+          }
+
+          <p class="kicker">
+            {{ creating() ? (inviteRequired() ? 'Seu convite' : 'Nova conta') : 'Sua conta' }}
+          </p>
           <h1>{{ creating() ? 'Criar conta' : 'Entrar' }}</h1>
           <p class="lede">
             {{
               creating()
                 ? inviteRequired()
-                  ? 'O Mnemos está aberto só para convidados. Use o código que você recebeu.'
+                  ? 'Use o código que você recebeu. A conta já nasce com a IA liberada.'
                   : 'Estude no navegador com o mesmo histórico do celular e do terminal.'
                 : 'Continue de onde parou, em qualquer superfície.'
             }}
@@ -212,6 +245,7 @@ export class SignIn {
   private readonly session = inject(Session);
   private readonly sync = inject(Sync);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   protected readonly email = signal('');
   protected readonly password = signal('');
@@ -238,6 +272,8 @@ export class SignIn {
   );
 
   constructor() {
+    // "Tenho um convite" na landing abre direto em criar conta.
+    if (this.route.snapshot.queryParamMap.has('convite')) this.creating.set(true);
     this.session
       .options()
       .then((o) => this.inviteRequired.set(o.invite_required))

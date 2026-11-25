@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Offline } from '../../core/api';
 import { Session } from '../../core/session';
 
 interface SampleCard {
@@ -24,7 +26,7 @@ type Surface = 'phone' | 'web' | 'ink';
 @Component({
   selector: 'app-landing',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink],
+  imports: [FormsModule, RouterLink],
   styleUrl: './landing.css',
   templateUrl: './landing.html',
 })
@@ -38,9 +40,9 @@ export class Landing {
       back: 'Três quintos dos votos, em dois turnos, em cada Casa do Congresso (art. 60, § 2º).',
     },
     {
-      deck: 'Redes de Computadores',
-      front: 'Em que camada do modelo OSI opera um roteador?',
-      back: 'Na camada 3, a de rede: ele encaminha pacotes pelo endereço IP de destino.',
+      deck: 'Geografia',
+      front: 'Por que existem as estações do ano?',
+      back: 'Pela inclinação do eixo da Terra, que muda o ângulo com que o Sol chega a cada hemisfério.',
     },
     {
       deck: 'Bioquímica',
@@ -70,14 +72,39 @@ export class Landing {
     this.inviteOnly() ? 'Tenho um convite' : 'Criar conta',
   );
   protected readonly ctaLong = computed(() =>
-    this.inviteOnly() ? 'Entrar com meu convite' : 'Começar grátis',
+    this.inviteOnly() ? 'Entrar com meu convite' : 'Testar um mês grátis',
   );
+  /** Quem chega pelo convite cai direto em criar conta, com o ingresso do beta. */
+  protected readonly ctaQuery = computed(() => (this.inviteOnly() ? { convite: 1 } : {}));
+
+  /** O plano com IA ainda não se compra: dá para pedir aviso. */
+  protected readonly waitEmail = signal('');
+  protected readonly waitState = signal<'idle' | 'busy' | 'done' | 'error'>('idle');
+  protected readonly waitProblem = signal('');
 
   constructor() {
     this.session
       .options()
       .then((o) => this.inviteOnly.set(o.invite_required))
       .catch(() => undefined);
+  }
+
+  protected async notifyMe(event: Event): Promise<void> {
+    event.preventDefault();
+    const email = this.waitEmail().trim();
+    if (!email.includes('@') || this.waitState() === 'busy') return;
+    this.waitState.set('busy');
+    try {
+      await this.session.joinWaitlist(email);
+      this.waitState.set('done');
+    } catch (e) {
+      this.waitProblem.set(
+        e instanceof Offline
+          ? 'Sem conexão com o servidor. Tente de novo.'
+          : 'Confira o e-mail e tente de novo.',
+      );
+      this.waitState.set('error');
+    }
   }
 
   protected reveal(): void {

@@ -540,7 +540,7 @@ class _CreateScreenState extends ConsumerState<CreateScreen> {
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
-                hintText: 'Camada de transporte: TCP, UDP e controle de congestionamento',
+                hintText: 'Ex.: Revolução Francesa: causas e consequências',
                 hintStyle: MnemosText.body.copyWith(
                   height: 1.4,
                   color: MnemosColors.faint,

@@ -20,6 +20,7 @@ from app.generation.router import router as generation_router
 from app.quota.router import router as quota_router
 from app.sync.router import router as sync_router
 from app.terminal.router import router as terminal_router
+from app.waitlist.router import router as waitlist_router
 
 settings = get_settings()
 
@@ -55,6 +56,7 @@ app.include_router(generation_router)
 app.include_router(account_router)
 app.include_router(terminal_router)
 app.include_router(chat_router)
+app.include_router(waitlist_router)
 
 
 class HealthResponse(BaseModel):

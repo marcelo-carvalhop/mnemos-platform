@@ -497,6 +497,15 @@ class Handler(SimpleHTTPRequestHandler):
 
     # -- API ----------------------------------------------------------------
     def _api(self, method, path, query):
+        if path == "/v1/auth/options":
+            # Como no servidor de verdade durante o beta: só com convite.
+            self._log("auth options")
+            return self._json({"invite_required": True, "email_verification_required": True})
+
+        if path == "/v1/waitlist" and method == "POST":
+            self._log("waitlist")
+            return self._json({"status": "ok"})
+
         if path.startswith("/v1/auth/"):
             self._log("auth")
             return self._json(

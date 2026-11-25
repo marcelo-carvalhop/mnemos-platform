@@ -109,6 +109,11 @@ export class Session {
     await this.post('/v1/auth/resend-verification', { email });
   }
 
+  /** O "Avise-me" do plano com IA. A mesma resposta para um e-mail repetido. */
+  async joinWaitlist(email: string): Promise<void> {
+    await this.post('/v1/waitlist', { email, plan: 'ai' });
+  }
+
   async options(): Promise<AuthOptions> {
     try {
       return await firstValueFrom(this.http.get<AuthOptions>(`${this.baseUrl}/v1/auth/options`));

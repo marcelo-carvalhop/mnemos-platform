@@ -484,3 +484,19 @@ class AttestationChallenge(Base):
     nonce: Mapped[str] = mapped_column(String(64), primary_key=True)
     device_id: Mapped[str] = mapped_column(_ID, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WaitlistEntry(Base):
+    """Quem pediu para ser avisado quando o plano com IA abrir.
+
+    Só o e-mail e o que a pessoa pediu: não é conta, não tem senha, e nada
+    liga a linha a um usuário. Pedir de novo não cria outra linha.
+    """
+
+    __tablename__ = "waitlist"
+
+    email: Mapped[str] = mapped_column(String(320), primary_key=True)
+    plan: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

@@ -38,12 +38,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _finishing = false;
 
   static const _suggestions = [
-    'Redes de Computadores',
-    'TCP/IP',
-    'Roteamento',
-    'Segurança de Redes',
-    'Sistemas Distribuídos',
-    'Protocolos',
+    'História do Brasil',
+    'Inglês',
+    'Biologia',
+    'Direito Constitucional',
+    'Geografia',
+    'Matemática',
   ];
 
   @override
@@ -382,7 +382,7 @@ class _CardStack extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              'REDES DE COMPUTADORES',
+                              'GEOGRAFIA',
                               style: MnemosText.eyebrowSmall.copyWith(fontSize: 11),
                             ),
                           ),
@@ -391,7 +391,7 @@ class _CardStack extends StatelessWidget {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        'O que o TCP garante que o UDP não garante?',
+                        'Por que existem as estações do ano?',
                         style: MnemosText.prompt.copyWith(fontSize: 21, height: 1.36),
                       ),
                       const Spacer(),
@@ -519,7 +519,7 @@ class _Subject extends StatelessWidget {
           controller: controller,
           decoration: const InputDecoration(
             border: OutlineInputBorder(),
-            hintText: 'Ex.: Redes de Computadores',
+            hintText: 'Ex.: História do Brasil',
             hintStyle: TextStyle(fontSize: 13.5, color: MnemosColors.faint),
           ),
         ),

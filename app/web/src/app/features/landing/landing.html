@@ -1,9 +1,9 @@
 <div class="notice">
   <span class="mono notice-tag">Beta</span>
   @if (inviteOnly()) {
-    O Mnemos está aberto só para convidados. Recebeu um código? Crie sua conta.
+    Beta fechado: quem tem convite testa o Mnemos com IA antes de todo mundo.
   } @else {
-    O Mnemos está aberto para todos. Comece grátis.
+    O Mnemos está aberto para todos. Teste um mês grátis.
   }
 </div>
 
@@ -25,7 +25,7 @@
     </div>
     <div class="nav-actions">
       <a class="pill ghost" routerLink="/entrar">Entrar</a>
-      <a class="pill dark" routerLink="/entrar">{{ ctaShort() }}</a>
+      <a class="pill dark" routerLink="/entrar" [queryParams]="ctaQuery()">{{ ctaShort() }}</a>
     </div>
   </nav>
 </header>
@@ -48,7 +48,7 @@
           cada, revisados onde você estiver.
         </p>
         <div class="row">
-          <a class="pill dark lg" routerLink="/entrar">
+          <a class="pill dark lg" routerLink="/entrar" [queryParams]="ctaQuery()">
             {{ ctaLong() }}
             <svg
               aria-hidden="true"
@@ -67,7 +67,13 @@
           </a>
           <a class="pill outline lg" href="#como-funciona">Ver como funciona</a>
         </div>
-        <p class="fine">Estudar e escrever cards é grátis. A IA que escreve por você é paga.</p>
+        <p class="fine">
+          @if (inviteOnly()) {
+            No beta, quem entra com convite usa tudo, com IA, sem pagar.
+          } @else {
+            O primeiro mês é grátis. A IA que escreve por você é um plano à parte.
+          }
+        </p>
       </div>
 
       <div class="hero-shot">
@@ -363,7 +369,7 @@
                     </div>
                   </div>
                   <div class="phone-row">
-                    <span>Redes de Computadores</span><span class="mono again-text">2</span>
+                    <span>Geografia</span><span class="mono again-text">2</span>
                   </div>
                   <div class="phone-row">
                     <span>Direito Constitucional</span><span class="mono again-text">2</span>
@@ -381,8 +387,8 @@
                   </div>
                   <div class="browser-main">
                     <div class="browser-card">
-                      <p class="mono tiny faint">REDES DE COMPUTADORES · 2 / 4</p>
-                      <p class="front-sm">Em que camada do modelo OSI opera um roteador?</p>
+                      <p class="mono tiny faint">GEOGRAFIA · 2 / 4</p>
+                      <p class="front-sm">Por que existem as estações do ano?</p>
                     </div>
                     <div class="mini-grades">
                       <span class="again">Errei</span><span class="hard">Difícil</span
@@ -499,13 +505,13 @@
   <section id="planos" class="wrap section-tight">
     <p class="eyebrow accent">Planos</p>
     <h2 class="title plans-title">
-      Estudar é grátis.<br /><span class="quiet">A IA é opcional.</span>
+      Um mês para testar.<br /><span class="quiet">A IA quando quiser.</span>
     </h2>
     <div class="plans">
       <article class="plan">
-        <p class="eyebrow">Grátis</p>
-        <p class="price">R$ 0</p>
-        <p class="muted">Para sempre, para estudar.</p>
+        <p class="eyebrow">Essencial</p>
+        <p class="price">R$ 15,90<span class="per">/mês</span></p>
+        <p class="muted">O primeiro mês é grátis, para testar.</p>
         <ul>
           <li>Cards e baralhos sem limite, escritos por você</li>
           <li>Revisão com cronograma no celular e no navegador</li>
@@ -515,15 +521,52 @@
       </article>
       <article class="plan-ai">
         <div class="plan ai">
-          <p class="eyebrow ai-text">Com IA</p>
-          <p class="price">Em breve</p>
-          <p class="muted">Quando o beta acabar.</p>
+          <div class="plan-head">
+            <p class="eyebrow ai-text">Com IA</p>
+            <span class="soon">Abre depois do beta</span>
+          </div>
+          <p class="price">R$ 29,90<span class="per">/mês</span></p>
+          <p class="muted">Hoje, só para quem entrou com convite.</p>
           <ul>
-            <li>Tudo do plano grátis</li>
+            <li>Tudo do Essencial</li>
             <li>Cards gerados de assunto, texto, foto ou PDF</li>
-            <li>Mais gerações por mês</li>
+            <li>Uma IA para tirar dúvidas enquanto você estuda</li>
             <li>Uma geração que falha não conta</li>
           </ul>
+          @if (waitState() === 'done') {
+            <p class="wait-done" role="status">
+              Pronto. Avisamos <strong>{{ waitEmail().trim() }}</strong> quando abrir.
+            </p>
+          } @else {
+            <form class="wait" (submit)="notifyMe($event)">
+              <label class="mn-sr-only" for="wait-email">Seu e-mail</label>
+              <input
+                id="wait-email"
+                type="email"
+                name="email"
+                autocomplete="email"
+                placeholder="seu@email.com"
+                required
+                [ngModel]="waitEmail()"
+                (ngModelChange)="waitEmail.set($event)"
+                [disabled]="waitState() === 'busy'"
+              />
+              <button
+                type="submit"
+                class="pill dark"
+                [disabled]="waitState() === 'busy' || !waitEmail().includes('@')"
+              >
+                {{ waitState() === 'busy' ? 'Um momento…' : 'Avise-me' }}
+              </button>
+            </form>
+            <p class="wait-note">
+              @if (waitState() === 'error') {
+                <span role="alert">{{ waitProblem() }}</span>
+              } @else {
+                Um e-mail quando abrir, e só.
+              }
+            </p>
+          }
         </div>
       </article>
     </div>
@@ -540,11 +583,20 @@
         <details>
           <summary>Como consigo um convite?<span class="plus" aria-hidden="true">+</span></summary>
           <p>
-            Durante o beta, o Mnemos está aberto só para convidados. Quem convida passa um código;
-            com ele você cria a conta e confirma o e-mail pelo link que mandamos.
+            Durante o beta, o Mnemos está aberto só para convidados, que testam a versão com IA
+            antes de todo mundo. Quem convida passa um código; com ele você cria a conta e confirma
+            o e-mail pelo link que mandamos.
           </p>
         </details>
       }
+      <details>
+        <summary>Quanto custa?<span class="plus" aria-hidden="true">+</span></summary>
+        <p>
+          O Essencial custa R$ 15,90 por mês, e o primeiro mês é grátis. O plano com IA custa R$
+          29,90 por mês e abre quando o beta acabar. Durante o beta, quem entra com convite usa
+          tudo, com IA, sem pagar.
+        </p>
+      </details>
       <details>
         <summary>O que é repetição espaçada?<span class="plus" aria-hidden="true">+</span></summary>
         <p>
@@ -594,7 +646,7 @@
           <p>Crie sua conta, traga o primeiro assunto e em dez minutos você está revisando.</p>
         }
       </div>
-      <a class="pill light lg" routerLink="/entrar">
+      <a class="pill light lg" routerLink="/entrar" [queryParams]="ctaQuery()">
         {{ ctaLong() }}
         <svg
           aria-hidden="true"
