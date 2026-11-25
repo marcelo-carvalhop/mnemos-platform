@@ -65,7 +65,9 @@
               <path d="m13 6 6 6-6 6" />
             </svg>
           </a>
-          <a class="pill outline lg" href="#como-funciona">Ver como funciona</a>
+          <a class="pill outline lg" routerLink="/entrar" [queryParams]="ctaQuery()"
+            >Ver como funciona</a
+          >
         </div>
         <p class="fine">
           @if (inviteOnly()) {
