@@ -308,11 +308,24 @@ class Registration:
     verification_token: str | None
 
 
+def invite_codes() -> list[str]:
+    """INVITE_CODE may list several codes separated by commas, so a new one can
+    go out without taking back the ones already handed out."""
+    raw = get_settings().invite_code
+    return [code.strip().lower() for code in raw.split(",") if code.strip()]
+
+
 def invite_matches(given: str | None) -> bool:
-    configured = get_settings().invite_code.strip().lower()
-    if not configured:
+    codes = invite_codes()
+    if not codes:
         return True
-    return hmac.compare_digest((given or "").strip().lower().encode(), configured.encode())
+    candidate = (given or "").strip().lower().encode()
+    # Every code is compared, match or not, so the time taken says nothing
+    # about which one came close.
+    matched = False
+    for code in codes:
+        matched |= hmac.compare_digest(candidate, code.encode())
+    return matched
 
 
 def _new_verification(user: User, now: datetime) -> str:

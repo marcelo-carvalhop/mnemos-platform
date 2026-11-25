@@ -212,3 +212,19 @@ def test_sender_keeps_only_the_address(monkeypatch):
     monkeypatch.setattr(settings, "mail_from", "")
     monkeypatch.setattr(settings, "smtp_user", "conta@example.com")
     assert mail.sender() == "Mnemos <conta@example.com>"
+
+
+def test_several_codes_each_open_the_door(monkeypatch, outbox):
+    settings = get_settings()
+    monkeypatch.setattr(settings, "invite_code", f" {INVITE} , Segundo-Convite ,")
+    monkeypatch.setattr(settings, "require_email_verification", True)
+    monkeypatch.setattr(settings, "smtp_host", "")
+    assert settings.invite_only
+
+    assert register(email(), invite=INVITE).status_code == 200
+    assert register(email(), invite="segundo-convite").status_code == 200
+    refused = register(email(), invite="terceiro")
+    assert refused.status_code == 403
+    assert refused.json()["detail"] == "invite_invalid"
+    # Uma vírgula sozinha não é um código vazio que aceite qualquer coisa.
+    assert register(email(), invite="").status_code == 403

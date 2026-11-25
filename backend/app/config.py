@@ -64,7 +64,8 @@ class Settings(BaseSettings):
 
     # Invite-only. When set, a new account needs this code and an email
     # address: anonymous device accounts are refused, and so is any request
-    # from an account without one. Compared case-insensitively.
+    # from an account without one. Compared case-insensitively. Several codes
+    # may be listed, separated by commas; any of them opens the door.
     invite_code: str = ""
     # Beta: accounts with an email generate without a quota (plan "beta").
     # Spend is capped outside the app, in the Anthropic console; a monthly
@@ -94,7 +95,7 @@ class Settings(BaseSettings):
 
     @property
     def invite_only(self) -> bool:
-        return bool(self.invite_code.strip())
+        return any(code.strip() for code in self.invite_code.split(","))
 
     def google_credentials(self) -> dict:
         import json
