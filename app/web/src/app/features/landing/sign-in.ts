@@ -38,9 +38,7 @@ import { Sync } from '../../core/sync';
       </a>
 
       <div class="pitch-body">
-        <p class="eyebrow">
-          {{ inviteRequired() ? 'Beta fechado · com IA' : 'Repetição espaçada' }}
-        </p>
+        <p class="eyebrow">Repetição espaçada</p>
         <p class="claim">
           O que você aprendeu,<br /><span class="quiet">de volta na hora certa.</span>
         </p>
@@ -118,38 +116,13 @@ import { Sync } from '../../core/sync';
         </section>
       } @else {
         <form (submit)="submit($event)">
-          @if (creating() && inviteRequired()) {
-            <section class="pass" aria-label="Seu convite para o beta">
-              <div class="pass-tags">
-                <span class="pass-tag">Convite</span>
-                <span class="pass-tag beta"
-                  ><span class="pulse" aria-hidden="true"></span>Beta fechado</span
-                >
-              </div>
-              <p class="pass-title">
-                Você vai testar o Mnemos <span class="ai-word">com IA</span>, antes de todo mundo.
-              </p>
-              <ul class="pass-perks">
-                <li>Cards criados pela IA a partir de um assunto, texto, foto ou PDF</li>
-                <li>Uma IA para tirar dúvidas enquanto você estuda</li>
-                <li>Tudo liberado, sem pagar, enquanto durar o beta</li>
-              </ul>
-              <p class="pass-foot">
-                <span>Acesso por convite</span>
-                <span>Beta · 2026</span>
-              </p>
-            </section>
-          }
-
-          <p class="kicker">
-            {{ creating() ? (inviteRequired() ? 'Seu convite' : 'Nova conta') : 'Sua conta' }}
-          </p>
+          <p class="kicker">{{ creating() ? 'Nova conta' : 'Sua conta' }}</p>
           <h1>{{ creating() ? 'Criar conta' : 'Entrar' }}</h1>
           <p class="lede">
             {{
               creating()
                 ? inviteRequired()
-                  ? 'Use o código que você recebeu. A conta já nasce com a IA liberada.'
+                  ? 'Use o código de convite que você recebeu.'
                   : 'Estude no navegador com o mesmo histórico do celular e do terminal.'
                 : 'Continue de onde parou, em qualquer superfície.'
             }}
