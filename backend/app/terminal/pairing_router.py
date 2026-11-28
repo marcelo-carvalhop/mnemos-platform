@@ -35,6 +35,9 @@ class PairingStartRequest(BaseModel):
     device_id: str = Field(min_length=1, max_length=64)
     model: str = Field(default="Mnemos Terminal", max_length=80)
     firmware: str = Field(default="unknown", max_length=40)
+    # The credential the terminal holds now, if any. Proves it is the terminal
+    # asking, so the code may move it from another account.
+    current_token: str | None = Field(default=None, max_length=128)
 
 
 class PairingStartResponse(BaseModel):
@@ -74,7 +77,11 @@ class PairingClaimResponse(BaseModel):
 def start(body: PairingStartRequest, session: DbSession) -> PairingStartResponse:
     _limit(_starts, "global", per_minute=30, per_day=2000)
     started = pairing.start(
-        session, device_id=body.device_id, model=body.model, firmware=body.firmware
+        session,
+        device_id=body.device_id,
+        model=body.model,
+        firmware=body.firmware,
+        current_token=body.current_token,
     )
     session.commit()
     base = get_settings().public_web_url.rstrip("/")

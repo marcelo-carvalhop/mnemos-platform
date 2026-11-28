@@ -555,3 +555,8 @@ class TerminalPairing(Base):
     claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deck_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # The terminal proved, when it asked for the code, that it holds the
+    # credential it has now. Then whoever claims the code takes it over, even
+    # from another account: the hardware is in their hands. Without that proof
+    # (a device_id typed by someone else), another account's terminal stays put.
+    takeover_allowed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

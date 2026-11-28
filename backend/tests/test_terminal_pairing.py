@@ -33,11 +33,11 @@ def account() -> dict:
     return {"Authorization": f"Bearer {pair.access_token}"}
 
 
-def start(device_id: str | None = None) -> dict:
-    r = client.post(
-        "/v1/terminal/pairing/start",
-        json={"device_id": device_id or f"T5S3-{uuid.uuid4().hex[:6]}", "firmware": "0.9.0"},
-    )
+def start(device_id: str | None = None, current_token: str | None = None) -> dict:
+    body = {"device_id": device_id or f"T5S3-{uuid.uuid4().hex[:6]}", "firmware": "0.9.0"}
+    if current_token:
+        body["current_token"] = current_token
+    r = client.post("/v1/terminal/pairing/start", json=body)
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -145,3 +145,39 @@ def test_guessing_is_rate_limited(monkeypatch):
         )
     assert codes[0].status_code == 404
     assert codes[-1].status_code == 429
+
+
+def test_the_terminal_itself_moves_to_the_account_that_claims_its_code():
+    """The person has the terminal in hand: it proves so with the credential it
+    holds, and the code moves it to their account — no "disconnect it first"."""
+    device = f"T5S3-{uuid.uuid4().hex[:6]}"
+    previous, new = account(), account()
+    first = start(device)
+    client.post("/v1/terminals/pairing/claim", headers=previous, json={"code": first["code"]})
+    old_token = poll(first["poll_token"]).json()["device_token"]
+
+    second = start(device, current_token=old_token)
+    claimed = client.post("/v1/terminals/pairing/claim", headers=new, json={"code": second["code"]})
+    assert claimed.status_code == 200
+    done = poll(second["poll_token"]).json()
+    assert done["status"] == "claimed"
+
+    def listed(headers: dict) -> list[str]:
+        return [t["device_id"] for t in client.get("/v1/terminals", headers=headers).json()]
+
+    assert device in listed(new)
+    assert device not in listed(previous)
+    old = client.get("/v1/terminal/snapshot", headers={"Authorization": f"Bearer {old_token}"})
+    assert old.status_code == 401
+
+
+def test_a_wrong_credential_does_not_move_a_terminal():
+    device = f"T5S3-{uuid.uuid4().hex[:6]}"
+    owner, other = account(), account()
+    first = start(device)
+    client.post("/v1/terminals/pairing/claim", headers=owner, json={"code": first["code"]})
+    poll(first["poll_token"])
+
+    forged = start(device, current_token="x" * 43)
+    taken = client.post("/v1/terminals/pairing/claim", headers=other, json={"code": forged["code"]})
+    assert taken.status_code == 409

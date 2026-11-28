@@ -231,6 +231,11 @@ bool BackendSyncService::startWebPairing(const String& baseUrl) {
     request["device_id"] = TerminalIdentity::deviceId();
     request["model"] = Config::DEVICE_MODEL;
     request["firmware"] = Config::APP_VERSION;
+    // A credencial atual prova que é o próprio terminal pedindo: com ela, o
+    // código pode tirá-lo de outra conta e passá-lo para quem o digitar.
+    if (network_.deviceToken().length() > 0) {
+        request["current_token"] = network_.deviceToken();
+    }
     String body;
     serializeJson(request, body);
 

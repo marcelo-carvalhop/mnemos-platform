@@ -87,6 +87,23 @@ interface Terminal {
                 <span class="mn-mono id">{{ terminal.device_id }}</span>
               </p>
             </div>
+            <!-- Desconectar em dois toques, sem diálogo: o primeiro arma, o
+                 segundo confirma, e o botão volta sozinho se ninguém confirmar. -->
+            <button
+              type="button"
+              class="unpair"
+              [class.armed]="armed() === terminal.device_id"
+              [disabled]="unpairing()"
+              (click)="unpair(terminal)"
+            >
+              {{
+                unpairing()
+                  ? 'Desconectando…'
+                  : armed() === terminal.device_id
+                    ? 'Toque de novo para desconectar'
+                    : 'Desconectar'
+              }}
+            </button>
           </header>
 
           <div class="split">
@@ -211,6 +228,11 @@ export class Device {
    * digita aqui. Sem app e sem cabo — o navegador não troca de rede nem fala
    * com o terminal; quem fala com ele é o servidor.
    */
+  /** O terminal com o "Desconectar" armado, esperando a confirmação. */
+  protected readonly armed = signal<string | null>(null);
+  protected readonly unpairing = signal(false);
+  private disarm: ReturnType<typeof setTimeout> | null = null;
+
   protected readonly code = signal('');
   protected readonly claiming = signal(false);
   protected readonly pairNotice = signal<string | null>(null);
@@ -224,6 +246,36 @@ export class Device {
     const fromQr = inject(ActivatedRoute).snapshot.queryParamMap.get('codigo');
     if (fromQr) this.code.set(fromQr.toUpperCase());
     void this.load();
+  }
+
+  /**
+   * Tira o terminal desta conta. Ele para de sincronizar até ser conectado de
+   * novo (pelo site ou pelo app); o que já subiu continua na conta.
+   */
+  protected async unpair(terminal: Terminal): Promise<void> {
+    if (this.armed() !== terminal.device_id) {
+      this.armed.set(terminal.device_id);
+      if (this.disarm) clearTimeout(this.disarm);
+      this.disarm = setTimeout(() => this.armed.set(null), 4000);
+      return;
+    }
+    if (this.disarm) clearTimeout(this.disarm);
+    this.armed.set(null);
+    this.unpairing.set(true);
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.baseUrl}/v1/terminals/${terminal.device_id}/revoke`, {}),
+      );
+      this.terminals.update((rows) => rows.filter((t) => t.device_id !== terminal.device_id));
+      this.problem.set(null);
+      this.pairNotice.set(
+        'Terminal desconectado. Para usá-lo de novo, conecte pelo código que ele mostra.',
+      );
+    } catch {
+      this.problem.set('Não consegui desconectar agora. Tente de novo.');
+    } finally {
+      this.unpairing.set(false);
+    }
   }
 
   protected async claim(event: Event): Promise<void> {
@@ -339,7 +391,7 @@ function pairingProblem(error: unknown): string {
       return 'Esse código não existe ou já expirou. Gere outro no terminal.';
     }
     if (error.status === 409) {
-      return 'Esse terminal está ligado a outra conta. Desconecte-o nela antes.';
+      return 'Esse terminal está ligado a outra conta. Atualize o terminal e gere um código novo nele.';
     }
     if (error.status === 429) return 'Muitas tentativas seguidas. Espere um minuto.';
     if (error.status === 0) return 'Sem conexão com o servidor. Tente de novo.';

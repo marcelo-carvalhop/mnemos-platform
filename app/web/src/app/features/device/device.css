@@ -339,3 +339,33 @@ h3 {
   background: var(--mn-good-bg);
   color: var(--mn-good) !important;
 }
+
+/* Desconectar: discreto até ser armado. */
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.unpair {
+  flex: none;
+  padding: 9px 16px;
+  border: 1px solid var(--mn-line-strong);
+  border-radius: var(--mn-radius-pill);
+  background: transparent;
+  color: var(--mn-text-muted);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.unpair:hover:not(:disabled) {
+  border-color: var(--mn-again);
+  color: var(--mn-again);
+}
+.unpair.armed {
+  border-color: var(--mn-again);
+  background: var(--mn-again-bg);
+  color: var(--mn-again);
+  font-weight: 600;
+}

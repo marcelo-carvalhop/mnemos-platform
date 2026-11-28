@@ -14,8 +14,10 @@ Rules this file keeps:
   not a plan.
 * No terminal token is stored. It is minted on the poll that follows a claim,
   through the same `register_terminal` the app uses, and returned once.
-* A terminal already tied to another account is refused, as it is in the app:
-  holding the hardware is not a reason to take it from someone else.
+* A terminal tied to another account moves to the account that claims the
+  code — but only when, asking for the code, it sent the credential it holds
+  now. That is the terminal itself asking (the person has it in hand), not
+  someone who read its device_id. Without that proof it stays where it is.
 """
 
 from __future__ import annotations
@@ -74,9 +76,23 @@ def _new_code() -> str:
 
 
 def start(
-    session: Session, *, device_id: str, model: str, firmware: str, now: datetime | None = None
+    session: Session,
+    *,
+    device_id: str,
+    model: str,
+    firmware: str,
+    current_token: str | None = None,
+    now: datetime | None = None,
 ) -> Started:
     now = now or datetime.now(UTC)
+    takeover = False
+    if current_token:
+        existing = session.get(TerminalCredential, device_id)
+        takeover = (
+            existing is not None
+            and not existing.revoked
+            and existing.token_hash == service._hash(current_token)
+        )
     code = _new_code()
     poll_token = secrets.token_urlsafe(32)
     session.add(
@@ -90,6 +106,7 @@ def start(
             created_at=now,
             expires_at=now + LIFETIME,
             deck_ids=[],
+            takeover_allowed=takeover,
         )
     )
     session.flush()
@@ -119,7 +136,12 @@ def claim(
         raise PairingNotFound("code not found")
 
     existing = session.get(TerminalCredential, row.device_id)
-    if existing is not None and existing.user_id != user_id and not existing.revoked:
+    if (
+        existing is not None
+        and existing.user_id != user_id
+        and not existing.revoked
+        and not row.takeover_allowed
+    ):
         raise PairingConflict("terminal belongs to another account")
 
     row.claimed_by = user_id
@@ -144,9 +166,12 @@ def poll(session: Session, poll_token: str, *, now: datetime | None = None) -> P
         return Polled(status="pending")
 
     existing = session.get(TerminalCredential, row.device_id)
-    if existing is not None and existing.user_id != row.claimed_by and existing.revoked:
-        # A revoked credential from a previous owner frees the hardware: the
-        # row is handed to the account that just claimed it.
+    if existing is not None and existing.user_id != row.claimed_by:
+        if not (existing.revoked or row.takeover_allowed):
+            raise PairingConflict("terminal belongs to another account")
+        # The previous account lets go: its credential is gone, and the row
+        # is made again for the account that just claimed the code. What the
+        # terminal already synced stays in the previous account.
         session.delete(existing)
         session.flush()
 
