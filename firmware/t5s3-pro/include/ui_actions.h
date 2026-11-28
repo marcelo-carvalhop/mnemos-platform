@@ -68,6 +68,9 @@ enum class UiAction : uint8_t {
     CycleBacklight,
     DeepCleanDisplay,
     PowerOff,
+
+    // Conectar à conta pelo site, com um código.
+    PairWeb,
 };
 
 inline const char* uiActionName(UiAction action) {
@@ -172,6 +175,8 @@ inline const char* uiActionName(UiAction action) {
             return "Limpeza profunda da tela";
         case UiAction::PowerOff:
             return "Desligar dispositivo";
+        case UiAction::PairWeb:
+            return "Conectar pelo site";
         case UiAction::None:
         default:
             return "Nenhuma";

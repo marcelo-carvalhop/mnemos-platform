@@ -4510,17 +4510,20 @@ void T5Display::showConnectionMenu(
         String(knownNetworks) +
             (knownNetworks == 1 ? " rede conhecida" : " redes conhecidas"));
 
-    const String labels[3] = {
+    const String labels[4] = {
         "Procurar redes",
         wifiEnabled
             ? "Desligar Wi-Fi"
             : "Ligar Wi-Fi",
-        "Configurar pelo celular"
+        "Configurar pelo celular",
+        wifiConnected
+            ? "Conectar pelo site"
+            : "Conectar pelo site (sem rede)"
     };
 
     for (
         uint8_t i = 0;
-        i < 3;
+        i < 4;
         ++i
     ) {
         const HmiLayout::Rect card =
@@ -4977,6 +4980,49 @@ void T5Display::showStorage(
 }
 
 
+
+void T5Display::showWebPairing(
+    const String& code,
+    const String& url,
+    const String& hint) {
+
+    clearBuffer();
+    drawTopBar();
+    drawScreenHeader("Conectar pelo site", "Sem o app, pelo navegador");
+
+    const int32_t w = logicalWidth();
+    const int32_t cardW = w - 2 * MARGIN;
+
+    // O passo a passo e o código, grande, num card branco.
+    int32_t y = 176;
+    drawSurfaceCard(MARGIN, y, cardW, 200);
+    drawCenteredText("Em mnemoscards.com, abra Dispositivo", w / 2, y + 44,
+                     MnemosFontRole::Body, INK);
+    drawCenteredText("e digite o código:", w / 2, y + 74, MnemosFontRole::Body, INK);
+    drawCenteredText(code.length() ? code : String("..."), w / 2, y + 160,
+                     MnemosFontRole::Figure, INK);
+
+    // O QR abre a mesma página com o código preenchido. Escala 5: 49
+    // módulos de 5 px mais a margem de 12 px de cada lado.
+    y += 216;
+    const int32_t qrSide = 49 * 5 + 24;
+    if (url.length()) {
+        drawSurfaceCard(MARGIN, y, cardW, qrSide + 56);
+        drawQr(url, (w - qrSide) / 2, y + 12, 5);
+        drawCenteredText("Ou aponte a câmera do celular", w / 2, y + qrSide + 38,
+                         MnemosFontRole::Small, INK);
+        y += qrSide + 72;
+    }
+
+    if (hint.length()) {
+        drawCenteredText(fitTextToWidth(hint, cardW, MnemosFontRole::Small), w / 2, y + 8,
+                         MnemosFontRole::Small, INK);
+    }
+
+    const HmiLayout::Rect zone = HmiLayout::actionZone(portrait());
+    drawPill(zone.x, zone.y + (zone.h - 68) / 2, zone.w, 68, "Cancelar", false);
+    refreshFull();
+}
 
 void T5Display::showLocalLink(
     const String& qrPayload,

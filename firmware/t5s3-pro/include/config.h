@@ -83,6 +83,9 @@ constexpr uint32_t NTP_SYNC_TIMEOUT_MS = 10000U;
 
 // CA HTTPS opcional no LittleFS.
 constexpr char BACKEND_CA_FILE[] = "/backend_ca.pem";
+// Onde "Conectar pelo site" pede o código: o mesmo endereço do site, já
+// que a pessoa digita o código em mnemoscards.com.
+constexpr char DEFAULT_BACKEND_URL[] = "https://mnemoscards.com";
 
 // H752-01: microSD no SPI compartilhado com o LoRa SX1262.
 constexpr int SD_MISO_PIN = 21;

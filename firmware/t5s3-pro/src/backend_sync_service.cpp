@@ -161,6 +161,166 @@ bool BackendSyncService::paired() const {
     return network_.backendUrl().length() > 0 && network_.deviceToken().length() > 0;
 }
 
+bool BackendSyncService::postPublic(const String& baseUrl,
+                                    const String& path,
+                                    const String& body,
+                                    HttpResult& out) {
+    // Sem credencial: é a única chamada que o terminal faz antes de ter uma.
+    out = HttpResult{};
+    String base = baseUrl;
+    base.trim();
+    while (base.endsWith("/")) base.remove(base.length() - 1);
+    const String url = base + path;
+    if (!url.startsWith("https://") && !url.startsWith("http://")) {
+        out.error = "invalid_backend_url";
+        return false;
+    }
+
+    Session session;
+    bool begun = false;
+    if (url.startsWith("https://")) {
+        session.roots = rootCertificates();
+        session.secure.setCACert(session.roots.c_str());
+        session.secure.setHandshakeTimeout((PlatformSync::HTTP_CONNECT_TIMEOUT_MS / 1000U) + 4U);
+        begun = session.http.begin(session.secure, url);
+    } else {
+        begun = session.http.begin(session.plain, url);
+    }
+    if (!begun) {
+        out.error = "http_begin_failed";
+        return false;
+    }
+    session.http.setReuse(false);
+    session.http.setConnectTimeout(static_cast<int32_t>(PlatformSync::HTTP_CONNECT_TIMEOUT_MS));
+    session.http.setTimeout(static_cast<uint16_t>(PlatformSync::HTTP_RESPONSE_TIMEOUT_MS));
+    session.http.setUserAgent(String("Mnemos-T5S3/") + Config::APP_VERSION);
+    session.http.addHeader("Content-Type", "application/json");
+    session.http.addHeader("Accept", "application/json");
+
+    const int status = session.http.POST(body);
+    out.status = status;
+    if (status <= 0) {
+        out.error = HTTPClient::errorToString(status);
+        char tlsError[96] = {0};
+        if (session.secure.lastError(tlsError, sizeof(tlsError)) != 0 && tlsError[0] != '\0') {
+            out.error = String("tls: ") + tlsError;
+        }
+        session.drop();
+        return false;
+    }
+    out.body = session.http.getString();
+    out.transportOk = true;
+    session.drop();
+    return true;
+}
+
+bool BackendSyncService::startWebPairing(const String& baseUrl) {
+    webPairingState_ = WebPairingState::Idle;
+    webPairingCode_ = "";
+    webPairingUrl_ = "";
+    webPairingPoll_ = "";
+    webPairingError_ = "";
+
+    if (!network_.connected()) {
+        webPairingError_ = "offline";
+        webPairingState_ = WebPairingState::Failed;
+        return false;
+    }
+
+    JsonDocument request;
+    request["device_id"] = TerminalIdentity::deviceId();
+    request["model"] = Config::DEVICE_MODEL;
+    request["firmware"] = Config::APP_VERSION;
+    String body;
+    serializeJson(request, body);
+
+    HttpResult result;
+    if (!postPublic(baseUrl, "/v1/terminal/pairing/start", body, result) || result.status != 200) {
+        webPairingError_ = result.error.length() ? result.error : String("http ") + result.status;
+        webPairingState_ = WebPairingState::Failed;
+        Serial.printf("[pairing] start falhou: %s\n", webPairingError_.c_str());
+        return false;
+    }
+
+    JsonDocument response;
+    if (deserializeJson(response, result.body)) {
+        webPairingError_ = "invalid_response";
+        webPairingState_ = WebPairingState::Failed;
+        return false;
+    }
+    webPairingBase_ = baseUrl;
+    webPairingCode_ = response["code"] | "";
+    webPairingUrl_ = response["verify_url"] | "";
+    webPairingPoll_ = response["poll_token"] | "";
+    const uint32_t interval = response["interval"] | 3U;
+    const uint32_t expiresIn = response["expires_in"] | 600U;
+    webPairingIntervalMs_ = std::max<uint32_t>(2U, interval) * 1000U;
+    webPairingExpiresMs_ = millis() + expiresIn * 1000U;
+    if (webPairingCode_.length() == 0 || webPairingPoll_.length() == 0) {
+        webPairingError_ = "invalid_response";
+        webPairingState_ = WebPairingState::Failed;
+        return false;
+    }
+    webPairingState_ = WebPairingState::Pending;
+    Serial.printf("[pairing] código %s\n", webPairingCode_.c_str());
+    return true;
+}
+
+BackendSyncService::WebPairingState BackendSyncService::pollWebPairing() {
+    if (webPairingState_ != WebPairingState::Pending) return webPairingState_;
+    if (static_cast<int32_t>(millis() - webPairingExpiresMs_) >= 0) {
+        webPairingState_ = WebPairingState::Expired;
+        return webPairingState_;
+    }
+
+    JsonDocument request;
+    request["poll_token"] = webPairingPoll_;
+    String body;
+    serializeJson(request, body);
+
+    HttpResult result;
+    if (!postPublic(webPairingBase_, "/v1/terminal/pairing/poll", body, result)) {
+        // Rede oscilou: continua esperando, tenta de novo no próximo intervalo.
+        return webPairingState_;
+    }
+    if (result.status == 404) {
+        webPairingState_ = WebPairingState::Expired;
+        return webPairingState_;
+    }
+    if (result.status == 409) {
+        webPairingError_ = "terminal_owned_elsewhere";
+        webPairingState_ = WebPairingState::Failed;
+        return webPairingState_;
+    }
+    if (result.status != 200) return webPairingState_;
+
+    JsonDocument response;
+    if (deserializeJson(response, result.body)) return webPairingState_;
+    const String status = response["status"] | "";
+    if (status == "expired") {
+        webPairingState_ = WebPairingState::Expired;
+    } else if (status == "claimed") {
+        const String token = response["device_token"] | "";
+        if (token.length() == 0 || !network_.setBackend(webPairingBase_, token)) {
+            webPairingError_ = "store_failed";
+            webPairingState_ = WebPairingState::Failed;
+        } else {
+            authRejected_ = false;
+            webPairingState_ = WebPairingState::Claimed;
+            Serial.println("[pairing] terminal conectado pela web");
+        }
+        webPairingPoll_ = "";
+    }
+    return webPairingState_;
+}
+
+void BackendSyncService::cancelWebPairing() {
+    webPairingState_ = WebPairingState::Idle;
+    webPairingPoll_ = "";
+    webPairingCode_ = "";
+    webPairingUrl_ = "";
+}
+
 bool BackendSyncService::consumeLibraryUpdated() {
     const bool value = libraryUpdated_;
     libraryUpdated_ = false;

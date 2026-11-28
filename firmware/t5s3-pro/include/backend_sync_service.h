@@ -87,6 +87,20 @@ public:
     bool consumeLibraryUpdated();
 
     bool paired() const;
+
+    // "Conectar pelo site": o terminal pede um código ao servidor, mostra, e
+    // pergunta de tempos em tempos se alguém o digitou no site. Quando sim, a
+    // resposta traz a credencial do terminal, gravada como a do app.
+    enum class WebPairingState : uint8_t { Idle, Pending, Claimed, Expired, Failed };
+    bool startWebPairing(const String& baseUrl);
+    WebPairingState pollWebPairing();
+    void cancelWebPairing();
+    bool webPairingActive() const { return webPairingState_ == WebPairingState::Pending; }
+    WebPairingState webPairingState() const { return webPairingState_; }
+    const String& webPairingCode() const { return webPairingCode_; }
+    const String& webPairingUrl() const { return webPairingUrl_; }
+    const String& webPairingError() const { return webPairingError_; }
+    uint32_t webPairingIntervalMs() const { return webPairingIntervalMs_; }
     bool authRejected() const { return authRejected_; }
     void clearAuthRejected() { authRejected_ = false; }
 
@@ -134,6 +148,16 @@ private:
     uint32_t mdnsResolvedMs_ = 0;
 
     BackendSyncReport report_;
+
+    WebPairingState webPairingState_ = WebPairingState::Idle;
+    String webPairingBase_;
+    String webPairingCode_;
+    String webPairingUrl_;
+    String webPairingPoll_;
+    String webPairingError_;
+    uint32_t webPairingIntervalMs_ = 3000;
+    uint32_t webPairingExpiresMs_ = 0;
+    bool postPublic(const String& baseUrl, const String& path, const String& body, HttpResult& out);
 
     bool pushReviews();
     bool pullSnapshot(bool& capacityExceeded);

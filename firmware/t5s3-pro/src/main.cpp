@@ -45,6 +45,7 @@ enum class AppScreen : uint8_t {
     Storage,
     Settings,
     LocalLink,
+    WebPairing,
     Question,
     SelfAssessment,
     ObjectiveFeedback,
@@ -152,6 +153,7 @@ bool lastWifiConnected = false;
 
 void canonicalizeActiveLibraryIfPossible();
 void finishLocalLinkScreen();
+void renderWebPairing();
 void handleSerialCommand(JsonDocument& command);
 void prepareForSleep();
 
@@ -455,6 +457,8 @@ const char* appScreenName(
             return "Settings";
         case AppScreen::LocalLink:
             return "LocalLink";
+        case AppScreen::WebPairing:
+            return "WebPairing";
         case AppScreen::Question:
             return "Question";
         case AppScreen::SelfAssessment:
@@ -1562,6 +1566,10 @@ void renderCurrentScreen() {
                 localLinkProvisioning);
             break;
 
+        case AppScreen::WebPairing:
+            renderWebPairing();
+            break;
+
         case AppScreen::Question:
             renderQuestion();
             break;
@@ -1668,6 +1676,79 @@ void advanceAfterCommit(
         }
     } else {
         renderQuestion();
+    }
+}
+
+// "Conectar pelo site": o código que a pessoa digita em mnemoscards.com.
+String webPairingHint;
+uint32_t webPairingNextPollMs = 0;
+
+void renderWebPairing() {
+    screen = AppScreen::WebPairing;
+    display.showWebPairing(
+        backendSync.webPairingCode(),
+        backendSync.webPairingUrl(),
+        webPairingHint);
+}
+
+void startWebPairingScreen() {
+    if (!networkService.connected()) {
+        showInfoMessage(
+            "Sem rede",
+            "Conecte o terminal a uma rede Wi-Fi em Procurar redes e tente de novo.",
+            "Voltar à conexão",
+            AppScreen::Connection);
+        return;
+    }
+
+    if (!backendSync.startWebPairing(Config::DEFAULT_BACKEND_URL)) {
+        showInfoMessage(
+            "Não deu para gerar o código",
+            "O servidor não respondeu. Confira a rede e tente de novo em instantes.",
+            "Voltar à conexão",
+            AppScreen::Connection);
+        return;
+    }
+
+    webPairingHint = "Esperando você digitar o código...";
+    webPairingNextPollMs = millis() + backendSync.webPairingIntervalMs();
+    renderWebPairing();
+}
+
+void pollWebPairingIfDue() {
+    if (!backendSync.webPairingActive()) return;
+    if (static_cast<int32_t>(millis() - webPairingNextPollMs) < 0) return;
+
+    // Esperando alguém digitar o código: o terminal não dorme nem desliga.
+    powerService.noteActivity();
+
+    using State = BackendSyncService::WebPairingState;
+    const State state = backendSync.pollWebPairing();
+    webPairingNextPollMs = millis() + backendSync.webPairingIntervalMs();
+
+    if (state == State::Claimed) {
+        noteNetworkDemand();
+        backendSync.requestSync(SyncTrigger::Provisioned, 0);
+        showInfoMessage(
+            "Terminal conectado",
+            "Escolha no site, em Dispositivo, quais baralhos vão para ele. "
+            "Ele sincroniza sozinho.",
+            "Continuar",
+            AppScreen::Sync);
+    } else if (state == State::Expired) {
+        showInfoMessage(
+            "O código expirou",
+            "Toque em Conectar pelo site para gerar outro.",
+            "Voltar à conexão",
+            AppScreen::Connection);
+    } else if (state == State::Failed) {
+        showInfoMessage(
+            "Não deu para conectar",
+            backendSync.webPairingError() == "terminal_owned_elsewhere"
+                ? "Este terminal está ligado a outra conta. Desconecte-o nela antes."
+                : "Algo falhou ao gravar a conexão. Tente de novo.",
+            "Voltar à conexão",
+            AppScreen::Connection);
     }
 }
 
@@ -2086,21 +2167,23 @@ addZone(
             break;
 
         case AppScreen::Connection: {
-            const UiAction actions[3] = {
+            const UiAction actions[4] = {
                 UiAction::ScanWifi,
                 UiAction::ToggleWifi,
-                UiAction::ConfigureNetwork
+                UiAction::ConfigureNetwork,
+                UiAction::PairWeb
             };
 
-            const char* names[3] = {
+            const char* names[4] = {
                 "connection_scan",
                 "connection_wifi",
-                "connection_phone"
+                "connection_phone",
+                "connection_web"
             };
 
             for (
                 uint8_t i = 0;
-                i < 3;
+                i < 4;
                 ++i
             ) {
                 const HmiLayout::Rect card =
@@ -2282,6 +2365,20 @@ addZone(
                     : 72,
                 UiAction::
                     CancelLocalLink);
+            break;
+
+        case AppScreen::WebPairing:
+            addZone(
+                zones,
+                count,
+                "web_pair_cancel",
+                HmiLayout::MARGIN,
+                actionTop,
+                width - 2 * HmiLayout::MARGIN,
+                portrait
+                    ? 136
+                    : 72,
+                UiAction::Back);
             break;
 
         case AppScreen::Question:
@@ -2658,6 +2755,7 @@ void processAction(
         case UiAction::SyncBackend:
         case UiAction::SyncPhone:
         case UiAction::ConfigureNetwork:
+        case UiAction::PairWeb:
         case UiAction::ToggleWifi:
         case UiAction::ScanWifi:
         case UiAction::SelectWifiNetwork:
@@ -2812,6 +2910,8 @@ void processAction(
                 scanWifiNetworks();
             } else if (action == UiAction::ConfigureNetwork) {
                 startLocalLink(LocalLinkMode::Provisioning);
+            } else if (action == UiAction::PairWeb) {
+                startWebPairingScreen();
             } else if (action == UiAction::ToggleWifi) {
                 if (networkService.enabled()) networkService.disable();
                 else networkService.enable();
@@ -3058,6 +3158,13 @@ void processAction(
             }
             break;
 
+        case AppScreen::WebPairing:
+            if (action == UiAction::Back) {
+                backendSync.cancelWebPairing();
+                renderConnection();
+            }
+            break;
+
         case AppScreen::Question:
             if (!engine) {
                 break;
@@ -3198,6 +3305,7 @@ bool powerSleepAllowed() {
         case AppScreen::WifiPassword:
         case AppScreen::WifiMessage:
         case AppScreen::LocalLink:
+        case AppScreen::WebPairing:
             return false;
 
         default:
@@ -3592,6 +3700,7 @@ void handleSerialCommand(JsonDocument& command) {
         commands.add("sync");
         commands.add("time {epoch}");
         commands.add("unpair {newIdentity?}");
+        commands.add("pairweb");
         commands.add("reboot");
         SerialConsole::reply(response);
         return;
@@ -3664,6 +3773,18 @@ void handleSerialCommand(JsonDocument& command) {
         describeTerminal(response);
         SerialConsole::reply(response);
         refreshAfterPlatformChange();
+        return;
+    }
+
+    if (cmd == "pairweb") {
+        startWebPairingScreen();
+        JsonDocument response;
+        response["cmd"] = cmd;
+        response["ok"] = backendSync.webPairingActive();
+        response["code"] = backendSync.webPairingCode();
+        response["url"] = backendSync.webPairingUrl();
+        response["error"] = backendSync.webPairingError();
+        SerialConsole::reply(response);
         return;
     }
 
@@ -4083,6 +4204,7 @@ void loop() {
         !activeStudyForPowerPolicy() &&
         !networkService.busy() &&
         !localLink.active() &&
+        !backendSync.webPairingActive() &&
         powerService.idleMs() >= Config::AUTO_POWER_OFF_IDLE_MS &&
         powerService.canPowerOff()
     ) {
@@ -4125,6 +4247,7 @@ void loop() {
     }
 
     localLink.loop();
+    pollWebPairingIfDue();
 
     JsonDocument serialCommand;
     if (serialConsole.poll(serialCommand)) {

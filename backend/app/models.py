@@ -529,3 +529,29 @@ class Invite(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class TerminalPairing(Base):
+    """A terminal asking to join an account by showing a short code.
+
+    The terminal starts it (no account yet), shows the code, and polls with a
+    secret only it holds. Someone signed in types the code on the site to
+    claim it; the terminal's next poll then registers it under that account
+    and receives its own credential. No terminal token is ever stored here:
+    it is minted on that poll and handed over once.
+    """
+
+    __tablename__ = "terminal_pairings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    code_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    poll_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    device_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    model: Mapped[str] = mapped_column(String(80), nullable=False)
+    firmware: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    claimed_by: Mapped[str | None] = mapped_column(_ID, ForeignKey("users.id"), nullable=True)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deck_ids: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -133,6 +133,13 @@ public:
         size_t fileCount,
         const String& status);
 
+    // "Conectar pelo site": o código para digitar em mnemoscards.com e um QR
+    // que abre a página já com ele preenchido.
+    void showWebPairing(
+        const String& code,
+        const String& url,
+        const String& hint);
+
     void showLocalLink(
         const String& qrPayload,
         const String& ssid,

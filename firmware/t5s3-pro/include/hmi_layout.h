@@ -186,9 +186,9 @@ inline Rect connectionCard(
         (
             LANDSCAPE_WIDTH -
             2 * MARGIN -
-            2 * GAP
+            3 * GAP
         ) /
-        3;
+        4;
 
     return {
         static_cast<int16_t>(

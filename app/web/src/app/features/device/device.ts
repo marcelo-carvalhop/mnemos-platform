@@ -1,5 +1,7 @@
 import { HttpClient } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE_URL } from '../../core/config';
 import { Store } from '../../core/store';
@@ -41,13 +43,38 @@ interface Terminal {
       <p class="quiet">Procurando terminais…</p>
     } @else if (terminals().length === 0) {
       <h1>Dispositivo</h1>
-      <section class="empty">
-        <h2>Nenhum terminal emparelhado</h2>
+      <form class="connect" (submit)="claim($event)">
+        <h2>{{ terminals().length ? 'Conectar outro terminal' : 'Conectar um terminal' }}</h2>
         <p>
-          O emparelhamento acontece no aplicativo, por Bluetooth. Depois disso o terminal aparece
-          aqui e você escolhe daqui o que vai nele.
+          No terminal, abra <strong>Mais › Conexão › Conectar pelo site</strong>. Ele mostra um
+          código de 8 letras; digite aqui.
         </p>
-      </section>
+        <div class="code-row">
+          <label class="mn-sr-only" for="pair-code">Código do terminal</label>
+          <input
+            id="pair-code"
+            name="code"
+            class="mn-mono"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            placeholder="ABCD-1234"
+            maxlength="12"
+            [value]="code()"
+            (input)="code.set($any($event.target).value)"
+            [disabled]="claiming()"
+          />
+          <button type="submit" [disabled]="claiming() || !codeReady()">
+            {{ claiming() ? 'Conectando…' : 'Conectar' }}
+          </button>
+        </div>
+        @if (pairNotice(); as message) {
+          <p class="pair-notice" role="status">{{ message }}</p>
+        }
+        @if (pairProblem(); as message) {
+          <p class="problem" role="alert">{{ message }}</p>
+        }
+      </form>
     } @else {
       @for (terminal of terminals(); track terminal.device_id) {
         <section class="terminal">
@@ -133,6 +160,38 @@ interface Terminal {
           </div>
         </section>
       }
+      <form class="connect" (submit)="claim($event)">
+        <h2>{{ terminals().length ? 'Conectar outro terminal' : 'Conectar um terminal' }}</h2>
+        <p>
+          No terminal, abra <strong>Mais › Conexão › Conectar pelo site</strong>. Ele mostra um
+          código de 8 letras; digite aqui.
+        </p>
+        <div class="code-row">
+          <label class="mn-sr-only" for="pair-code">Código do terminal</label>
+          <input
+            id="pair-code"
+            name="code"
+            class="mn-mono"
+            autocomplete="off"
+            autocapitalize="characters"
+            spellcheck="false"
+            placeholder="ABCD-1234"
+            maxlength="12"
+            [value]="code()"
+            (input)="code.set($any($event.target).value)"
+            [disabled]="claiming()"
+          />
+          <button type="submit" [disabled]="claiming() || !codeReady()">
+            {{ claiming() ? 'Conectando…' : 'Conectar' }}
+          </button>
+        </div>
+        @if (pairNotice(); as message) {
+          <p class="pair-notice" role="status">{{ message }}</p>
+        }
+        @if (pairProblem(); as message) {
+          <p class="problem" role="alert">{{ message }}</p>
+        }
+      </form>
     }
   `,
 })
@@ -147,8 +206,51 @@ export class Device {
 
   protected readonly decks = computed(() => this.store.liveDecks());
 
+  /**
+   * Conectar pelo site: o terminal mostra um código e quem está logado o
+   * digita aqui. Sem app e sem cabo — o navegador não troca de rede nem fala
+   * com o terminal; quem fala com ele é o servidor.
+   */
+  protected readonly code = signal('');
+  protected readonly claiming = signal(false);
+  protected readonly pairNotice = signal<string | null>(null);
+  protected readonly pairProblem = signal<string | null>(null);
+  protected readonly codeReady = computed(
+    () => this.code().replace(/[^A-Za-z0-9]/g, '').length === 8,
+  );
+
   constructor() {
+    // O QR do terminal abre esta tela com o código já preenchido.
+    const fromQr = inject(ActivatedRoute).snapshot.queryParamMap.get('codigo');
+    if (fromQr) this.code.set(fromQr.toUpperCase());
     void this.load();
+  }
+
+  protected async claim(event: Event): Promise<void> {
+    event.preventDefault();
+    if (!this.codeReady() || this.claiming()) return;
+    this.claiming.set(true);
+    this.pairProblem.set(null);
+    this.pairNotice.set(null);
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.baseUrl}/v1/terminals/pairing/claim`, {
+          code: this.code().trim(),
+        }),
+      );
+      this.code.set('');
+      this.pairNotice.set(
+        'Pronto. O terminal termina de conectar sozinho em alguns segundos; escolha abaixo os baralhos que vão para ele.',
+      );
+      await this.load();
+      // O terminal só aparece depois de buscar a credencial: dá a ele um
+      // instante e procura de novo.
+      setTimeout(() => void this.load(), 6000);
+    } catch (e) {
+      this.pairProblem.set(pairingProblem(e));
+    } finally {
+      this.claiming.set(false);
+    }
   }
 
   private async load(): Promise<void> {
@@ -229,4 +331,18 @@ export class Device {
       rows.map((t) => (t.device_id === deviceId ? { ...t, ...patch } : t)),
     );
   }
+}
+
+function pairingProblem(error: unknown): string {
+  if (error instanceof HttpErrorResponse) {
+    if (error.status === 404) {
+      return 'Esse código não existe ou já expirou. Gere outro no terminal.';
+    }
+    if (error.status === 409) {
+      return 'Esse terminal está ligado a outra conta. Desconecte-o nela antes.';
+    }
+    if (error.status === 429) return 'Muitas tentativas seguidas. Espere um minuto.';
+    if (error.status === 0) return 'Sem conexão com o servidor. Tente de novo.';
+  }
+  return 'Não consegui conectar agora. Tente de novo.';
 }

@@ -276,3 +276,66 @@ h3 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Conectar pelo site: o código que o terminal mostra. */
+.connect {
+  margin-top: 28px;
+  border: 1px solid var(--mn-line);
+  border-radius: var(--mn-radius-lg);
+  padding: 24px;
+}
+.connect h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.connect p {
+  margin: 8px 0 0;
+  color: var(--mn-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.code-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.code-row input {
+  flex: 1 1 180px;
+  min-width: 0;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 12px 14px;
+  border: 1px solid var(--mn-line-strong);
+  border-radius: var(--mn-radius);
+  background: var(--mn-surface-raised);
+  color: var(--mn-text);
+}
+.code-row input:focus {
+  outline: none;
+  border-color: var(--mn-highlight);
+}
+.code-row button {
+  flex: none;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: var(--mn-radius-pill);
+  background: var(--mn-accent);
+  color: var(--mn-text-on-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.code-row button:disabled {
+  background: color-mix(in srgb, var(--mn-accent) 30%, transparent);
+  color: color-mix(in srgb, var(--mn-text-on-accent) 60%, transparent);
+  cursor: default;
+}
+.pair-notice {
+  margin-top: 14px !important;
+  padding: 10px 14px;
+  border-radius: var(--mn-radius);
+  background: var(--mn-good-bg);
+  color: var(--mn-good) !important;
+}
